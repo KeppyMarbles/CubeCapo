@@ -1,15 +1,19 @@
-/** @import { ScrambleBreakdownEntry, OrientationResultInfo } from "../types.js" */
+/** @import { ScrambleBreakdownEntry, OrientationResultInfo, FormatOptions } from "../types.js" */
 /** @import { ScrambleOptimizer } from "../cube/scramble.js" */
 
 /**
  * Show all the results of the scramble optimizer
  * @param {ScrambleOptimizer} optimizer 
+ * @param {FormatOptions} [formatOptions]
  */
-export async function drawOptimizerStats(optimizer) {
+export async function drawOptimizerStats(optimizer, formatOptions) {
     if(optimizer) {
+        const opts = formatOptions || {
+            showGrips: document.getElementById("showGrips")?.checked ?? true
+        };
         drawDistributionChart(optimizer.distribution);
         drawRotationInfoTable(optimizer.rotationInfo);
-        document.getElementById("output").textContent = optimizer.getBestAsString();
+        document.getElementById("output").textContent = optimizer.getBestAsString(opts);
         drawCostTable(optimizer.analyzeBest());
     }
     else {

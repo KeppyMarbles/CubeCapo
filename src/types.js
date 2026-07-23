@@ -28,6 +28,7 @@
  *   | "left_up_double"
  *   | "left_down"
  *   | "left_down_double"
+ *   | "rotation"
  * )} Fingertrick
  */
 
@@ -78,19 +79,27 @@
  */
 
 /**
+ * @typedef {Object} FormatOptions
+ * @property {boolean} [showGrips] If grip prompts (starting grip and regrip transitions) should be included in output
+ */
+
+/**
  * @typedef {Object} RunOptions
  * @property {Move[]} scramble The scramble to optimize
  * @property {number} depth The branch pruning threshold
  * @property {number} maxIterations Number of iterations to try before bailing out
  * @property {boolean} searchRotations If all orientations should be searched
+ * @property {boolean} searchStartingGrips If all starting thumb placements (grips) should be searched
  * @property {boolean} pruneRotations If an orientation search should be stopped if worse than best orientation
  * @property {boolean} memoize If search shouldn't continue if same index, orientation and grip is reached
  * @property {boolean} wideReplaceDouble If search should try replacing double moves with 1 wide and 1 normal move
+ * @property {boolean} [showGrips] If grip prompts (starting grip and regrip transitions) should be included in output
  */
 
 /**
  * @typedef OrientationResultInfo
  * @property {Rotation} rotation The rotation applied at the beginning of the scramble
+ * @property {GripState} [startingGrip] The starting grip used
  * @property {number} cost The scramble cost
  * @property {number} iterations The number of iterations of bruteforceOptimize
  * @property {boolean} maxed If the max iteration count was hit

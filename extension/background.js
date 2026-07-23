@@ -18,20 +18,38 @@ async function loadGripTransitions() {
 
 // Listen for messages from content scripts or popup
 extAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === "OPEN_OPTIONS_PAGE") {
+        (async () => {
+            if (message.scrambleText) {
+                await extAPI.storage.local.set({ pendingScramble: message.scrambleText });
+            }
+            if (extAPI.runtime.openOptionsPage) {
+                extAPI.runtime.openOptionsPage();
+            }
+            if (message.scrambleText && extAPI.tabs) {
+                extAPI.tabs.query({}, (tabs) => {
+                    tabs.forEach(tab => {
+                        extAPI.tabs.sendMessage(tab.id, {
+                            action: "LOAD_PENDING_SCRAMBLE",
+                            scrambleText: message.scrambleText
+                        }, () => {
+                            if (extAPI.runtime.lastError) { /* ignore */ }
+                        });
+                    });
+                });
+            }
+            sendResponse({ success: true });
+        })();
+        return true;
+    }
+
     if (message.action === "OPTIMIZE_SCRAMBLE") {
         (async () => {
             try {
                 const store = await extAPI.storage.local.get(["costConfig", "runOptions"]);
                 const config = store.costConfig || ScrambleOptimizer.defaultCostConfiguration;
                 
-                const defaults = {
-                    depth: 1,
-                    maxIterations: 999999,
-                    searchRotations: true,
-                    pruneRotations: true,
-                    memoize: true,
-                    wideReplaceDouble: true
-                };
+                const defaults = ScrambleOptimizer.defaultRunOptions;
                 const runOptions = { ...defaults, ...store.runOptions };
 
                 const transitions = await loadGripTransitions();
@@ -44,13 +62,14 @@ extAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     depth: runOptions.depth,
                     maxIterations: runOptions.maxIterations,
                     searchRotations: runOptions.searchRotations,
+                    searchStartingGrips: runOptions.searchStartingGrips,
                     pruneRotations: runOptions.pruneRotations,
                     memoize: runOptions.memoize,
                     wideReplaceDouble: runOptions.wideReplaceDouble
                 });
                 const end = performance.now();
 
-                const bestScrambleStr = optimizer.getBestAsString();
+                const bestScrambleStr = optimizer.getBestAsString(runOptions);
                 const breakdown = optimizer.analyzeBest();
                 const bestCost = optimizer.bestCost;
 

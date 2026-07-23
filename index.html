@@ -13,15 +13,19 @@
           <h2>Scramble</h2>
           <div>
             <label>Scramble
-              <input type="text" id="scramble" placeholder="Enter scramble" value="B' D' L F R B R D R U F2 L2 B2 U' L2 D2 F2 D L2 U'"/>
+              <input type="text" id="scramble" placeholder="Enter scramble" value=""/>
             </label>
 
             <label title="If double moves can be replaced with a wide move + normal face move. Increases search time">Wide Replace Double
-              <input type="checkbox" id="wideReplaceDouble" checked/>
+              <input type="checkbox" id="wideReplaceDouble"/>
             </label>
 
             <label title="If a the search should be tried on every orientation">Search Starting Rotations
-              <input type="checkbox" id="searchRotations" checked/>
+              <input type="checkbox" id="searchRotations"/>
+            </label>
+
+            <label title="If the search should try every starting thumb placement (grip)">Search Starting Grips
+              <input type="checkbox" id="searchStartingGrips"/>
             </label>
           </div>
 
@@ -32,23 +36,32 @@
           </div>
 
           <div>
+            <details open>
+              <summary>Format Options</summary>
+              <div id="formatContent">
+                <label title="Show starting thumb placement and mid-scramble regrip transitions in the output scramble string">Show Grips
+                  <input type="checkbox" id="showGrips"/>
+                </label>
+              </div>
+            </details>
+
             <details>
               <summary>Computation Settings</summary>
               <div id="advancedContent">
                 <label title="Number of iterations to try on each orientation before bailing out">Max Iterations
-                  <input type="number" id="iterations" value="999999"/>
+                  <input type="number" id="iterations"/>
                 </label>
 
                 <label title="The most the current cost can be above the best cost before pruning the branch. Increase this if you have negative cost values">Pruning Threshold
-                  <input type="number" id="depth" value="1"/>
+                  <input type="number" id="depth"/>
                 </label>
 
                 <label title="If a rotation search should stop if worse than the best rotation. Disable if you want more data">Prune Starting Rotations
-                  <input type="checkbox" id="pruneRotations" checked/>
+                  <input type="checkbox" id="pruneRotations"/>
                 </label>
 
                 <label title="If reaching an already visited state [current grip & scramble index & cube orientation] should prune the current branch. Disable if you want to ensure minimization">Memoize
-                  <input type="checkbox" id="memoize" checked/>
+                  <input type="checkbox" id="memoize"/>
                 </label>
               </div>
             </details>

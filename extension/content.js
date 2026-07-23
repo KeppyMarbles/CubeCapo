@@ -276,9 +276,24 @@ function showOptimizedState(scrambleElement, data) {
     toggleDetailsBtn.className = "scramblemanip-details-link";
     toggleDetailsBtn.textContent = "Details";
 
+    const openSettingsBtn = document.createElement("button");
+    openSettingsBtn.type = "button";
+    openSettingsBtn.id = "scramblemanip-open-settings";
+    openSettingsBtn.className = "scramblemanip-details-link";
+    openSettingsBtn.textContent = "Settings";
+
+    openSettingsBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        extAPI.runtime.sendMessage({ 
+            action: "OPEN_OPTIONS_PAGE",
+            scrambleText: lastOriginalText
+        });
+    });
+
     bar.appendChild(badge);
     bar.appendChild(toggleOriginalBtn);
     bar.appendChild(toggleDetailsBtn);
+    bar.appendChild(openSettingsBtn);
 
     // 3. Setup details table card (as a floating popup appended to body to prevent clipping)
     let details = document.getElementById("scramblemanip-details-card");

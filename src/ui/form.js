@@ -21,6 +21,53 @@ export async function setupForm(onSubmit) {
 
     let savedConfig = structuredClone(initialConfig);
 
+    /**
+     * Set scramble input value, clean up pending storage, and trigger auto-submit
+     * @param {string} text 
+     */
+    const applyScrambleAndSubmit = (text) => {
+        const input = document.getElementById("scramble");
+        if (!input) return;
+
+        input.value = text || "";
+
+        if (text) {
+            if (typeof chrome !== "undefined" && chrome.storage?.local) {
+                chrome.storage.local.remove(["pendingScramble"]);
+            }
+            setTimeout(() => {
+                document.getElementById("submitButton")?.click();
+            }, 50);
+        }
+    };
+
+    // Initial scramble population on setup
+    const urlScramble = new URLSearchParams(window.location.search).get("scramble");
+    if (urlScramble) {
+        applyScrambleAndSubmit(urlScramble);
+    } else if (typeof chrome !== "undefined" && chrome.storage?.local) {
+        chrome.storage.local.get(["pendingScramble"], (store) => {
+            applyScrambleAndSubmit(store?.pendingScramble || "");
+        });
+    } else {
+        applyScrambleAndSubmit("");
+    }
+
+    // Real-time updates for already-open settings tabs
+    if (typeof chrome !== "undefined") {
+        chrome.storage?.onChanged?.addListener((changes, area) => {
+            if (area === "local" && changes.pendingScramble?.newValue) {
+                applyScrambleAndSubmit(changes.pendingScramble.newValue);
+            }
+        });
+
+        chrome.runtime?.onMessage?.addListener((msg) => {
+            if (msg.action === "LOAD_PENDING_SCRAMBLE" && msg.scrambleText) {
+                applyScrambleAndSubmit(msg.scrambleText);
+            }
+        });
+    }
+
     /** @type {HTMLFormElement} */
     const form = document.getElementById("costForm");
 
@@ -91,7 +138,7 @@ export async function setupForm(onSubmit) {
     };
 
     // Attach change detection to computation settings
-    const computationInputs = ["depth", "iterations", "searchRotations", "pruneRotations", "memoize", "wideReplaceDouble"];
+    const computationInputs = ["depth", "iterations", "searchRotations", "searchStartingGrips", "showGrips", "pruneRotations", "memoize", "wideReplaceDouble"];
     computationInputs.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -433,14 +480,7 @@ async function saveRunOptions(options) {
  * @returns {Promise<Object>}
  */
 async function loadRunOptions() {
-    const defaults = {
-        depth: 1,
-        maxIterations: 999999,
-        searchRotations: true,
-        pruneRotations: true,
-        memoize: true,
-        wideReplaceDouble: true
-    };
+    const defaults = ScrambleOptimizer.defaultRunOptions;
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
         return new Promise((resolve) => {
             chrome.storage.local.get(["runOptions"], (result) => {
@@ -486,7 +526,11 @@ function collectCostConfig(form, initialConfig) {
  * @returns {RunOptions}
  */
 function collectRunOptions() {
-    const scramble = ScrambleOptimizer.parseScramble(document.getElementById("scramble").value.trim());
+    const rawText = document.getElementById("scramble").value.trim();
+    if (!rawText) {
+        throw new Error("Please enter a scramble to analyze.");
+    }
+    const scramble = ScrambleOptimizer.parseScramble(rawText);
     const runOpts = collectRunOptionsValues();
 
     if (Number.isNaN(runOpts.depth) || Number.isNaN(runOpts.maxIterations)) {
@@ -507,12 +551,14 @@ function collectRunOptions() {
 function collectRunOptionsValues() {
     const depth = parseFloat(document.getElementById("depth").value);
     const maxIterations = parseFloat(document.getElementById("iterations").value);
-    const searchRotations = document.getElementById("searchRotations").checked;
-    const pruneRotations = document.getElementById("pruneRotations").checked;
-    const memoize = document.getElementById("memoize").checked;
-    const wideReplaceDouble = document.getElementById("wideReplaceDouble").checked;
+    const searchRotations = document.getElementById("searchRotations")?.checked ?? true;
+    const searchStartingGrips = document.getElementById("searchStartingGrips")?.checked ?? true;
+    const showGrips = document.getElementById("showGrips")?.checked ?? true;
+    const pruneRotations = document.getElementById("pruneRotations")?.checked ?? true;
+    const memoize = document.getElementById("memoize")?.checked ?? true;
+    const wideReplaceDouble = document.getElementById("wideReplaceDouble")?.checked ?? true;
 
-    return { depth, maxIterations, searchRotations, pruneRotations, memoize, wideReplaceDouble };
+    return { depth, maxIterations, searchRotations, searchStartingGrips, showGrips, pruneRotations, memoize, wideReplaceDouble };
 }
 
 /**
@@ -520,12 +566,14 @@ function collectRunOptionsValues() {
  * @param {Object} runOpts
  */
 function applyRunOptionsValues(runOpts) {
-    document.getElementById("depth").value = runOpts.depth;
-    document.getElementById("iterations").value = runOpts.maxIterations;
-    document.getElementById("searchRotations").checked = runOpts.searchRotations;
-    document.getElementById("pruneRotations").checked = runOpts.pruneRotations;
-    document.getElementById("memoize").checked = runOpts.memoize;
-    document.getElementById("wideReplaceDouble").checked = runOpts.wideReplaceDouble;
+    if (document.getElementById("depth")) document.getElementById("depth").value = runOpts.depth;
+    if (document.getElementById("iterations")) document.getElementById("iterations").value = runOpts.maxIterations;
+    if (document.getElementById("searchRotations")) document.getElementById("searchRotations").checked = runOpts.searchRotations;
+    if (document.getElementById("searchStartingGrips")) document.getElementById("searchStartingGrips").checked = runOpts.searchStartingGrips;
+    if (document.getElementById("showGrips")) document.getElementById("showGrips").checked = runOpts.showGrips;
+    if (document.getElementById("pruneRotations")) document.getElementById("pruneRotations").checked = runOpts.pruneRotations;
+    if (document.getElementById("memoize")) document.getElementById("memoize").checked = runOpts.memoize;
+    if (document.getElementById("wideReplaceDouble")) document.getElementById("wideReplaceDouble").checked = runOpts.wideReplaceDouble;
 }
 
 /**
