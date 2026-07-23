@@ -12,12 +12,14 @@ import { costToColor } from "./stats.js";
  * Set up everything needed for the user to configure the optimizer
  * @param {()} onSubmit
  */
-export function setupForm(onSubmit) {
-    let initialConfig = loadCostConfig();
+export async function setupForm(onSubmit) {
+    let initialConfig = await loadCostConfig();
     if(initialConfig)
         initialConfig = migrateConfig(initialConfig, ScrambleOptimizer.defaultCostConfiguration);
     else
         initialConfig = ScrambleOptimizer.defaultCostConfiguration;
+
+    let savedConfig = structuredClone(initialConfig);
 
     /** @type {HTMLFormElement} */
     const form = document.getElementById("costForm");
@@ -44,6 +46,10 @@ export function setupForm(onSubmit) {
             const groupDiv = form.querySelector(`[data-group="${groupName}"]`);
             if (!groupDiv || typeof groupValue !== "object") continue;
 
+            const gridDiv = document.createElement("div");
+            gridDiv.className = "cost-columns";
+            groupDiv.appendChild(gridDiv);
+
             for (const [key, val] of Object.entries(groupValue)) {
                 const label = document.createElement("label");
                 label.textContent = formAlias[key] || key;
@@ -56,17 +62,83 @@ export function setupForm(onSubmit) {
                 input.valueType = formTypes[key] || "additive";
                 //input.colorShift = formShifts[key] || -2;
                 label.appendChild(input);
-                groupDiv.appendChild(label);
+                gridDiv.appendChild(label);
             }
         }
     }
+
+    const runOpts = await loadRunOptions();
+    let savedRunOpts = structuredClone(runOpts);
+
+    applyRunOptionsValues(runOpts);
+
+    // Check if configuration has unsaved changes
+    const checkUnsavedChanges = () => {
+        const currentConfig = collectCostConfig(form, savedConfig);
+        const currentRunOpts = collectRunOptionsValues();
+
+        const configDiff = JSON.stringify(currentConfig) !== JSON.stringify(savedConfig);
+        const optsDiff = JSON.stringify(currentRunOpts) !== JSON.stringify(savedRunOpts);
+
+        const bar = document.getElementById("unsavedChangesBar");
+        if (bar) {
+            if (configDiff || optsDiff) {
+                bar.classList.remove("hidden");
+            } else {
+                bar.classList.add("hidden");
+            }
+        }
+    };
+
+    // Attach change detection to computation settings
+    const computationInputs = ["depth", "iterations", "searchRotations", "pruneRotations", "memoize", "wideReplaceDouble"];
+    computationInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", checkUnsavedChanges);
+            el.addEventListener("change", checkUnsavedChanges);
+        }
+    });
+
+    // Unsaved Changes Bar click listeners
+    document.getElementById("saveChangesButton").addEventListener("click", async () => {
+        const config = collectCostConfig(form, savedConfig);
+        await saveCostConfig(config);
+
+        const runOptions = collectRunOptionsValues();
+        await saveRunOptions(runOptions);
+
+        savedConfig = structuredClone(config);
+        savedRunOpts = structuredClone(runOptions);
+
+        // Notify options page / content scripts of settings change
+        if (typeof chrome !== "undefined" && chrome.tabs) {
+            chrome.tabs.query({}, (tabs) => {
+                tabs.forEach(tab => {
+                    chrome.tabs.sendMessage(tab.id, { action: "SETTINGS_CHANGED" }, () => {
+                        if (chrome.runtime.lastError) { /* ignore */ }
+                    });
+                });
+            });
+        }
+
+        checkUnsavedChanges();
+    });
+
+    document.getElementById("revertChangesButton").addEventListener("click", () => {
+        applyConfig(form, savedConfig);
+        applyRunOptionsValues(savedRunOpts);
+
+        updateCostInputColors(form);
+        checkUnsavedChanges();
+    });
 
     // Submit handler
     document.getElementById("submitButton").addEventListener("click", (e) => {
         e.preventDefault();
         document.getElementById("errorMessage").textContent = "";
         try {
-            const config = collectCostConfig(form, initialConfig);
+            const config = collectCostConfig(form, savedConfig);
             const options = collectRunOptions();
             onSubmit(config, options);
         } 
@@ -75,14 +147,9 @@ export function setupForm(onSubmit) {
         }
     });
 
-    document.getElementById("saveButton").addEventListener("click", (e) => {
-        saveCostConfig(collectCostConfig(form, initialConfig));
-    });
-    document.getElementById("resetSavedButton").addEventListener("click", (e) => {
-        applyConfig(form, initialConfig);
-    });
     document.getElementById("resetDefaultButton").addEventListener("click", (e) => {
         applyConfig(form, ScrambleOptimizer.defaultCostConfiguration);
+        form.dispatchEvent(new Event("input", { bubbles: true }));
     });
 
     document.querySelectorAll('.tab-buttons button').forEach(btn => {
@@ -164,6 +231,7 @@ export function setupForm(onSubmit) {
             const text = await file.text();
             const config = JSON.parse(text);
             applyConfig(document.getElementById("costForm"), config);
+            form.dispatchEvent(new Event("input", { bubbles: true }));
         } 
         catch (err) {
             alert("Error importing configuration: " + err.message);
@@ -176,6 +244,7 @@ export function setupForm(onSubmit) {
         if (e.target.matches('input[type="number"]')) {
             updateCostInputColors(form);
         }
+        checkUnsavedChanges();
     });
 
     updateCostInputColors(form);
@@ -228,34 +297,41 @@ function addGroupControls(form, groupName, controls) {
 
     // Create controls
     for (const ctrl of controls) {
-        const div = document.createElement("div");
-        div.style = "text-align: right;";
-
-        const wrapper = document.createElement("label");
-        wrapper.textContent = ctrl.label + " ";
-
-        wrapper.appendChild(div);
-        groupDiv.appendChild(wrapper);
-
         if(ctrl.label == "") {
-            div.appendChild(document.createElement("p"))
+            const spacer = document.createElement("div");
+            spacer.style.height = "8px";
+            groupDiv.appendChild(spacer);
             continue;
         }
 
+        const wrapper = document.createElement("div");
+        wrapper.className = "adjustment-row";
+
+        const labelSpan = document.createElement("span");
+        labelSpan.textContent = ctrl.label;
+        wrapper.appendChild(labelSpan);
+
+        const btnGroup = document.createElement("div");
+        btnGroup.className = "btn-adjust-group";
+
         const minus = document.createElement("button");
         minus.type = "button";
+        minus.className = "btn-adjust";
         minus.textContent = "−";
         minus.dataset.group = groupName;
         minus.dataset.delta = -0.5;
 
         const plus = document.createElement("button");
         plus.type = "button";
+        plus.className = "btn-adjust";
         plus.textContent = "+";
         plus.dataset.group = groupName;
         plus.dataset.delta = 0.5;
 
-        div.appendChild(minus);
-        div.appendChild(plus);
+        btnGroup.appendChild(minus);
+        btnGroup.appendChild(plus);
+        wrapper.appendChild(btnGroup);
+        groupDiv.appendChild(wrapper);
 
         for(const btn of [minus, plus]) {
             btn.addEventListener('click', () => {
@@ -268,6 +344,7 @@ function addGroupControls(form, groupName, controls) {
                     }
                 })
                 updateCostInputColors(form);
+                form.dispatchEvent(new Event("input", { bubbles: true }));
             })
         }
     }
@@ -275,6 +352,7 @@ function addGroupControls(form, groupName, controls) {
     const zeroButton = document.createElement("button");
     zeroButton.textContent = "Zero All";
     zeroButton.type = "button";
+    zeroButton.className = "btn-zero";
     groupDiv.appendChild(zeroButton);
 
     zeroButton.addEventListener('click', () => {
@@ -283,6 +361,7 @@ function addGroupControls(form, groupName, controls) {
             input.value = 0;
         });
         updateCostInputColors(form);
+        form.dispatchEvent(new Event("input", { bubbles: true }));
     });
 }
 
@@ -303,24 +382,78 @@ function updateCostInputColors(form) {
 }
 
 /**
- * Save config to local storage
+ * Save config to local storage / chrome storage
  * @param {CostConfig} config 
  */
-function saveCostConfig(config) {
+async function saveCostConfig(config) {
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        await new Promise((resolve) => {
+            chrome.storage.local.set({ costConfig: config }, resolve);
+        });
+    }
     localStorage.setItem("costConfig", JSON.stringify(config));
 }
 
 /**
- * Get the cost configuration saved in local storage
- * @returns {CostConfig | null}
+ * Get the cost configuration saved in storage
+ * @returns {Promise<CostConfig | null>}
  */
-function loadCostConfig() {
+async function loadCostConfig() {
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        return new Promise((resolve) => {
+            chrome.storage.local.get(["costConfig"], (result) => {
+                resolve(result.costConfig || null);
+            });
+        });
+    }
     try {
         const stored = localStorage.getItem("costConfig");
         return stored ? JSON.parse(stored) : null;
     } 
     catch {
         return null;
+    }
+}
+
+/**
+ * Save run options to storage
+ * @param {Object} options 
+ */
+async function saveRunOptions(options) {
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        await new Promise((resolve) => {
+            chrome.storage.local.set({ runOptions: options }, resolve);
+        });
+    }
+    localStorage.setItem("runOptions", JSON.stringify(options));
+}
+
+/**
+ * Load run options from storage
+ * @returns {Promise<Object>}
+ */
+async function loadRunOptions() {
+    const defaults = {
+        depth: 1,
+        maxIterations: 999999,
+        searchRotations: true,
+        pruneRotations: true,
+        memoize: true,
+        wideReplaceDouble: true
+    };
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        return new Promise((resolve) => {
+            chrome.storage.local.get(["runOptions"], (result) => {
+                resolve({ ...defaults, ...result.runOptions });
+            });
+        });
+    }
+    try {
+        const stored = localStorage.getItem("runOptions");
+        return stored ? { ...defaults, ...JSON.parse(stored) } : defaults;
+    }
+    catch {
+        return defaults;
     }
 }
 
@@ -354,14 +487,9 @@ function collectCostConfig(form, initialConfig) {
  */
 function collectRunOptions() {
     const scramble = ScrambleOptimizer.parseScramble(document.getElementById("scramble").value.trim());
-    const depth = parseFloat(document.getElementById("depth").value);
-    const maxIterations = parseFloat(document.getElementById("iterations").value);
-    const searchRotations = document.getElementById("searchRotations").checked;
-    const pruneRotations = document.getElementById("pruneRotations").checked;
-    const memoize = document.getElementById("memoize").checked;
-    const wideReplaceDouble = document.getElementById("wideReplaceDouble").checked;
+    const runOpts = collectRunOptionsValues();
 
-    if (Number.isNaN(depth) || Number.isNaN(maxIterations)) {
+    if (Number.isNaN(runOpts.depth) || Number.isNaN(runOpts.maxIterations)) {
         throw new Error("Depth and iterations must be numbers");
     }
     for(const move of scramble) {
@@ -369,7 +497,35 @@ function collectRunOptions() {
             throw new Error("Rotations not supported yet");
     }
 
-    return { scramble, depth, maxIterations, searchRotations, pruneRotations, memoize, wideReplaceDouble };
+    return { scramble, ...runOpts };
+}
+
+/**
+ * Gather the current run options values from the DOM
+ * @returns {Object}
+ */
+function collectRunOptionsValues() {
+    const depth = parseFloat(document.getElementById("depth").value);
+    const maxIterations = parseFloat(document.getElementById("iterations").value);
+    const searchRotations = document.getElementById("searchRotations").checked;
+    const pruneRotations = document.getElementById("pruneRotations").checked;
+    const memoize = document.getElementById("memoize").checked;
+    const wideReplaceDouble = document.getElementById("wideReplaceDouble").checked;
+
+    return { depth, maxIterations, searchRotations, pruneRotations, memoize, wideReplaceDouble };
+}
+
+/**
+ * Populate the DOM elements with the provided run options values
+ * @param {Object} runOpts
+ */
+function applyRunOptionsValues(runOpts) {
+    document.getElementById("depth").value = runOpts.depth;
+    document.getElementById("iterations").value = runOpts.maxIterations;
+    document.getElementById("searchRotations").checked = runOpts.searchRotations;
+    document.getElementById("pruneRotations").checked = runOpts.pruneRotations;
+    document.getElementById("memoize").checked = runOpts.memoize;
+    document.getElementById("wideReplaceDouble").checked = runOpts.wideReplaceDouble;
 }
 
 /**

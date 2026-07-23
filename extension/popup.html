@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="title">ScrambleManip</div>
+      <label class="switch">
+        <input type="checkbox" id="enableToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+    
+    <div class="card">
+      <div class="section-title">Website Settings</div>
+      <div class="status-text">
+        <span>Current Host:</span>
+        <span class="status-val" id="hostName">-</span>
+      </div>
+      <div class="status-text">
+        <span>Selector:</span>
+        <span class="status-val not-set" id="selectorState">Not Set</span>
+      </div>
+      <button class="btn" id="pickerBtn">
+        <svg viewBox="0 0 24 24"><path d="M17,18a1,1,0,0,1-1-1V12.75l-2.45,2.44a1,1,0,0,1-1.42,0,1,1,0,0,1,0-1.42l4.16-4.16a1,1,0,0,1,1.42,0l4.16,4.16a1,1,0,0,1,0,1.42,1,1,0,0,1-1.42,0L18,12.75V17A1,1,0,0,1,17,18ZM10,18a6,6,0,1,1,6-6A6,6,0,0,1,10,18Zm0-10a4,4,0,1,0,4,4A4,4,0,0,0,10,8ZM2,12H4a1,1,0,0,0,0-2H2a1,1,0,0,0,0,2Zm16-2a1,1,0,0,0-1,1v1a1,1,0,0,0,2,0V11A1,1,0,0,0,18,10Z"/></svg>
+        Pick Scramble Element
+      </button>
+      <button class="btn btn-secondary hidden" id="clearSelectorBtn">
+        Clear Custom Selector
+      </button>
+    </div>
+    
+    <button class="btn btn-secondary" id="optionsBtn">
+      Configure Costs & Settings
+    </button>
+    
+    <div class="footer">
+      ScrambleManip v1.0.0
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

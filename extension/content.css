@@ -1,0 +1,200 @@
+/* Visual element text replacement overlay */
+.scramblemanip-hidden-text {
+    opacity: 0 !important;
+    user-select: none !important;
+    pointer-events: none !important;
+}
+
+.scramblemanip-visual-overlay {
+    color: inherit !important;
+    font-family: inherit !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    font-style: inherit !important;
+    letter-spacing: inherit !important;
+    line-height: inherit !important;
+    text-align: inherit !important;
+    display: inline !important;
+    pointer-events: auto !important;
+}
+
+/* Inline Scramble Indicator styling */
+.scramblemanip-indicator-bar {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 12px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    user-select: none;
+    pointer-events: auto;
+}
+
+.scramblemanip-optimized-text-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.scramblemanip-badge {
+    background: #dbeafe;
+    color: #1e40af;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.scramblemanip-optimized-scramble {
+    font-weight: 600;
+    font-size: 14px;
+    color: #0f172a;
+    font-family: inherit;
+}
+
+body[style*="background-color: rgb(0, 0, 0)"] .scramblemanip-badge,
+body[style*="background-color: black"] .scramblemanip-badge,
+body.dark .scramblemanip-badge {
+    background: #1e3a8a;
+    color: #93c5fd;
+}
+
+body[style*="background-color: rgb(0, 0, 0)"] .scramblemanip-optimized-scramble,
+body[style*="background-color: black"] .scramblemanip-optimized-scramble,
+body.dark .scramblemanip-optimized-scramble {
+    color: #f8fafc;
+}
+
+.scramblemanip-details-link {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 500;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.scramblemanip-details-link:hover {
+    color: #2563eb;
+}
+
+body[style*="background-color: rgb(0, 0, 0)"] .scramblemanip-details-link:hover,
+body[style*="background-color: black"] .scramblemanip-details-link:hover,
+body.dark .scramblemanip-details-link:hover {
+    color: #60a5fa;
+}
+
+/* Floating Details Popup Card */
+.scramblemanip-details-card {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    color: #0f172a;
+    width: 360px;
+    z-index: 99999;
+    box-sizing: border-box;
+    display: none;
+    pointer-events: auto;
+}
+
+.scramblemanip-details-card.active {
+    display: block;
+}
+
+body[style*="background-color: rgb(0, 0, 0)"] .scramblemanip-details-card,
+body[style*="background-color: black"] .scramblemanip-details-card,
+body.dark .scramblemanip-details-card {
+    background: #1e293b;
+    border: 1px solid #475569;
+    color: #f8fafc;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.scramblemanip-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    text-align: left;
+}
+
+.scramblemanip-table th, .scramblemanip-table td {
+    padding: 5px 6px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+body[style*="background-color: rgb(0, 0, 0)"] .scramblemanip-table td,
+body[style*="background-color: black"] .scramblemanip-table td,
+body.dark .scramblemanip-table td {
+    border-bottom: 1px solid #334155;
+}
+
+.scramblemanip-table th {
+    color: #64748b;
+    font-weight: 600;
+}
+
+body[style*="background-color: rgb(0, 0, 0)"] .scramblemanip-table th,
+body[style*="background-color: black"] .scramblemanip-table th,
+body.dark .scramblemanip-table th {
+    color: #94a3b8;
+}
+
+/* Helper classes */
+.scramblemanip-semibold {
+    font-weight: 600;
+}
+
+.scramblemanip-right {
+    text-align: right;
+}
+
+.scramblemanip-total-row {
+    font-weight: 600;
+    border-top: 2px solid #cbd5e1;
+}
+
+body[style*="background-color: rgb(0, 0, 0)"] .scramblemanip-total-row,
+body[style*="background-color: black"] .scramblemanip-total-row,
+body.dark .scramblemanip-total-row {
+    border-top: 2px solid #475569;
+}
+
+/* Picker hover style */
+.scramblemanip-picker-hover {
+    outline: 2px dashed #2563eb !important;
+    outline-offset: 2px !important;
+    cursor: pointer !important;
+}
+
+/* Picker overlay */
+.scramblemanip-picker-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.2);
+    z-index: 999999;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.scramblemanip-picker-banner {
+    background: #0f172a;
+    color: #ffffff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 13px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    pointer-events: auto;
+}

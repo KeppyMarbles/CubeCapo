@@ -1,18 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
-<body style="background-color:#e3eeff;">
-  <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Scramble Optimizer</title>
-      <link rel="stylesheet" href="styles.css">
-  </head>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scramble Optimizer Settings</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
   <div class="container">
       <div class="left-section">
           <h2>Scramble</h2>
           <div>
             <label>Scramble
-              <input type="text" id="scramble" placeholder="Enter scramble" value="B' D' L F R B R D R U F2 L2 B2 U' L2 D2 F2 D L2 U'", style="width: 350px;"/>
+              <input type="text" id="scramble" placeholder="Enter scramble" value="B' D' L F R B R D R U F2 L2 B2 U' L2 D2 F2 D L2 U'"/>
             </label>
 
             <label title="If double moves can be replaced with a wide move + normal face move. Increases search time">Wide Replace Double
@@ -25,9 +26,9 @@
           </div>
 
           <button id="submitButton">Submit</button>
-          <p id="errorMessage" style="font-size: 1rem; color: #ff0000;"></p>
+          <p id="errorMessage"></p>
           <div>
-              <p id="output" style="font-size: 2rem; font-family: monospace;"></p>
+              <p id="output"></p>
           </div>
 
           <div>
@@ -55,7 +56,7 @@
           </div>
 
           <h3>Cost Distribution</h3>
-          <div id="myChart" style="width:500px;height:300px;"></div>
+          <div id="myChart"></div>
 
           <table class="stats-table">
             <tr><th>Total Samples</th><td id="samples"></td></tr>
@@ -104,20 +105,18 @@
                 <div class="tab-content" id="fingertricks" data-group="fingertrick"></div>
             </div>
           </form>
-          <div style="text-align: end; vertical-align: bottom;">
+          <div class="config-options-container">
             <details>
               <summary>Config Options</summary>
               <div id="configOptions">
                 <div>
-                  <button type="button" id="resetSavedButton">Reset To Saved</button>
                   <button type="button" id="resetDefaultButton">Reset To Defaults</button>
                 </div>
                 <p></p>
-                <div class="config-buttons" style="text-align: end;">
-                  <button id="saveButton" type="button">Save</button>
+                <div class="config-buttons">
                   <button id="exportButton" type="button">Export</button>
                   <button id="importButton" type="button">Import</button>
-                  <input id="importFile" type="file" accept=".json" style="display:none;">
+                  <input id="importFile" type="file" accept=".json" class="hidden">
                 </div>
               </div>
             </details>
@@ -127,11 +126,19 @@
       <a href="https://github.com/KeppyMarbles/scramblemanip"
          target="_blank" rel="noopener noreferrer">
         <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/github.svg"
-             alt="GitHub" style="width:20px; vertical-align:middle; margin-right:4px;">Source
+             alt="GitHub">Source
       </a>
     </footer>
   </div>
-</body>
 
-<script type="module" src="main.js"></script>
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <div id="unsavedChangesBar" class="unsaved-changes-bar hidden">
+    <span>You have unsaved changes.</span>
+    <div class="bar-buttons">
+      <button type="button" id="revertChangesButton" class="btn-revert">Revert</button>
+      <button type="button" id="saveChangesButton" class="btn-save">Save</button>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

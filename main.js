@@ -1,8 +1,8 @@
-import { setupForm, drawSearchTime } from "./ui/form.js";
-import { ScrambleOptimizer } from "./cube/scramble.js";
-import { drawOptimizerStats } from "./ui/stats.js";
-import gripTransitions from './gripTransitions.json' with { type: 'json' };
-/** @import { CostConfig, RunOptions } from "./types.js" */
+import { setupForm, drawSearchTime } from "./src/ui/form.js";
+import { ScrambleOptimizer } from "./src/cube/scramble.js";
+import { drawOptimizerStats } from "./src/ui/stats.js";
+import gripTransitions from './src/data/gripTransitions.json' with { type: 'json' };
+/** @import { CostConfig, RunOptions } from "./src/types.js" */
 
 /**
  * Called when submit scramble button is pressed
@@ -23,4 +23,6 @@ async function onSubmit(config, options) {
     drawSearchTime(end - start);
 }
 
-setupForm(onSubmit);
+(async () => {
+    await setupForm(onSubmit);
+})();

@@ -27,36 +27,71 @@ export async function drawOptimizerStats(optimizer) {
  * @param {Map<number, number>} distribution 
  */
 function drawDistributionChart(distribution) {
+    const chartContainer = document.getElementById("myChart");
+    chartContainer.innerHTML = "";
+
+    const isMap = distribution instanceof Map;
+    if (!isMap || distribution.size === 0) {
+        chartContainer.innerHTML = `<div class="chart-empty">No stats available</div>`;
+        document.getElementById("samples").textContent = "-";
+        document.getElementById("averageCost").textContent = "-";
+        document.getElementById("standardDeviation").textContent = "-";
+        document.getElementById("skewness").textContent = "-";
+        document.getElementById("minZ").textContent = "-";
+        return;
+    }
+
     const costs = Array.from(distribution.keys()).sort((a, b) => a - b);
     const counts = costs.map(c => distribution.get(c));
-    const data = [{
-        x: costs,
-        y: counts,
-        type: 'bar',
-    }];
-    const layout = {
-        margin: { l: 50, r: 50, b: 50, t: 10, pad: 4 },
-        xaxis: { title: "Scramble Cost" },
-        yaxis: { title: "Scrambles Found" },
-        paper_bgcolor: document.body.style.backgroundColor,
-        plot_bgcolor: document.body.style.backgroundColor
-    };
+    const maxCount = Math.max(...counts);
 
     const samples =  Array.from(distribution.values()).reduce((a, b) => a + b, 0);
     const mean =     Array.from(distribution.entries()).reduce((sum, [cost, count]) => sum + cost * count, 0) / samples;
     const variance = Array.from(distribution.entries()).reduce((sum, [cost, count]) => sum + count * Math.pow(cost - mean, 2), 0) / samples;
     const stdDev = Math.sqrt(variance);
-    const skewness = Array.from(distribution.entries()).reduce((sum, [cost, count]) => sum + count * Math.pow((cost - mean) / stdDev, 3), 0) / samples;
+    const skewness = stdDev > 0 ? Array.from(distribution.entries()).reduce((sum, [cost, count]) => sum + count * Math.pow((cost - mean) / stdDev, 3), 0) / samples : 0;
 
     const minCost = Math.min(...distribution.keys());
-    const zScore = (minCost - mean) / stdDev;
+    const zScore = stdDev > 0 ? (minCost - mean) / stdDev : 0;
 
-    Plotly.newPlot(document.getElementById("myChart"), data, layout);
     document.getElementById("samples").textContent = samples;
     document.getElementById("averageCost").textContent = mean.toFixed(3);
     document.getElementById("standardDeviation").textContent = stdDev.toFixed(3);
     document.getElementById("skewness").textContent = skewness.toFixed(3);
     document.getElementById("minZ").textContent = zScore.toFixed(3);
+
+    // Create the visual CSS bar chart
+    const wrapper = document.createElement("div");
+    wrapper.className = "chart-wrapper";
+
+    const barsContainer = document.createElement("div");
+    barsContainer.className = "chart-bars-container";
+
+    costs.forEach((cost, idx) => {
+        const count = counts[idx];
+        const percent = (count / maxCount) * 100;
+        
+        const col = document.createElement("div");
+        col.className = "chart-col";
+
+        const bar = document.createElement("div");
+        bar.className = "chart-bar";
+        bar.style.height = `${percent}%`;
+        bar.title = `Cost: ${cost}, Count: ${count}`;
+
+        const label = document.createElement("div");
+        label.className = "chart-label";
+        if (idx === 0 || idx === costs.length - 1 || idx % Math.max(1, Math.floor(costs.length / 5)) === 0) {
+            label.textContent = cost.toFixed(1);
+        }
+
+        col.appendChild(bar);
+        col.appendChild(label);
+        barsContainer.appendChild(col);
+    });
+
+    wrapper.appendChild(barsContainer);
+    chartContainer.appendChild(wrapper);
 }
 
 /**
