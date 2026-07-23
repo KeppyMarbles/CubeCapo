@@ -81,6 +81,8 @@
 /**
  * @typedef {Object} FormatOptions
  * @property {boolean} [showGrips] If grip prompts (starting grip and regrip transitions) should be included in output
+ * @property {boolean} [wedgeNotation] If wide moves should be output using wedge count notation (e.g. Rw, 3Rw)
+ * @property {number} [cubeSize] Size of the cube (e.g. 3 for 3x3, 7 for 7x7) for calculating wedge slice counts
  */
 
 /**
@@ -94,6 +96,8 @@
  * @property {boolean} memoize If search shouldn't continue if same index, orientation and grip is reached
  * @property {boolean} wideReplaceDouble If search should try replacing double moves with 1 wide and 1 normal move
  * @property {boolean} [showGrips] If grip prompts (starting grip and regrip transitions) should be included in output
+ * @property {boolean} [wedgeNotation] If wide moves should be output using wedge count notation (e.g. Rw, 3Rw)
+ * @property {number} [cubeSize] Size of the cube (e.g. 3 for 3x3, 7 for 7x7) for calculating wedge slice counts
  */
 
 /**

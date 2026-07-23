@@ -138,7 +138,7 @@ export async function setupForm(onSubmit) {
     };
 
     // Attach change detection to computation settings
-    const computationInputs = ["depth", "iterations", "searchRotations", "searchStartingGrips", "showGrips", "pruneRotations", "memoize", "wideReplaceDouble"];
+    const computationInputs = ["depth", "iterations", "searchRotations", "searchStartingGrips", "showGrips", "wedgeNotation", "pruneRotations", "memoize", "wideReplaceDouble"];
     computationInputs.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -530,18 +530,25 @@ function collectRunOptions() {
     if (!rawText) {
         throw new Error("Please enter a scramble to analyze.");
     }
+
     const scramble = ScrambleOptimizer.parseScramble(rawText);
+    const cubeSize = ScrambleOptimizer.detectCubeSize(scramble);
+    const supportedSizes = [3]; // Currently 3x3 supported
+    if (!supportedSizes.includes(cubeSize)) {
+        throw new Error(`${cubeSize}x${cubeSize} scrambles are not supported yet.`);
+    }
     const runOpts = collectRunOptionsValues();
 
     if (Number.isNaN(runOpts.depth) || Number.isNaN(runOpts.maxIterations)) {
-        throw new Error("Depth and iterations must be numbers");
+        throw new Error("Depth and iterations must be numbers.");
     }
-    for(const move of scramble) {
-        if(move.isRotation)
-            throw new Error("Rotations not supported yet");
+    for (const move of scramble) {
+        if (move.isRotation) {
+            throw new Error("Rotations in input not supported yet.");
+        }
     }
 
-    return { scramble, ...runOpts };
+    return { scramble, cubeSize, ...runOpts };
 }
 
 /**
@@ -554,11 +561,12 @@ function collectRunOptionsValues() {
     const searchRotations = document.getElementById("searchRotations")?.checked ?? true;
     const searchStartingGrips = document.getElementById("searchStartingGrips")?.checked ?? true;
     const showGrips = document.getElementById("showGrips")?.checked ?? true;
+    const wedgeNotation = document.getElementById("wedgeNotation")?.checked ?? false;
     const pruneRotations = document.getElementById("pruneRotations")?.checked ?? true;
     const memoize = document.getElementById("memoize")?.checked ?? true;
     const wideReplaceDouble = document.getElementById("wideReplaceDouble")?.checked ?? true;
 
-    return { depth, maxIterations, searchRotations, searchStartingGrips, showGrips, pruneRotations, memoize, wideReplaceDouble };
+    return { depth, maxIterations, searchRotations, searchStartingGrips, showGrips, wedgeNotation, pruneRotations, memoize, wideReplaceDouble };
 }
 
 /**
@@ -571,6 +579,7 @@ function applyRunOptionsValues(runOpts) {
     if (document.getElementById("searchRotations")) document.getElementById("searchRotations").checked = runOpts.searchRotations;
     if (document.getElementById("searchStartingGrips")) document.getElementById("searchStartingGrips").checked = runOpts.searchStartingGrips;
     if (document.getElementById("showGrips")) document.getElementById("showGrips").checked = runOpts.showGrips;
+    if (document.getElementById("wedgeNotation")) document.getElementById("wedgeNotation").checked = runOpts.wedgeNotation;
     if (document.getElementById("pruneRotations")) document.getElementById("pruneRotations").checked = runOpts.pruneRotations;
     if (document.getElementById("memoize")) document.getElementById("memoize").checked = runOpts.memoize;
     if (document.getElementById("wideReplaceDouble")) document.getElementById("wideReplaceDouble").checked = runOpts.wideReplaceDouble;

@@ -47,32 +47,6 @@ function getUniqueSelector(el) {
 }
 
 /**
- * Validates whether a scramble string is currently supported by the optimizer.
- * @param {string} text - Scramble text string to validate.
- * @returns {boolean} True if supported 3x3 scramble, false otherwise.
- */
-function isSupportedScramble(text) {
-    const trimmed = text.trim();
-    if (!trimmed) return false;
-    const tokens = trimmed.split(/\s+/);
-    
-    // Standard 3x3 scramble length check (13 to 30 moves)
-    if (tokens.length < 13 || tokens.length > 30) return false;
-
-    for (const token of tokens) {
-        // Reject any token containing wide moves (lowercase or 'w') or slice moves (M, E, S)
-        if (/[rufldbwMES]/.test(token)) {
-            return false;
-        }
-        // Match valid RULDFB move token: face R|U|L|D|F|B optionally followed by 2, ', or '2
-        if (!/^[RULDFB](2'|'2|2|')?$/.test(token)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-/**
  * Finds the scramble DOM element saved by user for the current hostname.
  * @returns {Promise<Element|null>} Target scramble element or null if not found.
  */
@@ -146,13 +120,6 @@ async function processScramble(element) {
     // Ignore if this text is equal to lastOriginalText
     if (text === lastOriginalText) return;
 
-    if (!isSupportedScramble(text)) {
-        console.log("[ScrambleManip] Scramble text is not a valid 3x3 scramble:", text);
-        hideIndicator();
-        return;
-    }
-
-    console.log("[ScrambleManip] New valid scramble detected from page:", text);
     lastOriginalText = text;
     lastOptimizedText = "";
     isShowingOptimized = true;
@@ -176,7 +143,7 @@ async function processScramble(element) {
                 lastOptimizedText = response.bestScrambleStr;
                 showOptimizedState(element, response);
             } else {
-                console.error("[ScrambleManip] Optimization failed:", response ? response.error : "No response");
+                console.log("[ScrambleManip] Scramble ignored or not supported:", response ? response.error : "No response");
                 hideIndicator();
             }
         }

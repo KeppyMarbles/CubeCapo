@@ -56,10 +56,53 @@ export class ScrambleOptimizer {
         searchRotations: true,
         searchStartingGrips: true,
         showGrips: true,
+        wedgeNotation: false,
         pruneRotations: true,
         memoize: true,
         wideReplaceDouble: true
     };
+
+    /**
+     * Detects the cube size (2, 3, 4, 5, 6, 7) from a parsed Move array.
+     * @param {Move[]} moves 
+     * @returns {number} Cube size N
+     */
+    static detectCubeSize(moves) {
+        if (!Array.isArray(moves) || moves.length === 0) return 3;
+
+        let maxSlice = 1;
+        let hasLeftDwBw = false;
+        let has3LeftDwBw = false;
+        let hasW = false;
+
+        for (const move of moves) {
+            if (!move || move.isRotation) continue;
+
+            const slices = (move.isWide || move.sliceNum > 1) ? (move.sliceNum || 1) : 1;
+            if (slices > maxSlice) maxSlice = slices;
+
+            if (move.isWide || move.sliceNum > 1) {
+                hasW = true;
+                if (["L", "D", "B"].includes(move.alpha)) {
+                    hasLeftDwBw = true;
+                    if (slices >= 3) {
+                        has3LeftDwBw = true;
+                    }
+                }
+            }
+        }
+
+        if (maxSlice >= 4) return maxSlice * 2 - 1;
+        if (maxSlice === 3) return has3LeftDwBw ? 7 : 6;
+        if (hasW) return hasLeftDwBw ? 5 : 4;
+
+        // 2x2 vs 3x3 check: 2x2 scrambles have <= 12 moves and no wide moves
+        if (moves.length <= 12) {
+            return 2;
+        }
+
+        return 3;
+    }
 
     /**
      * 
@@ -74,6 +117,8 @@ export class ScrambleOptimizer {
         this.transitions = transitions;
         /** @type {()} Function to call when a rotation optimization finishes */
         this.callback = callback;
+        /** @type {number} The detected or assigned cube size (e.g. 2, 3, 4, 5, 6, 7) */
+        this.cubeSize = 3;
         /** @type {Move[]} The current minimum cost scramble */
         this.minScramble = null;
         /** @type {number} The current minimum cost */
@@ -325,6 +370,7 @@ export class ScrambleOptimizer {
         this.bestScramble = options.scramble;
         this.memoize = options.memoize;
         this.doWideReplaceDouble = options.wideReplaceDouble;
+        this.cubeSize = options.cubeSize || ScrambleOptimizer.detectCubeSize(options.scramble);
 
         this.bestRotation = {up: null, front: null};
         this.bestStartingGrip = "start";
@@ -392,8 +438,10 @@ export class ScrambleOptimizer {
     /**
      * @param {Move[]} scramble 
      * @param {GripState} [startGrip]
+     * @param {FormatOptions} [formatOptions]
      */
-    analyze(scramble, startGrip = this.bestStartingGrip) {
+    analyze(scramble, startGrip = this.bestStartingGrip, formatOptions = {}) {
+        const wedgeNotation = Boolean(formatOptions.wedgeNotation);
         let totalCost = 0;
 
         /** @type {GripState} */
@@ -416,7 +464,11 @@ export class ScrambleOptimizer {
             const addedCost = this.computeTransitionCost(lastTransition, transition, move);
             lastTransition = transition;
 
-            breakdown.push({move: move.toString(), transition, addedCost });
+            breakdown.push({
+                move: move.toString(wedgeNotation, this.cubeSize), 
+                transition, 
+                addedCost 
+            });
 
             totalCost += addedCost;
             currentGrip = nextGrip;
@@ -425,46 +477,33 @@ export class ScrambleOptimizer {
         return breakdown;
     }
 
-    analyzeBest() {
-        return this.analyze(this.bestScramble, this.bestStartingGrip);
+    /**
+     * @param {FormatOptions} [formatOptions]
+     */
+    analyzeBest(formatOptions = {}) {
+        return this.analyze(this.bestScramble, this.bestStartingGrip, formatOptions);
     }
 
     /**
      * @param {FormatOptions} [formatOptions]
      */
-    getBestAsString(formatOptions = {}) {
-        if (!this.bestScramble)
-            return "";
+    getBestAsString({ showGrips = true, wedgeNotation = false, cubeSize = this.cubeSize } = {}) {
+        if (!this.bestScramble) return "";
 
-        const showGrips = formatOptions.showGrips !== false;
+        const formatGrip = (g) => `[${g.replace(" ", "/")}]`;
 
-        let rotStr = "";
-        if (this.bestRotation?.up) {
-            rotStr += this.bestRotation.up + " ";
-        }
-        if (this.bestRotation?.front) {
-            rotStr += this.bestRotation.front + " ";
-        }
+        const rotations = [this.bestRotation?.up, this.bestRotation?.front].filter(Boolean);
+        const startGrip = showGrips && this.bestStartingGrip ? [formatGrip(this.bestStartingGrip)] : [];
+        const breakdown = showGrips ? this.analyzeBest({ wedgeNotation }) : [];
 
-        let gripStr = "";
-        if (showGrips && this.bestStartingGrip) {
-            gripStr = `[${this.bestStartingGrip.replace(" ", "/")}] `;
-        }
+        const moves = this.bestScramble.flatMap((move, i) => {
+            const transition = breakdown[i]?.transition;
+            const moveStr = move.toString(wedgeNotation, cubeSize);
+            return (transition?.regrip && transition?.next)
+                ? [formatGrip(transition.next), moveStr]
+                : [moveStr];
+        });
 
-        const breakdown = this.analyzeBest();
-        const moveTokens = [];
-
-        for (let i = 0; i < this.bestScramble.length; i++) {
-            const moveObj = this.bestScramble[i];
-            const entry = breakdown[i];
-
-            if (showGrips && entry?.transition?.regrip && entry?.transition?.next) {
-                moveTokens.push(`[${entry.transition.next.replace(" ", "/")}]`);
-            }
-            moveTokens.push(moveObj.toString());
-        }
-
-        const scrambleStr = moveTokens.join(" ");
-        return `${rotStr}${gripStr}${scrambleStr}`.trim();
+        return [...rotations, ...startGrip, ...moves].join(" ");
     }
 }

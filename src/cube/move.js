@@ -111,6 +111,7 @@ export class Move {
 
         // Optional 'w' modifier (e.g. "Rw", "3Rw")
         if (char === "w") {
+            move.isWide = true;
             if (!move.sliceNum) 
                 move.sliceNum = 2; // standard wide move means 2 slices
             index++;
@@ -147,13 +148,33 @@ export class Move {
     }
 
     /**
+     * @param {boolean} [wedgeNotation]
+     * @param {number} [cubeSize]
      * @returns {MoveStr}
      */
-    toString() { // TODO bool for replacing lowercase with slice count?
+    toString(wedgeNotation = false, cubeSize = 3) {
         let s = "";
-        if (this.sliceNum > 2) s += this.sliceNum;
-        s += (this.isWide || this.isRotation) ? this.alpha.toLowerCase() : this.alpha;
-        if (this.sliceNum > 1) s += "w";
+
+        if (this.isRotation) {
+            s += this.alpha.toLowerCase();
+        } else if (this.isWide || this.sliceNum > 1) {
+            const rawSlices = this.sliceNum || 1;
+            const slices = (wedgeNotation && this.isWide && cubeSize >= rawSlices) 
+                ? (cubeSize - rawSlices) 
+                : rawSlices;
+
+            const prefix = slices > 2 ? slices : "";
+
+            if (wedgeNotation) {
+                s += `${prefix}${this.alpha.toUpperCase()}w`;
+            } else {
+                const suffix = slices > 1 ? "w" : "";
+                s += `${prefix}${this.alpha.toLowerCase()}${suffix}`;
+            }
+        } else {
+            s += this.alpha.toUpperCase();
+        }
+
         if (this.isDouble) s += "2";
         if (this.isPrime) s += "'";
         return s;

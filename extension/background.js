@@ -46,31 +46,47 @@ extAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "OPTIMIZE_SCRAMBLE") {
         (async () => {
             try {
+                const rawText = (message.scrambleText || "").trim();
+                if (!rawText) {
+                    sendResponse({ success: false, error: "Empty scramble text" });
+                    return;
+                }
+
+                // Validate scramble move syntax
+                let scramble;
+                try {
+                    scramble = ScrambleOptimizer.parseScramble(rawText);
+                    if (!scramble || scramble.length === 0) {
+                        sendResponse({ success: false, error: "Invalid scramble text" });
+                        return;
+                    }
+                } catch (parseErr) {
+                    sendResponse({ success: false, error: parseErr.message });
+                    return;
+                }
+
+                // Validate supported cube size (currently 3x3)
+                const cubeSize = ScrambleOptimizer.detectCubeSize(scramble);
+                const supportedSizes = [3];
+                if (!supportedSizes.includes(cubeSize)) {
+                    sendResponse({ success: false, error: `${cubeSize}x${cubeSize} scrambles are not supported yet` });
+                    return;
+                }
+
                 const store = await extAPI.storage.local.get(["costConfig", "runOptions"]);
                 const config = store.costConfig || ScrambleOptimizer.defaultCostConfiguration;
                 
-                const defaults = ScrambleOptimizer.defaultRunOptions;
-                const runOptions = { ...defaults, ...store.runOptions };
+                const runOptions = { ...ScrambleOptimizer.defaultRunOptions, ...store.runOptions, scramble };
 
                 const transitions = await loadGripTransitions();
                 const optimizer = new ScrambleOptimizer(config, transitions, null);
-                const scramble = ScrambleOptimizer.parseScramble(message.scrambleText.trim());
 
                 const start = performance.now();
-                await optimizer.optimize({
-                    scramble,
-                    depth: runOptions.depth,
-                    maxIterations: runOptions.maxIterations,
-                    searchRotations: runOptions.searchRotations,
-                    searchStartingGrips: runOptions.searchStartingGrips,
-                    pruneRotations: runOptions.pruneRotations,
-                    memoize: runOptions.memoize,
-                    wideReplaceDouble: runOptions.wideReplaceDouble
-                });
+                await optimizer.optimize(runOptions);
                 const end = performance.now();
 
                 const bestScrambleStr = optimizer.getBestAsString(runOptions);
-                const breakdown = optimizer.analyzeBest();
+                const breakdown = optimizer.analyzeBest(runOptions);
                 const bestCost = optimizer.bestCost;
 
                 sendResponse({
@@ -78,7 +94,8 @@ extAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     bestScrambleStr,
                     breakdown,
                     bestCost,
-                    searchTime: end - start
+                    searchTime: end - start,
+                    cubeSize
                 });
             } catch (error) {
                 console.error("Optimization background task error:", error);
