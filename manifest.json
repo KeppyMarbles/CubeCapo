@@ -31,7 +31,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["extension/content.js"],
+      "js": ["src/ui/breakdownTable.js", "extension/content.js"],
       "css": ["extension/content.css"],
       "run_at": "document_end"
     }
@@ -39,6 +39,7 @@
   "web_accessible_resources": [
     {
       "resources": [
+        "src/ui/stats.js",
         "src/data/gripTransitions.json",
         "src/cube/scramble.js",
         "src/cube/move.js",

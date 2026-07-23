@@ -142,6 +142,10 @@ input[type="number"]:focus {
   margin-bottom: 8px;
 }
 
+#general .cost-columns {
+  column-count: 1;
+}
+
 @media (max-width: 480px) {
   .cost-columns {
     column-count: 1;
@@ -178,7 +182,7 @@ input[type="number"] {
   color: var(--text);
   padding: 2px 4px;
   font-size: 12px;
-  font-family: 'Fira Code', monospace;
+  font-family: inherit;
   width: 46px;
   text-align: right;
   outline: none;
@@ -387,22 +391,6 @@ summary {
   color: var(--text);
 }
 
-.config-buttons {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 10px;
-}
-
-.config-buttons button {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text);
-}
-
-.config-buttons button:hover {
-  background: var(--border);
-}
 
 #submitButton {
   width: 100%;
@@ -476,9 +464,11 @@ summary {
   white-space: nowrap;
 }
 
-.config-options-container {
-  text-align: right;
-  margin-top: 12px;
+#configOptions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
 }
 
 .hidden {

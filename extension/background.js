@@ -21,7 +21,6 @@ extAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "OPTIMIZE_SCRAMBLE") {
         (async () => {
             try {
-                // 1. Get configurations from storage
                 const store = await extAPI.storage.local.get(["costConfig", "runOptions"]);
                 const config = store.costConfig || ScrambleOptimizer.defaultCostConfiguration;
                 
@@ -35,16 +34,10 @@ extAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 };
                 const runOptions = { ...defaults, ...store.runOptions };
 
-                // 2. Ensure transitions are loaded
                 const transitions = await loadGripTransitions();
-
-                // 3. Initialize optimizer
                 const optimizer = new ScrambleOptimizer(config, transitions, null);
-
-                // 4. Parse the scramble
                 const scramble = ScrambleOptimizer.parseScramble(message.scrambleText.trim());
 
-                // 5. Optimize
                 const start = performance.now();
                 await optimizer.optimize({
                     scramble,
@@ -57,7 +50,6 @@ extAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 });
                 const end = performance.now();
 
-                // 6. Fetch optimized data
                 const bestScrambleStr = optimizer.getBestAsString();
                 const breakdown = optimizer.analyzeBest();
                 const bestCost = optimizer.bestCost;

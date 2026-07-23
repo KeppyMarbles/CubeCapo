@@ -17,7 +17,7 @@ export async function drawOptimizerStats(optimizer) {
         drawRotationInfoTable([]);
         drawCostTable([]);
         document.getElementById("output").textContent = "";
-        document.getElementById("searchTime").innerHTML = "";
+        document.getElementById("searchTime").textContent = "";
     }
     await new Promise(requestAnimationFrame);
 }
@@ -28,11 +28,14 @@ export async function drawOptimizerStats(optimizer) {
  */
 function drawDistributionChart(distribution) {
     const chartContainer = document.getElementById("myChart");
-    chartContainer.innerHTML = "";
+    chartContainer.replaceChildren();
 
     const isMap = distribution instanceof Map;
     if (!isMap || distribution.size === 0) {
-        chartContainer.innerHTML = `<div class="chart-empty">No stats available</div>`;
+        const emptyDiv = document.createElement("div");
+        emptyDiv.className = "chart-empty";
+        emptyDiv.textContent = "No stats available";
+        chartContainer.appendChild(emptyDiv);
         document.getElementById("samples").textContent = "-";
         document.getElementById("averageCost").textContent = "-";
         document.getElementById("standardDeviation").textContent = "-";
@@ -112,28 +115,8 @@ export function costToColor(cost, maxAbsCost, shift) {
  * @param {ScrambleBreakdownEntry[]} breakdowns
  */
 function drawCostTable(breakdowns) {
-  
     const tbody = document.querySelector("#costTable tbody");
-    tbody.innerHTML = "";
-
-    let total = 0;
-    for (const row of breakdowns) {
-        total += row.addedCost;
-        const tr = document.createElement("tr");
-        const color = costToColor(row.addedCost, 5, -2);
-        tr.innerHTML = `
-            <td>${row.move}</td>
-            <td>${row.transition?.next || "(none)"}</td>
-            <td>${row.transition?.type || "(none)"}</td>
-            
-            <td style="background:${color};text-align:right">${row.addedCost}</td>
-        `;
-        tbody.appendChild(tr);
-    }
-
-    const totalRow = document.createElement("tr");
-    totalRow.innerHTML = `<td colspan="2"><b>Total</b></td><td><b>${total}</b></td>`;
-    tbody.appendChild(totalRow);
+    renderBreakdownTable(tbody, breakdowns, (cost) => costToColor(cost, 5, -2));
 }
 
 /**
@@ -142,21 +125,46 @@ function drawCostTable(breakdowns) {
  */
 function drawRotationInfoTable(info) {
     const tbody = document.querySelector("#rotationTable tbody");
-    tbody.innerHTML = "";
+    tbody.replaceChildren();
 
     let total = 0;
     for (const row of info) { //TODO sort by best cost
         total += row.iterations;
         const tr = document.createElement("tr");
-        const color = costToColor(row.cost, 80, -20); //TODO set this based on average costs?
-        tr.innerHTML = `
-            <td>${row.rotation.up} ${row.rotation.front}</td>
-            <td style=${row.maxed ? `background:#ff0000` : ""}>${row.iterations}</td>
-            <td style="background:${color};text-align:right">${row.cost}</td>
-        `;
+
+        const tdRotation = document.createElement("td");
+        tdRotation.textContent = `${row.rotation.up} ${row.rotation.front}`;
+
+        const tdIterations = document.createElement("td");
+        if (row.maxed) {
+            tdIterations.style.background = "#ff0000";
+        }
+        tdIterations.textContent = String(row.iterations);
+
+        const tdCost = document.createElement("td");
+        tdCost.style.background = costToColor(row.cost, 80, -20);
+        tdCost.style.textAlign = "right";
+        tdCost.textContent = String(row.cost);
+
+        tr.appendChild(tdRotation);
+        tr.appendChild(tdIterations);
+        tr.appendChild(tdCost);
         tbody.appendChild(tr);
     }
+
     const totalRow = document.createElement("tr");
-    totalRow.innerHTML = `<td colspan="1"><b>Total Iterations</b></td><td><b>${total}</b></td>`;
+    const tdTotalLabel = document.createElement("td");
+    tdTotalLabel.colSpan = 1;
+    const bLabel = document.createElement("b");
+    bLabel.textContent = "Total Iterations";
+    tdTotalLabel.appendChild(bLabel);
+
+    const tdTotalVal = document.createElement("td");
+    const bVal = document.createElement("b");
+    bVal.textContent = String(total);
+    tdTotalVal.appendChild(bVal);
+
+    totalRow.appendChild(tdTotalLabel);
+    totalRow.appendChild(tdTotalVal);
     tbody.appendChild(totalRow);
 }

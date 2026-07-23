@@ -105,22 +105,15 @@
                 <div class="tab-content" id="fingertricks" data-group="fingertrick"></div>
             </div>
           </form>
-          <div class="config-options-container">
-            <details>
-              <summary>Config Options</summary>
-              <div id="configOptions">
-                <div>
-                  <button type="button" id="resetDefaultButton">Reset To Defaults</button>
-                </div>
-                <p></p>
-                <div class="config-buttons">
-                  <button id="exportButton" type="button">Export</button>
-                  <button id="importButton" type="button">Import</button>
-                  <input id="importFile" type="file" accept=".json" class="hidden">
-                </div>
-              </div>
-            </details>
-          </div>
+          <details style="text-align: right; margin-top: 12px;">
+            <summary style="cursor: pointer; font-size: 13px; color: var(--text-muted);">Config Options</summary>
+            <div id="configOptions">
+              <button type="button" id="resetDefaultButton">Reset To Defaults</button>
+              <button type="button" id="exportButton">Export</button>
+              <button type="button" id="importButton">Import</button>
+              <input id="importFile" type="file" accept=".json" class="hidden">
+            </div>
+          </details>
       </div>
     <footer class="footer-fixed">
       <a href="https://github.com/KeppyMarbles/scramblemanip"
@@ -139,6 +132,7 @@
     </div>
   </div>
 
+  <script src="src/ui/breakdownTable.js"></script>
   <script type="module" src="main.js"></script>
 </body>
 </html>

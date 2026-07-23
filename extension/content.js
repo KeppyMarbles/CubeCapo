@@ -258,11 +258,27 @@ function showOptimizedState(scrambleElement, data) {
     // Stop propagation on clicks inside the indicator bar
     bar.addEventListener("click", (e) => e.stopPropagation());
 
-    bar.innerHTML = `
-        <span class="scramblemanip-badge">(Optimized | Cost: ${data.bestCost.toFixed(1)})</span>
-        <button type="button" id="scramblemanip-toggle-original" class="scramblemanip-details-link">Show Original</button>
-        <button type="button" id="scramblemanip-toggle-details" class="scramblemanip-details-link">Details</button>
-    `;
+    bar.replaceChildren();
+
+    const badge = document.createElement("span");
+    badge.className = "scramblemanip-badge";
+    badge.textContent = `(Optimized | Cost: ${data.bestCost.toFixed(1)})`;
+
+    const toggleOriginalBtn = document.createElement("button");
+    toggleOriginalBtn.type = "button";
+    toggleOriginalBtn.id = "scramblemanip-toggle-original";
+    toggleOriginalBtn.className = "scramblemanip-details-link";
+    toggleOriginalBtn.textContent = "Show Original";
+
+    const toggleDetailsBtn = document.createElement("button");
+    toggleDetailsBtn.type = "button";
+    toggleDetailsBtn.id = "scramblemanip-toggle-details";
+    toggleDetailsBtn.className = "scramblemanip-details-link";
+    toggleDetailsBtn.textContent = "Details";
+
+    bar.appendChild(badge);
+    bar.appendChild(toggleOriginalBtn);
+    bar.appendChild(toggleDetailsBtn);
 
     // 3. Setup details table card (as a floating popup appended to body to prevent clipping)
     let details = document.getElementById("scramblemanip-details-card");
@@ -277,39 +293,36 @@ function showOptimizedState(scrambleElement, data) {
     // Stop propagation so clicking inside the details card doesn't copy text or trigger csTimer start/stop
     details.addEventListener("click", (e) => e.stopPropagation());
 
-    let rowsHtml = "";
-    let accumulated = 0;
-    for (const entry of data.breakdown) {
-        accumulated += entry.addedCost;
-        rowsHtml += `
-            <tr>
-                <td class="scramblemanip-semibold">${entry.move}</td>
-                <td>${entry.transition?.next || "-"}</td>
-                <td>${entry.transition?.type || "-"}</td>
-                <td class="scramblemanip-right scramblemanip-semibold" style="${costToColorStyle(entry.addedCost)}">${entry.addedCost}</td>
-            </tr>
-        `;
+    const table = document.createElement("table");
+    table.className = "scramblemanip-table";
+
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    const headers = [
+        { text: "Move", alignRight: false },
+        { text: "Grip", alignRight: false },
+        { text: "Fingertrick", alignRight: false },
+        { text: "Cost", alignRight: true }
+    ];
+
+    for (const h of headers) {
+        const th = document.createElement("th");
+        th.textContent = h.text;
+        if (h.alignRight) {
+            th.className = "scramblemanip-right";
+        }
+        headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+
+    const tbody = document.createElement("tbody");
+    if (typeof renderBreakdownTable === "function") {
+        renderBreakdownTable(tbody, data.breakdown, costToColorStyle);
     }
 
-    details.innerHTML = `
-        <table class="scramblemanip-table">
-            <thead>
-                <tr>
-                    <th>Move</th>
-                    <th>Grip</th>
-                    <th>Fingertrick</th>
-                    <th class="scramblemanip-right">Cost</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${rowsHtml}
-                <tr class="scramblemanip-total-row">
-                    <td colspan="3">Total cost</td>
-                    <td class="scramblemanip-right">${accumulated.toFixed(1)}</td>
-                </tr>
-            </tbody>
-        </table>
-    `;
+    table.appendChild(thead);
+    table.appendChild(tbody);
+    details.appendChild(table);
 
     // Append to body so z-index floating positions correctly without parent page layout overflow cutting it off
     document.body.appendChild(details);
