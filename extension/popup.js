@@ -20,7 +20,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             const store = await extAPI.storage.local.get([`selector_${hostname}`]);
             const savedSelector = store[`selector_${hostname}`];
             if (savedSelector) {
-                selectorStateEl.textContent = "Custom Set";
+                selectorStateEl.textContent = "Set";
                 selectorStateEl.className = "status-val set";
                 clearSelectorBtn.classList.remove("hidden");
             } else {

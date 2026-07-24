@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Scramble Manipulator",
+  "name": "Cube Capo",
   "version": "1.0.0",
-  "description": "Optimizes Rubik's cube scrambles for ergonomics, injecting details directly into cubing timers like csTimer.",
+  "description": "Transposes Rubik's cube scrambles for ergonomics, injecting details directly into cubing timers like csTimer.",
   "browser_specific_settings": {
     "gecko": {
-      "id": "scramble-manipulator@example.com"
+      "id": "cube-capo@example.com"
     }
   },
   "permissions": [
@@ -18,7 +18,7 @@
   ],
   "action": {
     "default_popup": "extension/popup.html",
-    "default_title": "Scramble Manipulator"
+    "default_title": "Cube Capo"
   },
   "options_ui": {
     "page": "index.html",

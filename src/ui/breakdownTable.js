@@ -13,7 +13,7 @@ function renderBreakdownTable(tbody, breakdownEntries, costToStyleFn) {
         const tr = document.createElement("tr");
 
         const tdMove = document.createElement("td");
-        tdMove.className = "scramblemanip-semibold";
+        tdMove.className = "cubecapo-semibold";
         tdMove.textContent = entry.move;
 
         const tdGrip = document.createElement("td");
@@ -23,7 +23,7 @@ function renderBreakdownTable(tbody, breakdownEntries, costToStyleFn) {
         tdTrick.textContent = entry.transition?.type || "(none)";
 
         const tdCost = document.createElement("td");
-        tdCost.className = "scramblemanip-right scramblemanip-semibold";
+        tdCost.className = "cubecapo-right cubecapo-semibold";
         if (costToStyleFn) {
             const styleRes = costToStyleFn(entry.addedCost);
             if (styleRes.startsWith("hsl") || styleRes.startsWith("#") || styleRes.startsWith("rgb")) {
@@ -45,7 +45,7 @@ function renderBreakdownTable(tbody, breakdownEntries, costToStyleFn) {
     }
 
     const totalRow = document.createElement("tr");
-    totalRow.className = "scramblemanip-total-row";
+    totalRow.className = "cubecapo-total-row";
 
     const tdTotalLabel = document.createElement("td");
     tdTotalLabel.colSpan = 3;
@@ -54,7 +54,7 @@ function renderBreakdownTable(tbody, breakdownEntries, costToStyleFn) {
     tdTotalLabel.appendChild(bLabel);
 
     const tdTotalCost = document.createElement("td");
-    tdTotalCost.className = "scramblemanip-right";
+    tdTotalCost.className = "cubecapo-right";
     const bCost = document.createElement("b");
     bCost.textContent = accumulated.toFixed(1);
     tdTotalCost.appendChild(bCost);

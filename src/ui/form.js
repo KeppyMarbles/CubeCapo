@@ -177,7 +177,7 @@ export async function setupForm(onSubmit) {
         applyRunOptionsValues(savedRunOpts);
 
         updateCostInputColors(form);
-        checkUnsavedChanges();
+        checkUnsavedChanges(); //TODO not always working?
     });
 
     // Submit handler

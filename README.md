@@ -1,11 +1,12 @@
-# scramblemanip
-A tool for generating more ergonomic versions of Rubik's cube scrambles. Currently experimental
+# Cube Capo
+A tool for generating more ergonomic versions of Rubik's cube scrambles.
 
 ### Current features
 - Tracking of likely thumb positions and fingertricks in 3x3 scrambles
 - Cost analysis of scrambles using customizable values
 - Optimization by branching with wide-move or double-prime replacements, searching multiple starting orientations
 - Memoization and pruning to reduce running time (though it can still be slow with large scrambles)
+- Injection of transposed scrambles into websites like csTimer
  
  ### Current limitations
  - Unhelpful output for big cubes, since the grip transitions were made with 3x3 in mind.
@@ -14,8 +15,6 @@ A tool for generating more ergonomic versions of Rubik's cube scrambles. Current
  - No "thumb" type fingertricks
  - Limited view of the hand state beyond thumb placement; sometimes the output contains moves that are good on paper but awkward in practice.
  - No analysis for rotations or slice moves yet.
- - Just a webpage at the momement, no extra tools or API.
-   - I'm new to web dev stuff so the site is pretty minimal.
 
 ## Screenshots
 <details>

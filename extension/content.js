@@ -58,16 +58,16 @@ async function findScrambleElement() {
         try {
             const el = document.querySelector(savedSelector);
             if (el) {
-                console.log(`[ScrambleManip] Found element using saved selector '${savedSelector}'`);
+                console.log(`[Cube Capo] Found element using saved selector '${savedSelector}'`);
                 return el;
             } else {
-                console.warn(`[ScrambleManip] Saved selector '${savedSelector}' yielded no element in DOM.`);
+                console.warn(`[Cube Capo] Saved selector '${savedSelector}' yielded no element in DOM.`);
             }
         } catch (err) {
-            console.error(`[ScrambleManip] Invalid saved selector '${savedSelector}':`, err);
+            console.error(`[Cube Capo] Invalid saved selector '${savedSelector}':`, err);
         }
     } else {
-        console.log(`[ScrambleManip] No saved selector for host '${location.hostname}'.`);
+        console.log(`[Cube Capo] No saved selector for host '${location.hostname}'.`);
     }
     return null;
 }
@@ -107,9 +107,9 @@ async function processScramble(element) {
         if (node.nodeType === Node.TEXT_NODE) {
             rawText += node.textContent;
         } else if (node.nodeType === Node.ELEMENT_NODE) {
-            if (node.classList.contains("scramblemanip-hidden-text")) {
+            if (node.classList.contains("cubecapo-hidden-text")) {
                 rawText += node.textContent;
-            } else if (!node.classList.contains("scramblemanip-visual-overlay")) {
+            } else if (!node.classList.contains("cubecapo-visual-overlay")) {
                 rawText += node.textContent;
             }
         }
@@ -134,16 +134,16 @@ async function processScramble(element) {
         },
         async (response) => {
             if (extAPI.runtime.lastError) {
-                console.warn("[ScrambleManip] Chrome extension message error:", extAPI.runtime.lastError);
+                console.warn("[Cube Capo] Chrome extension message error:", extAPI.runtime.lastError);
                 hideIndicator();
                 return;
             }
             if (response && response.success) {
-                console.log("[ScrambleManip] Optimization success:", response.bestScrambleStr);
+                console.log("[Cube Capo] Optimization success:", response.bestScrambleStr);
                 lastOptimizedText = response.bestScrambleStr;
                 showOptimizedState(element, response);
             } else {
-                console.log("[ScrambleManip] Scramble ignored or not supported:", response ? response.error : "No response");
+                console.log("[Cube Capo] Scramble ignored or not supported:", response ? response.error : "No response");
                 hideIndicator();
             }
         }
@@ -169,31 +169,31 @@ function hideOriginalText(scrambleElement) {
     for (const child of Array.from(scrambleElement.childNodes)) {
         if (child.nodeType === Node.TEXT_NODE && child.textContent.trim()) {
             const hideSpan = document.createElement("span");
-            hideSpan.className = "scramblemanip-hidden-text";
+            hideSpan.className = "cubecapo-hidden-text";
             hideSpan.style.display = "none";
             hideSpan.textContent = child.textContent;
             scrambleElement.replaceChild(hideSpan, child);
-        } else if (child.nodeType === Node.ELEMENT_NODE && !child.classList.contains("scramblemanip-visual-overlay")) {
+        } else if (child.nodeType === Node.ELEMENT_NODE && !child.classList.contains("cubecapo-visual-overlay")) {
             child.style.display = "none";
         }
     }
 }
 
 /**
- * Sets up optimizing state UI displaying 'Optimizing...' inside the scramble text area.
+ * Sets up optimizing state UI displaying 'Transposing...' inside the scramble text area.
  * @param {Element} scrambleElement - Target scramble DOM element.
  */
 function showOptimizingState(scrambleElement) {
     hideIndicator();
     hideOriginalText(scrambleElement);
 
-    let visualSpan = scrambleElement.querySelector(".scramblemanip-visual-overlay");
+    let visualSpan = scrambleElement.querySelector(".cubecapo-visual-overlay");
     if (!visualSpan) {
         visualSpan = document.createElement("span");
-        visualSpan.className = "scramblemanip-visual-overlay";
+        visualSpan.className = "cubecapo-visual-overlay";
         scrambleElement.appendChild(visualSpan);
     }
-    visualSpan.textContent = "Optimizing...";
+    visualSpan.textContent = "Transposing...";
 }
 
 /**
@@ -205,20 +205,20 @@ function showOptimizedState(scrambleElement, data) {
     // 1. Hide original text nodes immediately
     hideOriginalText(scrambleElement);
     
-    let visualSpan = scrambleElement.querySelector(".scramblemanip-visual-overlay");
+    let visualSpan = scrambleElement.querySelector(".cubecapo-visual-overlay");
     if (!visualSpan) {
         visualSpan = document.createElement("span");
-        visualSpan.className = "scramblemanip-visual-overlay";
+        visualSpan.className = "cubecapo-visual-overlay";
         scrambleElement.appendChild(visualSpan);
     }
     visualSpan.textContent = data.bestScrambleStr;
 
     // 2. Ensure indicator bar exists above the element
-    let bar = document.getElementById("scramblemanip-indicator");
+    let bar = document.getElementById("cubecapo-indicator");
     if (!bar) {
         bar = document.createElement("div");
-        bar.id = "scramblemanip-indicator";
-        bar.className = "scramblemanip-indicator-bar";
+        bar.id = "cubecapo-indicator";
+        bar.className = "cubecapo-indicator-bar";
         scrambleElement.parentNode.insertBefore(bar, scrambleElement);
     }
 
@@ -228,25 +228,25 @@ function showOptimizedState(scrambleElement, data) {
     bar.replaceChildren();
 
     const badge = document.createElement("span");
-    badge.className = "scramblemanip-badge";
-    badge.textContent = `(Optimized | Cost: ${data.bestCost.toFixed(1)})`;
+    badge.className = "cubecapo-badge";
+    badge.textContent = `(Transposed | Cost: ${data.bestCost.toFixed(1)})`; //TODO don't show this if showing original
 
     const toggleOriginalBtn = document.createElement("button");
     toggleOriginalBtn.type = "button";
-    toggleOriginalBtn.id = "scramblemanip-toggle-original";
-    toggleOriginalBtn.className = "scramblemanip-details-link";
+    toggleOriginalBtn.id = "cubecapo-toggle-original";
+    toggleOriginalBtn.className = "cubecapo-details-link";
     toggleOriginalBtn.textContent = "Show Original";
 
     const toggleDetailsBtn = document.createElement("button");
     toggleDetailsBtn.type = "button";
-    toggleDetailsBtn.id = "scramblemanip-toggle-details";
-    toggleDetailsBtn.className = "scramblemanip-details-link";
+    toggleDetailsBtn.id = "cubecapo-toggle-details";
+    toggleDetailsBtn.className = "cubecapo-details-link";
     toggleDetailsBtn.textContent = "Details";
 
     const openSettingsBtn = document.createElement("button");
     openSettingsBtn.type = "button";
-    openSettingsBtn.id = "scramblemanip-open-settings";
-    openSettingsBtn.className = "scramblemanip-details-link";
+    openSettingsBtn.id = "cubecapo-open-settings";
+    openSettingsBtn.className = "cubecapo-details-link";
     openSettingsBtn.textContent = "Settings";
 
     openSettingsBtn.addEventListener("click", (e) => {
@@ -263,20 +263,20 @@ function showOptimizedState(scrambleElement, data) {
     bar.appendChild(openSettingsBtn);
 
     // 3. Setup details table card (as a floating popup appended to body to prevent clipping)
-    let details = document.getElementById("scramblemanip-details-card");
+    let details = document.getElementById("cubecapo-details-card");
     if (details) {
         details.remove();
     }
 
     details = document.createElement("div");
-    details.id = "scramblemanip-details-card";
-    details.className = "scramblemanip-details-card";
+    details.id = "cubecapo-details-card";
+    details.className = "cubecapo-details-card";
 
     // Stop propagation so clicking inside the details card doesn't copy text or trigger csTimer start/stop
     details.addEventListener("click", (e) => e.stopPropagation());
 
     const table = document.createElement("table");
-    table.className = "scramblemanip-table";
+    table.className = "cubecapo-table";
 
     const thead = document.createElement("thead");
     const headerRow = document.createElement("tr");
@@ -291,7 +291,7 @@ function showOptimizedState(scrambleElement, data) {
         const th = document.createElement("th");
         th.textContent = h.text;
         if (h.alignRight) {
-            th.className = "scramblemanip-right";
+            th.className = "cubecapo-right";
         }
         headerRow.appendChild(th);
     }
@@ -310,7 +310,7 @@ function showOptimizedState(scrambleElement, data) {
     document.body.appendChild(details);
 
     // Bind original vs optimized toggle button
-    const toggleTextBtn = document.getElementById("scramblemanip-toggle-original");
+    const toggleTextBtn = document.getElementById("cubecapo-toggle-original");
     if (toggleTextBtn) {
         toggleTextBtn.addEventListener("click", (e) => {
             e.stopPropagation();
@@ -320,13 +320,13 @@ function showOptimizedState(scrambleElement, data) {
                 toggleTextBtn.textContent = "Show Original";
             } else {
                 visualSpan.textContent = lastOriginalText;
-                toggleTextBtn.textContent = "Show Optimized";
+                toggleTextBtn.textContent = "Show Transposed";
             }
         });
     }
 
     // Bind details toggle button click event
-    const toggleBtn = document.getElementById("scramblemanip-toggle-details");
+    const toggleBtn = document.getElementById("cubecapo-toggle-details");
     if (toggleBtn) {
         toggleBtn.addEventListener("click", (e) => {
             e.stopPropagation();
@@ -372,11 +372,11 @@ function showOptimizedState(scrambleElement, data) {
  */
 function hideIndicator() {
     if (targetElement) {
-        const visualSpan = targetElement.querySelector(".scramblemanip-visual-overlay");
+        const visualSpan = targetElement.querySelector(".cubecapo-visual-overlay");
         if (visualSpan) visualSpan.remove();
 
         for (const child of Array.from(targetElement.childNodes)) {
-            if (child.nodeType === Node.ELEMENT_NODE && child.classList.contains("scramblemanip-hidden-text")) {
+            if (child.nodeType === Node.ELEMENT_NODE && child.classList.contains("cubecapo-hidden-text")) {
                 const textNode = document.createTextNode(child.textContent);
                 targetElement.replaceChild(textNode, child);
             } else if (child.nodeType === Node.ELEMENT_NODE) {
@@ -386,10 +386,10 @@ function hideIndicator() {
         }
     }
 
-    const bar = document.getElementById("scramblemanip-indicator");
+    const bar = document.getElementById("cubecapo-indicator");
     if (bar) bar.remove();
 
-    const details = document.getElementById("scramblemanip-details-card");
+    const details = document.getElementById("cubecapo-details-card");
     if (details) details.remove();
 }
 
@@ -407,13 +407,13 @@ async function startMonitoring() {
 
     // Check if existing target element was removed from document DOM tree
     if (targetElement && !document.body.contains(targetElement)) {
-        console.log("[ScrambleManip] Target element was detached from DOM. Re-querying selector...");
+        console.log("[Cube Capo] Target element was detached from DOM. Re-querying selector...");
         stopMonitoring();
     }
 
     targetElement = await findScrambleElement();
     if (targetElement) {
-        console.log("[ScrambleManip] Target scramble element found/connected:", targetElement);
+        console.log("[Cube Capo] Target scramble element found/connected:", targetElement);
         // Observe text changes directly on scramble element
         if (scrambleObserver) scrambleObserver.disconnect();
         
@@ -430,7 +430,7 @@ async function startMonitoring() {
         // Run immediately
         processScramble(targetElement);
     } else {
-        console.log("[ScrambleManip] Target scramble element not found in DOM.");
+        console.log("[Cube Capo] Target scramble element not found in DOM.");
     }
 }
 
@@ -476,10 +476,10 @@ function startPicker() {
 
     // Create selection cover/overlay message banner
     const overlay = document.createElement("div");
-    overlay.className = "scramblemanip-picker-overlay";
+    overlay.className = "cubecapo-picker-overlay";
     
     pickerBanner = document.createElement("div");
-    pickerBanner.className = "scramblemanip-picker-banner";
+    pickerBanner.className = "cubecapo-picker-banner";
     pickerBanner.textContent = "Click on the Rubik's cube scramble element (Press ESC to cancel)";
     overlay.appendChild(pickerBanner);
     document.body.appendChild(overlay);
@@ -487,12 +487,12 @@ function startPicker() {
     const onMouseOver = (e) => {
         e.stopPropagation();
         if (hoverElement) {
-            hoverElement.classList.remove("scramblemanip-picker-hover");
+            hoverElement.classList.remove("cubecapo-picker-hover");
         }
         hoverElement = e.target;
         // Avoid highlighting our own picker overlay
         if (hoverElement && !overlay.contains(hoverElement)) {
-            hoverElement.classList.add("scramblemanip-picker-hover");
+            hoverElement.classList.add("cubecapo-picker-hover");
         }
     };
 
@@ -522,7 +522,7 @@ function startPicker() {
         pickerActive = false;
         overlay.remove();
         if (hoverElement) {
-            hoverElement.classList.remove("scramblemanip-picker-hover");
+            hoverElement.classList.remove("cubecapo-picker-hover");
             hoverElement = null;
         }
         document.removeEventListener("mouseover", onMouseOver, true);
