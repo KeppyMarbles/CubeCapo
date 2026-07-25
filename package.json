@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node scramble.js"
+    "test": "node benchmark.js"
   },
   "keywords": [],
   "author": "",
