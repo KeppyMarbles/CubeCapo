@@ -89,15 +89,43 @@ export async function setupForm(onSubmit) {
             "wideMultiplier": "scalar"
         }
       
+        /** @type {Record<string, (key: string) => number>} */
+        const columnClassifiers = {
+            "general": () => 0,
+            "alpha": (key) => ["x", "y", "z"].includes(key) ? 2 : (key === key.toLowerCase() ? 1 : 0),
+            "grip": (key) => {
+                const firstGrip = key.split(" ")[0];
+                const order = ["F", "U", "D", "Bd", "Bu"];
+                const idx = order.indexOf(firstGrip);
+                return idx !== -1 ? idx : 0;
+            },
+            "fingertrick": (key) => {
+                if (key === "rotation") return 2;
+                if (key.startsWith("right_")) return 1;
+                return 0;
+            }
+        };
+
         for (const [groupName, groupValue] of Object.entries(initialConfig)) {
             const groupDiv = form.querySelector(`[data-group="${groupName}"]`);
             if (!groupDiv || typeof groupValue !== "object") continue;
 
             const gridDiv = document.createElement("div");
-            gridDiv.className = "cost-columns";
-            groupDiv.appendChild(gridDiv);
+            gridDiv.className = "cost-category-grid";
+
+            const getColumnIndex = columnClassifiers[groupName] || (() => 0);
+            /** @type {Map<number, HTMLDivElement>} */
+            const colMap = new Map();
 
             for (const [key, val] of Object.entries(groupValue)) {
+                const colIdx = getColumnIndex(key);
+                if (!colMap.has(colIdx)) {
+                    const col = document.createElement("div");
+                    col.className = "cost-col";
+                    colMap.set(colIdx, col);
+                }
+                const colDiv = colMap.get(colIdx);
+
                 const label = document.createElement("label");
                 label.textContent = formAlias[key] || key;
                 label.title = formTitles[key] || "";
@@ -107,10 +135,16 @@ export async function setupForm(onSubmit) {
                 input.name = `${groupName}.${key}`;
                 input.value = val;
                 input.valueType = formTypes[key] || "additive";
-                //input.colorShift = formShifts[key] || -2;
                 label.appendChild(input);
-                gridDiv.appendChild(label);
+                colDiv.appendChild(label);
             }
+
+            // Append columns sorted by index
+            const sortedIndices = Array.from(colMap.keys()).sort((a, b) => a - b);
+            for (const idx of sortedIndices) {
+                gridDiv.appendChild(colMap.get(idx));
+            }
+            groupDiv.appendChild(gridDiv);
         }
     }
 
@@ -138,7 +172,7 @@ export async function setupForm(onSubmit) {
     };
 
     // Attach change detection to computation settings
-    const computationInputs = ["depth", "iterations", "searchRotations", "searchStartingGrips", "showGrips", "wedgeNotation", "pruneRotations", "memoize", "wideReplaceDouble"];
+    const computationInputs = ["depth", "iterations", "searchRotations", "searchStartingGrips", "showGrips", "wedgeNotation", "pruneRotations", "memoize", "wideReplaceDouble", "allowMidScrambleRotations"];
     computationInputs.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -211,12 +245,12 @@ export async function setupForm(onSubmit) {
     addGroupControls(form, "fingertrick", [
         { label: "Pushes", targets: ["right_index_push", "right_ring_push", "left_index_push", "left_ring_push"]},
         { label: "Ring Finger", targets: ["right_ring", "right_ring_middle", "right_ring_push", "left_ring", "left_ring_middle", "left_ring_push"]},
-        { label: "Index Finger", targets: ["right_index", "right_index_push", "right_index_middle", "left_index", "left_index_middle"]},
+        { label: "Index Finger", targets: ["right_index", "right_index_push", "right_index_front", "right_index_middle", "left_index", "left_index_front", "left_index_middle"]},
         { label: "Twist Up", targets: ["right_up", "right_up_double", "left_up", "left_up_double"]},
         { label: "Twist Down", targets: ["right_down", "right_down_double", "left_down", "left_down_double"]},
         { label: ""},
-        { label: "Right Hand", targets: ["right_index", "right_index_push", "right_index_middle", "right_ring", "right_ring_middle", "right_ring_push", "right_up", "right_up_double", "right_down", "right_down_double"]},
-        { label: "Left Hand", targets: ["left_index", "left_index_push", "left_index_middle", "left_ring", "left_ring_middle", "left_ring_push", "left_up", "left_up_double", "left_down", "left_down_double"]},
+        { label: "Right Hand", targets: ["right_index", "right_index_push", "right_index_front", "right_index_middle", "right_ring", "right_ring_middle", "right_ring_push", "right_up", "right_up_double", "right_down", "right_down_double"]},
+        { label: "Left Hand", targets: ["left_index", "left_index_push", "left_index_front", "left_index_middle", "left_ring", "left_ring_middle", "left_ring_push", "left_up", "left_up_double", "left_down", "left_down_double"]},
     ]);
 
     addGroupControls(form, "grip", [
@@ -244,6 +278,7 @@ export async function setupForm(onSubmit) {
         { label: ""},
         { label: "Normal", targets: ["F", "B", "R", "L", "U", "D"]},
         { label: "Wide", targets: ["f", "b", "r", "l", "u", "d"]},
+        { label: "Rotation", targets: ["x", "y", "z"]},
     ]);
 
     document.getElementById("exportButton").addEventListener("click", () => {
@@ -338,7 +373,7 @@ function addGroupControls(form, groupName, controls) {
     groupDiv.appendChild(separator);
 
     // Create a section header
-    const header = document.createElement("p");
+    const header = document.createElement("h4");
     header.textContent = "Adjustments";
     groupDiv.appendChild(header);
 
@@ -533,10 +568,10 @@ function collectRunOptions() {
 
     const scramble = ScrambleOptimizer.parseScramble(rawText);
     const cubeSize = ScrambleOptimizer.detectCubeSize(scramble);
-    const supportedSizes = [3]; // Currently 3x3 supported
-    if (!supportedSizes.includes(cubeSize)) {
-        throw new Error(`${cubeSize}x${cubeSize} scrambles are not supported yet.`);
-    }
+    //const supportedSizes = [3]; // Currently 3x3 supported
+    //if (!supportedSizes.includes(cubeSize)) {
+    //    throw new Error(`${cubeSize}x${cubeSize} scrambles are not supported yet.`);
+    //}
     const runOpts = collectRunOptionsValues();
 
     if (Number.isNaN(runOpts.depth) || Number.isNaN(runOpts.maxIterations)) {
@@ -565,8 +600,9 @@ function collectRunOptionsValues() {
     const pruneRotations = document.getElementById("pruneRotations")?.checked ?? true;
     const memoize = document.getElementById("memoize")?.checked ?? true;
     const wideReplaceDouble = document.getElementById("wideReplaceDouble")?.checked ?? true;
+    const allowMidScrambleRotations = document.getElementById("allowMidScrambleRotations")?.checked ?? false;
 
-    return { depth, maxIterations, searchRotations, searchStartingGrips, showGrips, wedgeNotation, pruneRotations, memoize, wideReplaceDouble };
+    return { depth, maxIterations, searchRotations, searchStartingGrips, showGrips, wedgeNotation, pruneRotations, memoize, wideReplaceDouble, allowMidScrambleRotations };
 }
 
 /**
@@ -583,6 +619,7 @@ function applyRunOptionsValues(runOpts) {
     if (document.getElementById("pruneRotations")) document.getElementById("pruneRotations").checked = runOpts.pruneRotations;
     if (document.getElementById("memoize")) document.getElementById("memoize").checked = runOpts.memoize;
     if (document.getElementById("wideReplaceDouble")) document.getElementById("wideReplaceDouble").checked = runOpts.wideReplaceDouble;
+    if (document.getElementById("allowMidScrambleRotations")) document.getElementById("allowMidScrambleRotations").checked = runOpts.allowMidScrambleRotations ?? false;
 }
 
 /**

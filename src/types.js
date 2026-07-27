@@ -10,6 +10,7 @@
  * @typedef {(
  *   | "right_index"
  *   | "right_index_push"
+ *   | "right_index_front"
  *   | "right_index_middle"
  *   | "right_ring"
  *   | "right_ring_middle"
@@ -20,6 +21,7 @@
  *   | "right_down_double"
  *   | "left_index"
  *   | "left_index_push"
+ *   | "left_index_front"
  *   | "left_index_middle"
  *   | "left_ring"
  *   | "left_ring_middle"

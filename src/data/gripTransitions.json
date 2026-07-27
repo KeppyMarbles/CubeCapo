@@ -223,9 +223,9 @@
       "regrip": false
     },
     "F": {
-      "next": "F D",
-      "type": "right_index",
-      "regrip": true
+      "next": "F F",
+      "type": "right_index_front",
+      "regrip": false
     },
     "F2": {
       "next": "F D",
@@ -238,9 +238,9 @@
       "regrip": true
     },
     "F'": {
-      "next": "D F",
-      "type": "left_index",
-      "regrip": true
+      "next": "F F",
+      "type": "left_index_front",
+      "regrip": false
     },
     "x": {
       "next": "U U",
@@ -385,7 +385,7 @@
       "regrip": false
     },
     "x": {
-      "next": "F Bu",
+      "next": "U Bu",
       "type": "rotation",
       "regrip": false
     },
@@ -664,9 +664,9 @@
       "regrip": true      
     },
     "F'": {
-      "next": "F U",
-      "type": "left_ring",
-      "regrip": true
+      "next": "F Bu",
+      "type": "left_index_front",
+      "regrip": false
     },
     "x": {
       "next": "U F",
@@ -674,17 +674,17 @@
       "regrip": true
     },
     "x2": {
-      "next": "F F",
+      "next": "Bu F",
       "type": "rotation",
       "regrip": true
     },
     "x2'": {
-      "next": "F F",
+      "next": "Bd F",
       "type": "rotation",
-      "regrip": true
+      "regrip": false
     },
     "x'": {
-      "next": "D F",
+      "next": "D U",
       "type": "rotation",
       "regrip": false
     }
@@ -807,7 +807,7 @@
     },
     "F'": {
       "next": "F Bd",
-      "type": "left_index",
+      "type": "left_index_front",
       "regrip": false
     },
     "x": {
@@ -953,24 +953,24 @@
       "regrip": false
     },
     "x": {
-      "next": "U D",
+      "next": "Bu U",
       "type": "rotation",
       "regrip": false
     },
     "x2": {
-      "next": "Bu F",
+      "next": "U Bu",
+      "type": "rotation",
+      "regrip": true
+    },
+    "x2'": {
+      "next": "D Bd",
       "type": "rotation",
       "regrip": false
     },
-    "x2'": {
-      "next": "F F",
-      "type": "rotation",
-      "regrip": true
-    },
     "x'": {
-      "next": "F F",
+      "next": "F D",
       "type": "rotation",
-      "regrip": true
+      "regrip": false
     }
   },
   "U D": {
@@ -1070,8 +1070,8 @@
       "regrip": true
     },
     "U'": {
-      "next": "F D",
-      "type": "left_index",
+      "next": "U D",
+      "type": "left_index_front",
       "regrip": true
     },
     "F": {
@@ -1105,7 +1105,7 @@
       "regrip": true
     },
     "x2'": {
-      "next": "F F",
+      "next": "D F",
       "type": "rotation",
       "regrip": true
     },
@@ -1198,7 +1198,7 @@
     },
     "U": {
       "next": "U U",
-      "type": "right_index",
+      "type": "right_index_front",
       "regrip": false
     },
     "U2": {
@@ -1213,7 +1213,7 @@
     },
     "U'": {
       "next": "U U",
-      "type": "left_index",
+      "type": "left_index_front",
       "regrip": false
     },
     "F": {
@@ -1355,7 +1355,7 @@
     },
     "U'": {
       "next": "U Bu",
-      "type": "left_index",
+      "type": "left_index_front",
       "regrip": false
     },
     "F": {
@@ -1497,7 +1497,7 @@
     },
     "U'": {
       "next": "U Bd",
-      "type": "left_index",
+      "type": "left_index_front",
       "regrip": false
     },
     "F": {
@@ -1765,9 +1765,9 @@
       "regrip": false
     },
     "U": {
-      "next": "D F",
-      "type": "right_index",
-      "regrip": true
+      "next": "D U",
+      "type": "right_index_front",
+      "regrip": false
     },
     "U2": {
       "next": "D F",
@@ -1847,9 +1847,9 @@
       "regrip": false
     },
     "D": {
-      "next": "F D",
-      "type": "left_ring",
-      "regrip": true
+      "next": "D D",
+      "type": "left_index_front",
+      "regrip": false
     },
     "D2": {
       "next": "F D",
@@ -1862,9 +1862,9 @@
       "regrip": true
     },
     "D'": {
-      "next": "D F",
-      "type": "right_ring",
-      "regrip": true
+      "next": "D D",
+      "type": "right_index_front",
+      "regrip": false
     },    
     "L": {
       "next": "Bd D",
@@ -2146,9 +2146,9 @@
       "regrip": true
     },
     "D'": {
-      "next": "D F",
-      "type": "right_ring",
-      "regrip": true
+      "next": "D Bd",
+      "type": "right_index_push",
+      "regrip": false
     },    
     "L": {
       "next": "Bd Bd",
@@ -2353,9 +2353,9 @@
       "regrip": false
     },
     "F": {
-      "next": "Bu D",
-      "type": "right_index",
-      "regrip": true
+      "next": "Bu F",
+      "type": "right_index_front",
+      "regrip": false
     },
     "F2": {
       "next": "Bu D",
@@ -2476,7 +2476,7 @@
     },
     "U": {
       "next": "Bu U",
-      "type": "right_index",
+      "type": "right_index_front",
       "regrip": false
     },
     "U2": {
@@ -3063,9 +3063,9 @@
       "regrip": false
     },
     "F": {
-      "next": "Bd D",
-      "type": "right_index",
-      "regrip": true
+      "next": "Bd F",
+      "type": "right_index_front",
+      "regrip": false
     },
     "F2": {
       "next": "Bd D",
@@ -3185,9 +3185,9 @@
       "regrip": false
     },
     "U": {
-      "next": "Bd F",
-      "type": "right_index",
-      "regrip": true
+      "next": "Bd U",
+      "type": "right_index_front",
+      "regrip": false
     },
     "U2": {
       "next": "Bd F",
@@ -3282,9 +3282,9 @@
       "regrip": true
     },
     "D'": {
-      "next": "Bd F",
-      "type": "right_ring",
-      "regrip": true
+      "next": "Bd D",
+      "type": "left_index",
+      "regrip": false
     },    
     "L": {
       "next": "F D",

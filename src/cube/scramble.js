@@ -14,7 +14,8 @@ export class ScrambleOptimizer {
         },
         "alpha": { 
             "F": 0, "B": 1, "R": 0, "L": 1, "U": 0, "D": 1,
-            "f": 3, "b": 3, "r": 1, "l": 2, "u": 3, "d": 3
+            "f": 3, "b": 3, "r": 1, "l": 2, "u": 3, "d": 3,
+            "x": 2, "y": 2, "z": 2
         },
         "grip": {
             "F F": 0, "F U": 0, "F D": 0, "F Bd": 2, "F Bu": 2, 
@@ -26,6 +27,7 @@ export class ScrambleOptimizer {
         "fingertrick": {
             "right_index": 0,
             "right_index_push": 2,
+            "right_index_front": 3,
             "right_index_middle": 0,
             "right_ring": 1,
             "right_ring_middle": 1,
@@ -36,6 +38,7 @@ export class ScrambleOptimizer {
             "right_down_double": 0,
             "left_index": 0,
             "left_index_push": 2,
+            "left_index_front": 3,
             "left_index_middle": 0,
             "left_ring": 1,
             "left_ring_middle": 1,
@@ -44,14 +47,16 @@ export class ScrambleOptimizer {
             "left_up_double": 0,
             "left_down": 0,
             "left_down_double": 0,
-            "rotation": 0
         }
     }
+
+    /** @type {Move[]} */
+    static ROTATION_CANDIDATES = ["x", "x'", "x2", "x2'"].map(Move.fromString);
 
     /** @type {RunOptions} */
     static defaultRunOptions = {
         scramble: [],
-        depth: 0,
+        depth: 1,
         maxIterations: 999999,
         searchRotations: true,
         searchStartingGrips: true,
@@ -59,7 +64,8 @@ export class ScrambleOptimizer {
         wedgeNotation: false,
         pruneRotations: true,
         memoize: true,
-        wideReplaceDouble: true
+        wideReplaceDouble: false,
+        allowMidScrambleRotations: false
     };
 
     /**
@@ -154,13 +160,28 @@ export class ScrambleOptimizer {
     }
 
     /**
+     * Applies rotation to all moves after `index` and updates orientation.
+     * @param {Move[]} moves 
+     * @param {number} index 
+     * @param {Orientation} orientation 
+     * @param {RotationStr} rotation 
+     */
+    static applyRotation(moves, index, orientation, rotation) {
+        for (let i = index + 1; i < moves.length; i++) {
+            moves[i].transpose(rotation);
+        }
+        orientation.up = Move.TRANSPOSITIONS[rotation][orientation.up];
+        orientation.front = Move.TRANSPOSITIONS[rotation][orientation.front];
+    }
+
+    /**
      * Changes the move at a given index to a wide move and updates the orientation
      * @type {MoveTransform}
      */
     static wideReplace(moves, index, orientation) {
-        moves[index].alpha = Move.WIDE_EQUIVALENTS[moves[index].alpha]
+        moves[index].alpha = Move.WIDE_EQUIVALENTS[moves[index].alpha];
         moves[index].isWide = true;
-        ScrambleOptimizer._applyWideRotation(moves, index, orientation);
+        ScrambleOptimizer.applyRotation(moves, index, orientation, Move.WIDE_ROTATIONS[moves[index].toKey()]);
     }
 
     /**
@@ -171,22 +192,7 @@ export class ScrambleOptimizer {
         const newMove = new Move(Move.WIDE_EQUIVALENTS[moves[index].alpha], moves[index].isPrime, false, false, true);
         moves[index].isDouble = false;
         moves.splice(index, 0, newMove);
-        ScrambleOptimizer._applyWideRotation(moves, index, orientation);
-    }
-
-    /**
-     * Applies the rotation caused by a wide move at `index` to all subsequent moves and the cube orientation.
-     * @type {MoveTransform}
-     */
-    static _applyWideRotation(moves, index, orientation) {
-        const rotation = Move.WIDE_ROTATIONS[moves[index].toKey()];
-
-        for (let i = index + 1; i < moves.length; i++) {
-            moves[i].transpose(rotation);
-        }
-
-        orientation.up = Move.TRANSPOSITIONS[rotation][orientation.up];
-        orientation.front = Move.TRANSPOSITIONS[rotation][orientation.front];
+        ScrambleOptimizer.applyRotation(moves, index, orientation, Move.WIDE_ROTATIONS[newMove.toKey()]);
     }
 
     /**
@@ -195,6 +201,18 @@ export class ScrambleOptimizer {
      */
     static primeReplace(moves, index, orientation) {
         moves[index].isPrime = true;
+    }
+
+    /**
+     * Inserts a mid-scramble rotation before the move at `index` and transposes subsequent moves
+     * @param {Move[]} moves 
+     * @param {number} index 
+     * @param {Orientation} orientation 
+     * @param {Move} rotMove 
+     */
+    static insertRotation(moves, index, orientation, rotMove) {
+        moves.splice(index, 0, new Move(rotMove.alpha, rotMove.isPrime, rotMove.isDouble, rotMove.isRotation, rotMove.isWide, rotMove.sliceNum));
+        ScrambleOptimizer.applyRotation(moves, index, orientation, rotMove.toKey());
     }
 
     /**
@@ -329,6 +347,13 @@ export class ScrambleOptimizer {
         if(move.isRotation)
             return;
 
+        // Mid-scramble rotation insertion (e.g. x, x', x2)
+        if (this.allowMidScrambleRotations) {
+            for (const rot of ScrambleOptimizer.ROTATION_CANDIDATES) {
+                branchWithClone((arr, idx, or) => ScrambleOptimizer.insertRotation(arr, idx, or, rot), 2);
+            }
+        }
+
         // wide variation (single-layer wide)
         if (!move.isWide)
             branchWithClone((arr, idx, or) => ScrambleOptimizer.wideReplace(arr, idx, or), 1);
@@ -370,6 +395,7 @@ export class ScrambleOptimizer {
         this.bestScramble = options.scramble;
         this.memoize = options.memoize;
         this.doWideReplaceDouble = options.wideReplaceDouble;
+        this.allowMidScrambleRotations = options.allowMidScrambleRotations || false;
         this.cubeSize = options.cubeSize || ScrambleOptimizer.detectCubeSize(options.scramble);
 
         this.bestRotation = {up: null, front: null};

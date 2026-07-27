@@ -136,29 +136,23 @@ input[type="number"]:focus {
   border-color: var(--primary);
 }
 
-.cost-columns {
-  column-count: 2;
-  column-gap: 20px;
+.cost-category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
   margin-bottom: 8px;
 }
 
-#general .cost-columns {
-  column-count: 1;
+.cost-col {
+  display: flex;
+  flex-direction: column;
 }
 
-@media (max-width: 480px) {
-  .cost-columns {
-    column-count: 1;
-  }
-}
-
-.cost-columns label {
+.cost-col label {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
   font-size: 12px;
-  break-inside: avoid;
 }
 
 .adjustment-row {
