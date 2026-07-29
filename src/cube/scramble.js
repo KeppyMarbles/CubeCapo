@@ -1,5 +1,5 @@
 import { Move } from "./move.js";
-/** @import { CostConfig, TransitionConfig, Orientation, GripState, MoveKey, Transition, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, RotationStr, Rotation } from "../types.js" */
+/** @import { CostConfig, TransitionConfig, Orientation, GripState, MoveKey, Transition, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, CostDetails, RotationStr, Rotation } from "../types.js" */
 
 /** @typedef {(moves: Move[], index: number, orientation: Orientation) => void} MoveTransform */
 
@@ -267,25 +267,6 @@ export class ScrambleOptimizer {
     }
 
     /**
-     * @param {Transition} lastTransition 
-     * @param {Transition} transition 
-     * @param {Move} move
-     * @returns 
-     */
-    computeTransitionCost(lastTransition, transition, move) { //TODO should probably have a better prevention of NaNs
-        let added = 0;
-        if (!transition) return 999999;
-        if (transition.regrip) added += this.config.general.regrip;
-        added += this.config.grip[transition.next] ?? 0;
-        const ftCost = this.config.fingertrick[transition.type] ?? 0;
-        added += this.config.general.perSliceFingertrick ? move.getPhysicalSlices(this.cubeSize) * ftCost : ftCost;
-        added += this.config.alpha[move.isWide ? move.alpha.toLowerCase() : move.alpha] ?? 0;
-        if(move.isDouble) added += this.config.general.double;
-        if(lastTransition?.type == transition.type) added += this.config.general.repeatPenalty;
-        return added;
-    }
-
-    /**
      * @param {Move[]} moves 
      * @param {number} index 
      * @param {GripState} currentGrip 
@@ -545,7 +526,49 @@ export class ScrambleOptimizer {
             }
         }
     }
-    
+
+    /**
+     * @param {Transition} lastTransition 
+     * @param {Transition} transition 
+     * @param {Move} move
+     * @param {CostDetails} [outDetails] Optional object to populate with itemized cost components
+     * @returns {number}
+     */
+    computeTransitionCost(lastTransition, transition, move, outDetails = null) {
+        if (!transition) return 999999;
+
+        let added = 0;
+        const regripCost = (transition.regrip && this.config.general.regrip) ? this.config.general.regrip : 0;
+        added += regripCost;
+
+        const gripCost = this.config.grip[transition.next] ?? 0;
+        added += gripCost;
+
+        const ftCost = this.config.fingertrick[transition.type] ?? 0;
+        const totalFtCost = this.config.general.perSliceFingertrick ? move.getPhysicalSlices(this.cubeSize) * ftCost : ftCost;
+        added += totalFtCost;
+
+        const alphaCost = this.config.alpha[move.isWide ? move.alpha.toLowerCase() : move.alpha] ?? 0;
+        added += alphaCost;
+
+        const doubleCost = (move.isDouble && this.config.general.double) ? this.config.general.double : 0;
+        added += doubleCost;
+
+        const repeatCost = (lastTransition?.type === transition.type && this.config.general.repeatPenalty) ? this.config.general.repeatPenalty : 0;
+        added += repeatCost;
+
+        if (outDetails) {
+            outDetails.regrip = regripCost;
+            outDetails.grip = gripCost;
+            outDetails.fingertrick = totalFtCost;
+            outDetails.alpha = alphaCost;
+            outDetails.double = doubleCost;
+            outDetails.repeatPenalty = repeatCost;
+        }
+
+        return added;
+    }
+
     /**
      * @param {Move[]} scramble 
      * @param {GripState} [startGrip]
@@ -572,13 +595,15 @@ export class ScrambleOptimizer {
             }
 
             const nextGrip = transition.next;
-            const addedCost = this.computeTransitionCost(lastTransition, transition, move);
+            const costBreakdown = {};
+            const addedCost = this.computeTransitionCost(lastTransition, transition, move, costBreakdown);
             lastTransition = transition;
 
             breakdown.push({
                 move: move.toString(options.wedgeNotation, this.cubeSize), 
                 transition, 
                 addedCost,
+                costBreakdown,
                 isPartitionBoundary: i > 0 && boundaries.includes(i)
             });
 

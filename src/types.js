@@ -112,10 +112,21 @@
  */
 
 /**
+ * @typedef CostDetails
+ * @property {number} [regrip] Cost contribution from regripping
+ * @property {number} [grip] Cost contribution from thumb grip placement
+ * @property {number} [fingertrick] Cost contribution from move fingertrick execution
+ * @property {number} [alpha] Cost contribution from face/alpha turn preference
+ * @property {number} [double] Cost contribution from double turns
+ * @property {number} [repeatPenalty] Penalty for repeating identical move fingertricks consecutively
+ */
+
+/**
  * @typedef ScrambleBreakdownEntry
  * @property {MoveStr} move The move for this step
  * @property {Transition} transition The transition occuring from this move
- * @property {number} addedCost The cost of the transition
+ * @property {number} addedCost The total cost of the transition
+ * @property {CostDetails} [costBreakdown] Itemized breakdown of the cost components (fingertrick, grip, alpha, etc.)
  * @property {boolean} [isPartitionBoundary] If this move starts a new partition
  */
 

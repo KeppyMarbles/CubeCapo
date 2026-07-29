@@ -40,6 +40,11 @@ function renderBreakdownTable(tbody, breakdownEntries, costToStyleFn) {
         }
         tdCost.textContent = entry.addedCost;
 
+        if (entry.costBreakdown && Object.keys(entry.costBreakdown).length > 0) {
+            const tooltipParts = Object.entries(entry.costBreakdown).filter(([k, v]) => { return v > 0 }).map(([k, v]) => `${k}: ${v}`);
+            tdCost.title = tooltipParts.join(", ");
+        }
+
         tr.appendChild(tdMove);
         tr.appendChild(tdGrip);
         tr.appendChild(tdTrick);
