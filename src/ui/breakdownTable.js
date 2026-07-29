@@ -11,6 +11,9 @@ function renderBreakdownTable(tbody, breakdownEntries, costToStyleFn) {
     for (const entry of breakdownEntries || []) {
         accumulated += entry.addedCost;
         const tr = document.createElement("tr");
+        if (entry.isPartitionBoundary) {
+            tr.classList.add("cubecapo-partition-boundary");
+        }
 
         const tdMove = document.createElement("td");
         tdMove.className = "cubecapo-semibold";

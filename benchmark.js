@@ -32,6 +32,8 @@ for (let i = 0; i < scrambleLines.length; i++) {
 
     const options = {
         ...ScrambleOptimizer.defaultRunOptions,
+        searchRotations: false, //speedup
+        searchStartingGrips: false, //speedup
         scramble: parsedMoves
     };
 

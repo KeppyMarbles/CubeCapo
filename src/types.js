@@ -41,14 +41,14 @@
 
 /** @typedef {Record<Fingertrick, number>} FingertrickCosts */
 /** @typedef {Record<GripState, number>} GripCosts */
-/** @typedef {Record<WideFaceStr | FaceStr, number>} AlphaCosts */
+/** @typedef {Record<WideFaceStr | FaceStr | AxisStr, number>} AlphaCosts */
 
 /**
  * @typedef {Object} GeneralCosts
  * @property {number} regrip Cost of a regrip occuring
  * @property {number} double Cost of a double move
  * @property {number} repeatPenalty Cost of the same fingertrick occuring twice in a row
- * @property {number} wideMultiplier Cost scalar for wide moves
+ * @property {boolean} perSliceFingertrick If fingertrick cost should be applied for each effective slice
  */
 
 /**
@@ -83,23 +83,23 @@
 /**
  * @typedef {Object} FormatOptions
  * @property {boolean} [showGrips] If grip prompts (starting grip and regrip transitions) should be included in output
+ * @property {boolean} [showBoundaries] If the scramble should show `|` where partitions were made
  * @property {boolean} [wedgeNotation] If wide moves should be output using wedge count notation (e.g. Rw, 3Rw)
- * @property {number} [cubeSize] Size of the cube (e.g. 3 for 3x3, 7 for 7x7) for calculating wedge slice counts
  */
 
 /**
  * @typedef {Object} RunOptions
  * @property {Move[]} scramble The scramble to optimize
+ * @property {number} [cubeSize] Size of the cube (e.g. 3 for 3x3, 7 for 7x7), detected automatically if omitted
  * @property {number} depth The branch pruning threshold
  * @property {number} maxIterations Number of iterations to try before bailing out
  * @property {boolean} searchRotations If all orientations should be searched
  * @property {boolean} searchStartingGrips If all starting thumb placements (grips) should be searched
  * @property {boolean} pruneRotations If an orientation search should be stopped if worse than best orientation
  * @property {boolean} memoize If search shouldn't continue if same index, orientation and grip is reached
+ * @property {boolean} [wideReplace] If search should try replacing single moves with wide moves
  * @property {boolean} wideReplaceDouble If search should try replacing double moves with 1 wide and 1 normal move
- * @property {boolean} [showGrips] If grip prompts (starting grip and regrip transitions) should be included in output
- * @property {boolean} [wedgeNotation] If wide moves should be output using wedge count notation (e.g. Rw, 3Rw)
- * @property {number} [cubeSize] Size of the cube (e.g. 3 for 3x3, 7 for 7x7) for calculating wedge slice counts
+ * @property {number} [partitionLength] Maximum length of scramble partitions (0 or undefined to disable)
  */
 
 /**
@@ -116,6 +116,7 @@
  * @property {MoveStr} move The move for this step
  * @property {Transition} transition The transition occuring from this move
  * @property {number} addedCost The cost of the transition
+ * @property {boolean} [isPartitionBoundary] If this move starts a new partition
  */
 
 export {}

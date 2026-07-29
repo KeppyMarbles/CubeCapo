@@ -16,6 +16,10 @@
               <input type="text" id="scramble" placeholder="Enter scramble" value=""/>
             </label>
 
+            <label title="If single moves can be replaced with wide moves (e.g. R -> r)">Wide Replace
+              <input type="checkbox" id="wideReplace" checked/>
+            </label>
+
             <label title="If double moves can be replaced with a wide move + normal face move. Increases search time">Wide Replace Double
               <input type="checkbox" id="wideReplaceDouble"/>
             </label>
@@ -47,6 +51,10 @@
                   <input type="checkbox" id="showGrips"/>
                 </label>
 
+                <label title="Show where the scramble was split during computation.">Show Partition Boundaries
+                  <input type="checkbox" id="showBoundaries"/>
+                </label>
+
                 <label title="Convert wide moves to wedge count notation (e.g. Rw instead of r)">Wedge Notation
                   <input type="checkbox" id="wedgeNotation"/>
                 </label>
@@ -66,6 +74,10 @@
 
                 <label title="If a rotation search should stop if worse than the best rotation. Disable if you want more data">Prune Starting Rotations
                   <input type="checkbox" id="pruneRotations"/>
+                </label>
+
+                <label title="Maximum move count per sub-scramble partition to optimize long scrambles (0 to disable)">Partition Length
+                  <input type="number" id="partitionLength" min="0" value="0"/>
                 </label>
 
                 <label title="If reaching an already visited state [current grip & scramble index & cube orientation] should prune the current branch. Disable if you want to ensure minimization">Memoize

@@ -111,7 +111,6 @@ export class Move {
 
         // Optional 'w' modifier (e.g. "Rw", "3Rw")
         if (char === "w") {
-            move.isWide = true;
             if (!move.sliceNum) 
                 move.sliceNum = 2; // standard wide move means 2 slices
             index++;
@@ -150,29 +149,47 @@ export class Move {
     /**
      * @param {boolean} [wedgeNotation]
      * @param {number} [cubeSize]
-     * @returns {MoveStr}
+     * @returns {string}
      */
     toString(wedgeNotation = false, cubeSize = 3) {
         let s = "";
 
         if (this.isRotation) {
             s += this.alpha.toLowerCase();
-        } else if (this.isWide || this.sliceNum > 1) {
-            const rawSlices = this.sliceNum || 1;
-            const slices = (wedgeNotation && this.isWide && cubeSize >= rawSlices) 
-                ? (cubeSize - rawSlices) 
-                : rawSlices;
+        } else {
+            const physicalSlices = this.getPhysicalSlices(cubeSize);
 
-            const prefix = slices > 2 ? slices : "";
+            let prefix = "";
+            let face = this.alpha.toUpperCase();
+            let suffix = "";
 
             if (wedgeNotation) {
-                s += `${prefix}${this.alpha.toUpperCase()}w`;
+                if (physicalSlices > 1) {
+                    prefix = physicalSlices > 2 ? physicalSlices.toString() : "";
+                    suffix = "w";
+                }
             } else {
-                const suffix = slices > 1 ? "w" : "";
-                s += `${prefix}${this.alpha.toLowerCase()}${suffix}`;
+                if (physicalSlices * 2 > cubeSize && physicalSlices < cubeSize) {
+                    face = face.toLowerCase();
+                    const invertedSlices = cubeSize - physicalSlices;
+                    
+                    if (invertedSlices === 1) {
+                        suffix = "";
+                    } else if (invertedSlices === 2) {
+                        suffix = "w";
+                    } else {
+                        prefix = invertedSlices.toString();
+                        suffix = "w";
+                    }
+                } else {
+                    if (physicalSlices > 1) {
+                        prefix = physicalSlices > 2 ? physicalSlices.toString() : "";
+                        suffix = "w";
+                    }
+                }
             }
-        } else {
-            s += this.alpha.toUpperCase();
+            
+            s += `${prefix}${face}${suffix}`;
         }
 
         if (this.isDouble) s += "2";
@@ -196,5 +213,15 @@ export class Move {
      */
     transpose(string) {
         this.alpha = Move.TRANSPOSITIONS[string][this.alpha];
+    }
+
+    /**
+     * Calculates the actual physical number of slices being turned.
+     * @param {number} [cubeSize=3] - The dimensions of the cube (e.g., 3 for 3x3x3)
+     * @returns {number} The number of slices affected by the move
+     */
+    getPhysicalSlices(cubeSize = 3) {        
+        const parsedSliceNum = this.sliceNum || 1;
+        return this.isWide ? (cubeSize - parsedSliceNum) : parsedSliceNum;
     }
 }

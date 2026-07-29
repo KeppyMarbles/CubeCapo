@@ -73,10 +73,11 @@ extAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     return;
                 }
 
-                const store = await extAPI.storage.local.get(["costConfig", "runOptions"]);
+                const store = await extAPI.storage.local.get(["costConfig", "runOptions", "formatOptions"]);
                 const config = store.costConfig || ScrambleOptimizer.defaultCostConfiguration;
-                
+
                 const runOptions = { ...ScrambleOptimizer.defaultRunOptions, ...store.runOptions, scramble };
+                const formatOptions = { ...ScrambleOptimizer.defaultFormatOptions, ...store.formatOptions };
 
                 const transitions = await loadGripTransitions();
                 const optimizer = new ScrambleOptimizer(config, transitions, null);
@@ -85,8 +86,8 @@ extAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 await optimizer.optimize(runOptions);
                 const end = performance.now();
 
-                const bestScrambleStr = optimizer.getBestAsString(runOptions);
-                const breakdown = optimizer.analyzeBest(runOptions);
+                const bestScrambleStr = optimizer.getBestAsString(formatOptions);
+                const breakdown = optimizer.analyzeBest(formatOptions);
                 const bestCost = optimizer.bestCost;
 
                 sendResponse({

@@ -1,4 +1,4 @@
-import { setupForm, drawSearchTime } from "./src/ui/form.js";
+import { setupForm, drawSearchTime, collectFormatOptionsValues } from "./src/ui/form.js";
 import { ScrambleOptimizer } from "./src/cube/scramble.js";
 import { drawOptimizerStats } from "./src/ui/stats.js";
 import gripTransitions from './src/data/gripTransitions.json' with { type: 'json' };
@@ -16,28 +16,24 @@ async function onSubmit(config, options) {
     await drawOptimizerStats(null);
 
     currentOptimizer = new ScrambleOptimizer(config, gripTransitions, async () => {
-        await drawOptimizerStats(currentOptimizer, options);
+        await drawOptimizerStats(currentOptimizer, collectFormatOptionsValues());
     });
 
     const start = performance.now();
     await currentOptimizer.optimize(options);
     const end = performance.now();
 
-    await drawOptimizerStats(currentOptimizer, options);
+    await drawOptimizerStats(currentOptimizer, collectFormatOptionsValues());
     drawSearchTime(end - start);
 }
 
 (async () => {
-    await setupForm(onSubmit);
-
     const updateFormatLive = () => {
         if (currentOptimizer) {
-            const showGrips = document.getElementById("showGrips")?.checked ?? true;
-            const wedgeNotation = document.getElementById("wedgeNotation")?.checked ?? false;
-            document.getElementById("output").textContent = currentOptimizer.getBestAsString({ showGrips, wedgeNotation });
+            const formatOptions = collectFormatOptionsValues();
+            document.getElementById("output").textContent = currentOptimizer.getBestAsString(formatOptions);
         }
     };
 
-    document.getElementById("showGrips")?.addEventListener("change", updateFormatLive);
-    document.getElementById("wedgeNotation")?.addEventListener("change", updateFormatLive);
-})();
+    await setupForm(onSubmit, updateFormatLive);
+})();

@@ -8,14 +8,10 @@
  */
 export async function drawOptimizerStats(optimizer, formatOptions) {
     if(optimizer) {
-        const opts = formatOptions || {
-            showGrips: document.getElementById("showGrips")?.checked ?? true,
-            wedgeNotation: document.getElementById("wedgeNotation")?.checked ?? false
-        };
         drawDistributionChart(optimizer.distribution);
         drawRotationInfoTable(optimizer.rotationInfo);
-        document.getElementById("output").textContent = optimizer.getBestAsString(opts);
-        drawCostTable(optimizer.analyzeBest(opts));
+        document.getElementById("output").textContent = optimizer.getBestAsString(formatOptions);
+        drawCostTable(optimizer.analyzeBest(formatOptions));
     }
     else {
         drawDistributionChart([]);

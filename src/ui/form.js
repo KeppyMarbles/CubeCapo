@@ -1,6 +1,6 @@
 import { ScrambleOptimizer } from "../cube/scramble.js";
 import { costToColor } from "./stats.js";
-/** @import { CostConfig, RunOptions } from "../types.js" */
+/** @import { CostConfig, RunOptions, FormatOptions } from "../types.js" */
 
 /**
  * @typedef {Object} GroupControl
@@ -10,9 +10,10 @@ import { costToColor } from "./stats.js";
 
 /**
  * Set up everything needed for the user to configure the optimizer
- * @param {()} onSubmit
+ * @param {() => void} onSubmit
+ * @param {() => void} [onFormatChange] Called whenever a format option changes
  */
-export async function setupForm(onSubmit) {
+export async function setupForm(onSubmit, onFormatChange) {
     let initialConfig = await loadCostConfig();
     if(initialConfig)
         initialConfig = migrateConfig(initialConfig, ScrambleOptimizer.defaultCostConfiguration);
@@ -76,17 +77,17 @@ export async function setupForm(onSubmit) {
             "regrip": "Regrip",
             "double": "Double Move",
             "repeatPenalty": "Repeat Fingertrick",
-            "wideMultiplier": "Wide Fingertrick Multiplier"
+            "perSliceFingertrick": "Per-Slice Fingertrick Cost"
         }
 
         const formTitles = {
             "double": "Only effective if Wide Replace Double is active",
             "repeatPenalty": "The cost of doing the same fingertrick twice in a row",
-            "wideMultiplier": "How much the fingertrick cost should be scaled if it's a wide move"
+            "perSliceFingertrick": "If the fingertrick cost should be applied per effective slice"
         }
 
         const formTypes = {
-            "wideMultiplier": "scalar"
+            "perSliceFingertrick": "checkbox"
         }
       
         /** @type {Record<string, (key: string) => number>} */
@@ -130,11 +131,15 @@ export async function setupForm(onSubmit) {
                 label.textContent = formAlias[key] || key;
                 label.title = formTitles[key] || "";
                 const input = document.createElement("input");
-                input.type = "number";
-                input.step = "0.5";
+                input.type = formTypes[key] || "number";
                 input.name = `${groupName}.${key}`;
-                input.value = val;
-                input.valueType = formTypes[key] || "additive";
+                if (input.type === "checkbox") {
+                    input.checked = Boolean(val);
+                } else {
+                    input.step = "0.5";
+                    input.value = val;
+                    input.valueType = "additive";
+                }
                 label.appendChild(input);
                 colDiv.appendChild(label);
             }
@@ -148,12 +153,14 @@ export async function setupForm(onSubmit) {
         }
     }
 
-    const runOpts = await loadRunOptions();
+    const runOpts = await loadOptions("runOptions", ScrambleOptimizer.defaultRunOptions);
     let savedRunOpts = structuredClone(runOpts);
-
     applyRunOptionsValues(runOpts);
 
-    // Check if configuration has unsaved changes
+    const formatOpts = await loadOptions("formatOptions", ScrambleOptimizer.defaultFormatOptions);
+    applyFormatOptionsValues(formatOpts);
+
+    // Check if computation configuration has unsaved changes
     const checkUnsavedChanges = () => {
         const currentConfig = collectCostConfig(form, savedConfig);
         const currentRunOpts = collectRunOptionsValues();
@@ -171,13 +178,36 @@ export async function setupForm(onSubmit) {
         }
     };
 
-    // Attach change detection to computation settings
-    const computationInputs = ["depth", "iterations", "searchRotations", "searchStartingGrips", "showGrips", "wedgeNotation", "pruneRotations", "memoize", "wideReplaceDouble", "allowMidScrambleRotations"];
-    computationInputs.forEach(id => {
+    // Attach change detection to computation settings (require explicit save)
+    const computeInputIds = [
+        "depth",
+        "iterations",
+        "searchRotations",
+        "searchStartingGrips",
+        "pruneRotations",
+        "memoize",
+        "wideReplace",
+        "wideReplaceDouble",
+        "allowMidScrambleRotations",
+        "partitionLength"
+    ];
+    computeInputIds.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener("input", checkUnsavedChanges);
             el.addEventListener("change", checkUnsavedChanges);
+        }
+    });
+
+    // Format options: auto-save on change and trigger live update (no unsaved bar)
+    const formatInputIds = ["showGrips", "showBoundaries", "wedgeNotation"];
+    formatInputIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("change", async () => {
+                await saveOptions("formatOptions", collectFormatOptionsValues());
+                onFormatChange?.();
+            });
         }
     });
 
@@ -187,7 +217,7 @@ export async function setupForm(onSubmit) {
         await saveCostConfig(config);
 
         const runOptions = collectRunOptionsValues();
-        await saveRunOptions(runOptions);
+        await saveOptions("runOptions", runOptions);
 
         savedConfig = structuredClone(config);
         savedRunOpts = structuredClone(runOptions);
@@ -341,14 +371,14 @@ function migrateConfig(imported, defaults) {
     const output = structuredClone(defaults);
     for (const [key, value] of Object.entries(imported)) {
         if (key in defaults) {
-            if (typeof value === "object") {
+            if (typeof value === "object" && value !== null) {
                 for (const [sub, subVal] of Object.entries(value)) {
-                    if (sub in defaults[key]) {
+                    if (sub in defaults[key] && typeof subVal === typeof defaults[key][sub]) {
                         output[key][sub] = subVal;
                     }
                 }
             } 
-            else {
+            else if (typeof value === typeof defaults[key]) {
                 output[key] = value;
             }
         }
@@ -498,37 +528,39 @@ async function loadCostConfig() {
 }
 
 /**
- * Save run options to storage
- * @param {Object} options 
+ * Save an options object to storage under the given key
+ * @param {string} key
+ * @param {Object} options
  */
-async function saveRunOptions(options) {
+async function saveOptions(key, options) {
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
         await new Promise((resolve) => {
-            chrome.storage.local.set({ runOptions: options }, resolve);
+            chrome.storage.local.set({ [key]: options }, resolve);
         });
     }
-    localStorage.setItem("runOptions", JSON.stringify(options));
+    localStorage.setItem(key, JSON.stringify(options));
 }
 
 /**
- * Load run options from storage
+ * Load an options object from storage, falling back to defaults
+ * @param {string} key
+ * @param {Object} defaults
  * @returns {Promise<Object>}
  */
-async function loadRunOptions() {
-    const defaults = ScrambleOptimizer.defaultRunOptions;
+async function loadOptions(key, defaults) {
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
         return new Promise((resolve) => {
-            chrome.storage.local.get(["runOptions"], (result) => {
-                resolve({ ...defaults, ...result.runOptions });
+            chrome.storage.local.get([key], (result) => {
+                resolve({ ...defaults, ...result[key] });
             });
         });
     }
     try {
-        const stored = localStorage.getItem("runOptions");
-        return stored ? { ...defaults, ...JSON.parse(stored) } : defaults;
+        const stored = localStorage.getItem(key);
+        return stored ? { ...defaults, ...JSON.parse(stored) } : { ...defaults };
     }
     catch {
-        return defaults;
+        return { ...defaults };
     }
 }
 
@@ -540,16 +572,15 @@ async function loadRunOptions() {
  */
 function collectCostConfig(form, initialConfig) {
     const newConfig = structuredClone(initialConfig);
-    const formData = new FormData(form);
 
-    for (const [fullKey, val] of formData.entries()) {
-        const num = parseFloat(val);
+    for (const input of form.querySelectorAll("input[name]")) {
+        const fullKey = input.name;
+        const val = input.type === "checkbox" ? input.checked : parseFloat(input.value);
         if (fullKey.includes(".")) {
             const [group, subkey] = fullKey.split(".");
-            newConfig[group][subkey] = num;
-        } 
-        else {
-            newConfig[fullKey] = num;
+            if (newConfig[group]) newConfig[group][subkey] = val;
+        } else {
+            newConfig[fullKey] = val;
         }
     }
 
@@ -587,39 +618,61 @@ function collectRunOptions() {
 }
 
 /**
- * Gather the current run options values from the DOM
- * @returns {Object}
+ * Gather the current compute run option values from the DOM
+ * @returns {RunOptions}
  */
 function collectRunOptionsValues() {
-    const depth = parseFloat(document.getElementById("depth").value);
-    const maxIterations = parseFloat(document.getElementById("iterations").value);
-    const searchRotations = document.getElementById("searchRotations")?.checked ?? true;
-    const searchStartingGrips = document.getElementById("searchStartingGrips")?.checked ?? true;
-    const showGrips = document.getElementById("showGrips")?.checked ?? true;
-    const wedgeNotation = document.getElementById("wedgeNotation")?.checked ?? false;
-    const pruneRotations = document.getElementById("pruneRotations")?.checked ?? true;
-    const memoize = document.getElementById("memoize")?.checked ?? true;
-    const wideReplaceDouble = document.getElementById("wideReplaceDouble")?.checked ?? true;
-    const allowMidScrambleRotations = document.getElementById("allowMidScrambleRotations")?.checked ?? false;
-
-    return { depth, maxIterations, searchRotations, searchStartingGrips, showGrips, wedgeNotation, pruneRotations, memoize, wideReplaceDouble, allowMidScrambleRotations };
+    return {
+        depth:                     parseFloat(document.getElementById("depth").value),
+        maxIterations:             parseFloat(document.getElementById("iterations").value),
+        searchRotations:           document.getElementById("searchRotations").checked,
+        searchStartingGrips:       document.getElementById("searchStartingGrips").checked,
+        pruneRotations:            document.getElementById("pruneRotations").checked,
+        memoize:                   document.getElementById("memoize").checked,
+        wideReplace:               document.getElementById("wideReplace").checked,
+        wideReplaceDouble:         document.getElementById("wideReplaceDouble").checked,
+        allowMidScrambleRotations: document.getElementById("allowMidScrambleRotations").checked,
+        partitionLength:           parseFloat(document.getElementById("partitionLength").value) || 0,
+    };
 }
 
 /**
- * Populate the DOM elements with the provided run options values
- * @param {Object} runOpts
+ * Gather the current format option values from the DOM
+ * @returns {FormatOptions}
+ */
+export function collectFormatOptionsValues() {
+    return {
+        showGrips:      document.getElementById("showGrips").checked,
+        showBoundaries: document.getElementById("showBoundaries").checked,
+        wedgeNotation:  document.getElementById("wedgeNotation").checked,
+    };
+}
+
+/**
+ * Populate the compute option DOM elements with the provided values
+ * @param {RunOptions} runOpts
  */
 function applyRunOptionsValues(runOpts) {
-    if (document.getElementById("depth")) document.getElementById("depth").value = runOpts.depth;
-    if (document.getElementById("iterations")) document.getElementById("iterations").value = runOpts.maxIterations;
-    if (document.getElementById("searchRotations")) document.getElementById("searchRotations").checked = runOpts.searchRotations;
-    if (document.getElementById("searchStartingGrips")) document.getElementById("searchStartingGrips").checked = runOpts.searchStartingGrips;
-    if (document.getElementById("showGrips")) document.getElementById("showGrips").checked = runOpts.showGrips;
-    if (document.getElementById("wedgeNotation")) document.getElementById("wedgeNotation").checked = runOpts.wedgeNotation;
-    if (document.getElementById("pruneRotations")) document.getElementById("pruneRotations").checked = runOpts.pruneRotations;
-    if (document.getElementById("memoize")) document.getElementById("memoize").checked = runOpts.memoize;
-    if (document.getElementById("wideReplaceDouble")) document.getElementById("wideReplaceDouble").checked = runOpts.wideReplaceDouble;
-    if (document.getElementById("allowMidScrambleRotations")) document.getElementById("allowMidScrambleRotations").checked = runOpts.allowMidScrambleRotations ?? false;
+    document.getElementById("depth").value = runOpts.depth;
+    document.getElementById("iterations").value = runOpts.maxIterations;
+    document.getElementById("searchRotations").checked = runOpts.searchRotations;
+    document.getElementById("searchStartingGrips").checked = runOpts.searchStartingGrips;
+    document.getElementById("pruneRotations").checked = runOpts.pruneRotations;
+    document.getElementById("memoize").checked = runOpts.memoize;
+    document.getElementById("wideReplace").checked = runOpts.wideReplace;
+    document.getElementById("wideReplaceDouble").checked = runOpts.wideReplaceDouble;
+    document.getElementById("allowMidScrambleRotations").checked = runOpts.allowMidScrambleRotations;
+    document.getElementById("partitionLength").value = runOpts.partitionLength;
+}
+
+/**
+ * Populate the format option DOM elements with the provided values
+ * @param {FormatOptions} formatOpts
+ */
+function applyFormatOptionsValues(formatOpts) {
+    document.getElementById("showGrips").checked = formatOpts.showGrips;
+    document.getElementById("showBoundaries").checked = formatOpts.showBoundaries;
+    document.getElementById("wedgeNotation").checked = formatOpts.wedgeNotation;
 }
 
 /**
@@ -632,12 +685,16 @@ function applyConfig(form, config) {
         if (typeof groupValue === "object") {
             for (const [key, val] of Object.entries(groupValue)) {
                 const input = form.querySelector(`[name="${groupName}.${key}"]`);
-                if (input) input.value = val;
+                if (!input) continue;
+                if (input.type === "checkbox") input.checked = Boolean(val);
+                else input.value = val;
             }
         } 
         else {
             const input = form.querySelector(`[name="${groupName}"]`);
-            if (input) input.value = groupValue;
+            if (!input) continue;
+            if (input.type === "checkbox") input.checked = Boolean(groupValue);
+            else input.value = groupValue;
         }
     }
     updateCostInputColors(form);
