@@ -45,10 +45,6 @@ function drawDistributionChart(distribution) {
         return;
     }
 
-    const costs = Array.from(distribution.keys()).sort((a, b) => a - b);
-    const counts = costs.map(c => distribution.get(c));
-    const maxCount = Math.max(...counts);
-
     const samples =  Array.from(distribution.values()).reduce((a, b) => a + b, 0);
     const mean =     Array.from(distribution.entries()).reduce((sum, [cost, count]) => sum + cost * count, 0) / samples;
     const variance = Array.from(distribution.entries()).reduce((sum, [cost, count]) => sum + count * Math.pow(cost - mean, 2), 0) / samples;
@@ -63,6 +59,35 @@ function drawDistributionChart(distribution) {
     document.getElementById("standardDeviation").textContent = stdDev.toFixed(3);
     document.getElementById("skewness").textContent = skewness.toFixed(3);
     document.getElementById("minZ").textContent = zScore.toFixed(3);
+
+    // Aggregate into integer bins for UI chart display
+    const intMap = new Map();
+    for (const [cost, count] of distribution.entries()) {
+        const intCost = Math.round(cost);
+        intMap.set(intCost, (intMap.get(intCost) || 0) + count);
+    }
+
+    const rawIntCosts = Array.from(intMap.keys()).sort((a, b) => a - b);
+    const minIntCost = rawIntCosts[0];
+    const maxIntCost = rawIntCosts[rawIntCosts.length - 1];
+    const span = maxIntCost - minIntCost;
+
+    const targetCols = 100;
+    const binStep = Math.max(1, Math.ceil(span / targetCols));
+
+    // Aggregate into bins
+    const binnedMap = new Map();
+    for (const [cost, count] of intMap.entries()) {
+        const binKey = Math.floor((cost - minIntCost) / binStep) * binStep + minIntCost;
+        binnedMap.set(binKey, (binnedMap.get(binKey) || 0) + count);
+    }
+
+    const costs = [];
+    for (let c = minIntCost; c <= maxIntCost; c += binStep) {
+        costs.push(c);
+    }
+    const counts = costs.map(c => binnedMap.get(c) || 0);
+    const maxCount = Math.max(...counts);
 
     // Create the visual CSS bar chart
     const wrapper = document.createElement("div");
@@ -81,12 +106,19 @@ function drawDistributionChart(distribution) {
         const bar = document.createElement("div");
         bar.className = "chart-bar";
         bar.style.height = `${percent}%`;
-        bar.title = `Cost: ${cost}, Count: ${count}`;
+        bar.title = `Cost ~${cost}: Count ${count}`;
 
         const label = document.createElement("div");
         label.className = "chart-label";
-        if (idx === 0 || idx === costs.length - 1 || idx % Math.max(1, Math.floor(costs.length / 5)) === 0) {
-            label.textContent = cost.toFixed(1);
+        const step = Math.max(1, Math.floor(costs.length / 5));
+        if (idx === 0) {
+            label.classList.add("chart-label-first");
+            label.textContent = cost;
+        } else if (idx === costs.length - 1) {
+            label.classList.add("chart-label-last");
+            label.textContent = cost;
+        } else if (idx % step === 0 && (costs.length - 1 - idx) > Math.floor(step / 2)) {
+            label.textContent = cost;
         }
 
         col.appendChild(bar);
