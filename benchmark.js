@@ -21,6 +21,8 @@ console.log(`Loaded ${scrambleLines.length} test scrambles from scrambles.txt.\n
 console.log(`Running optimization suite on ${scrambleLines.length} 3x3 scrambles...`);
 
 const startTime = performance.now();
+let totalCost = 0;
+let totalIterations = 0;
 
 for (let i = 0; i < scrambleLines.length; i++) {
     const line = scrambleLines[i];
@@ -33,17 +35,23 @@ for (let i = 0; i < scrambleLines.length; i++) {
     const options = {
         ...ScrambleOptimizer.defaultRunOptions,
         searchRotations: false, //speedup
-        searchStartingGrips: false, //speedup
+        maxRegripBranches: 1, //speedup
         scramble: parsedMoves
     };
 
     await optimizer.optimize(options);
+    totalCost += optimizer.bestCost;
+    totalIterations += optimizer.iterations;
 }
 
 const endTime = performance.now();
 
 const totalMs = endTime - startTime;
+const totalSeconds = totalMs / 1000;
 const avgMs = totalMs / scrambleLines.length;
+const avgCost = totalCost / scrambleLines.length;
+const avgIterations = totalIterations / scrambleLines.length;
+const iterationsPerSec = totalSeconds > 0 ? (totalIterations / totalSeconds) : 0;
 
 console.log(`\n=== SCRAMBLE OPTIMIZER TEST & BENCHMARK RESULTS ===`);
 console.table({
@@ -51,6 +59,10 @@ console.table({
         'Total Scrambles': scrambleLines.length,
         'Total Time (ms)': totalMs.toFixed(2),
         'Avg Time per Scramble (ms)': avgMs.toFixed(2),
+        'Avg Optimized Cost': avgCost.toFixed(2),
+        'Total Iterations': totalIterations,
+        'Avg Iterations / Scramble': Math.round(avgIterations),
+        'Iterations / Second': Math.round(iterationsPerSec)
     }
 });
 console.log('SUCCESS: All 100 test scrambles processed cleanly!');

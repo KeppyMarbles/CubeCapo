@@ -31,10 +31,6 @@
             <label title="If a the search should be tried on every orientation">Search Starting Rotations
               <input type="checkbox" id="searchRotations"/>
             </label>
-
-            <label title="If the search should try every starting thumb placement (grip)">Search Starting Grips
-              <input type="checkbox" id="searchStartingGrips"/>
-            </label>
           </div>
 
           <button id="submitButton">Submit</button>
@@ -78,6 +74,10 @@
 
                 <label title="Maximum move count per sub-scramble partition to optimize long scrambles (0 to disable)">Partition Length
                   <input type="number" id="partitionLength" min="0" value="0"/>
+                </label>
+
+                <label title="Maximum number of candidate regrips to explore when a regrip is required">Max Regrip Branches
+                  <input type="number" id="maxRegripBranches" min="1" max="25" value="2"/>
                 </label>
 
                 <label title="If reaching an already visited state [current grip & scramble index & cube orientation] should prune the current branch. Disable if you want to ensure minimization">Memoize

@@ -1,8 +1,11 @@
-/** @import { FaceStr, RotationStr, AxisStr, MoveStr, MoveKey } from "../types.js" */
+/** @import { FaceStr, RotationStr, AxisStr, MoveStr, MiddleStr, MoveKey, ThumbPosition, GripState, Transition } from "../types.js" */
 
 export class Move {
     /** @type {FaceStr[]} */
     static MOVE_LIST = ["R", "L", "U", "D", "F", "B"];
+
+    /** @type {MiddleStr[]} */
+    static MIDDLE_MOVE_LIST = ["M", "E", "S"];
 
     /** @type {AxisStr[]} */
     static ROTATION_LIST = ["x", "y", "z"];
@@ -43,15 +46,137 @@ export class Move {
         B: 'F'
     };
 
+    /** @type {Record<ThumbPosition, number>} */
+    static THUMB_POSITIONS = {
+        "Bd": 0,
+        "D": 1,
+        "F": 2,
+        "U": 3,
+        "Bu": 4
+    };
+
+    /** @type {Partial<Record<MoveKey, Record<ThumbPosition, ThumbPosition | null>>>} */
+    static R_TRANSITIONS = {
+        "R":   { "Bd": "D",  "D": "F",  "F": "U",  "U": "Bu", "Bu": null },
+        "R'":  { "Bu": "U",  "U": "F",  "F": "D",  "D": "Bd", "Bd": null },
+        "R2":  { "Bd": "F",  "D": "U",  "F": "Bu", "U": null, "Bu": null },
+        "R2'": { "Bu": "F",  "U": "D",  "F": "Bd", "D": null, "Bd": null },
+    };
+
+    /** @type {Partial<Record<MoveKey, Record<ThumbPosition, ThumbPosition | null>>>} */
+    static L_TRANSITIONS = {
+        "L":   { "Bu": "U",  "U": "F",  "F": "D",  "D": "Bd", "Bd": null },
+        "L'":  { "Bd": "D",  "D": "F",  "F": "U",  "U": "Bu", "Bu": null },
+        "L2":  { "Bu": "F",  "U": "D",  "F": "Bd", "D": null, "Bd": null },
+        "L2'": { "Bd": "F",  "D": "U",  "F": "Bu", "U": null, "Bu": null },
+    };
+
+    /** @type {Partial<Record<RotationStr, MoveKey>>} */
+    static X_ROTATION_MAP = {
+        "x": "R",
+        "x'": "R'",
+        "x2": "R2",
+        "x2'": "R2'"
+    };
+
+    /** @type {ModifierStr[]} */
+    static MODIFIERS = ["", "'", "2", "2'"];
+
+    /** @type {ThumbPosition[]} */
+    static THUMB_KEYS = ["Bd", "D", "F", "U", "Bu"];
+
+    /** @type {GripState[]} Flat list of all 25 explicit grip combinations */
+    static ALL_GRIPS = Move.THUMB_KEYS.flatMap(l => Move.THUMB_KEYS.map(r => `${l} ${r}`));
+
+    /** @type {MoveKey[]} Face and slice moves that do not change thumb positions */
+    static FINGERTRICK_MOVES = ["U", "D", "F", "B", "M", "E", "S"].flatMap(m =>
+        Move.MODIFIERS.map(mod => `${m}${mod}`)
+    );
+
+    /** @type {Record<GripState, Record<GripState, number>>} */
+    static REGRIP_DIST_CACHE = (() => {
+        const cache = {};
+        for (const g1 of Move.ALL_GRIPS) {
+            cache[g1] = {};
+            const [l1, r1] = g1.split(" ");
+            const pL1 = Move.THUMB_POSITIONS[l1] ?? 0;
+            const pR1 = Move.THUMB_POSITIONS[r1] ?? 0;
+            for (const g2 of Move.ALL_GRIPS) {
+                const [l2, r2] = g2.split(" ");
+                const lDist = Math.abs(pL1 - (Move.THUMB_POSITIONS[l2] ?? 0));
+                const rDist = Math.abs(pR1 - (Move.THUMB_POSITIONS[r2] ?? 0));
+                cache[g1][g2] = lDist + rDist;
+            }
+        }
+        return cache;
+    })();
+
+    /** @type {Record<GripState, Record<MoveKey, GripState | null>>} */
+    static NEXT_GRIP_CACHE = (() => {
+        const cache = {};
+        for (const grip of Move.ALL_GRIPS) {
+            const [l, r] = grip.split(" ");
+            const row = {};
+
+            // R moves the right thumb
+            for (const moveKey in Move.R_TRANSITIONS) {
+                const nextRight = Move.R_TRANSITIONS[moveKey][r];
+                row[moveKey] = nextRight ? `${l} ${nextRight}` : null;
+            }
+            // L moves the left thumb
+            for (const moveKey in Move.L_TRANSITIONS) {
+                const nextLeft = Move.L_TRANSITIONS[moveKey][l];
+                row[moveKey] = nextLeft ? `${nextLeft} ${r}` : null;
+            }
+            // x moves both thumbs
+            for (const moveKey in Move.X_ROTATION_MAP) {
+                const rMap = Move.X_ROTATION_MAP[moveKey];
+                const nextLeft = Move.R_TRANSITIONS[rMap][l];
+                const nextRight = Move.R_TRANSITIONS[rMap][r];
+                row[moveKey] = (nextLeft && nextRight) ? `${nextLeft} ${nextRight}` : null;
+            }
+            // Fingertrick moves keep the grip
+            for (const moveKey of Move.FINGERTRICK_MOVES) {
+                row[moveKey] = grip;
+            }
+
+            cache[grip] = row;
+        }
+        return cache;
+    })();
+
+    /**
+     * Calculates the chain step distance between two grip states along Bd <-> D <-> F <-> U <-> Bu
+     * @param {GripState} fromGrip 
+     * @param {GripState} toGrip 
+     * @returns {number}
+     */
+    static computeRegripDistance(fromGrip, toGrip) {
+        if (!fromGrip || !toGrip || fromGrip === toGrip) return 0;
+        return Move.REGRIP_DIST_CACHE[fromGrip]?.[toGrip] ?? Infinity;
+    }
+
+    /**
+     * Calculates the resulting grip state after performing a move from currentGrip.
+     * @param {GripState} currentGrip 
+     * @param {MoveKey} moveKey 
+     * @returns {GripState | null}
+     */
+    static computeNextGrip(currentGrip, moveKey) {
+        if (!currentGrip) return null;
+        return Move.NEXT_GRIP_CACHE[currentGrip]?.[moveKey] ?? null;
+    }
+
     /**
      * @param {FaceStr | AxisStr} alpha 
      * @param {boolean} isPrime
      * @param {boolean} isDouble 
      * @param {boolean} isRotation 
      * @param {boolean} isWide 
+     * @param {boolean} isMiddle
      * @param {number} sliceNum 
      */
-    constructor(alpha, isPrime, isDouble, isRotation, isWide, sliceNum) {
+    constructor(alpha, isPrime, isDouble, isRotation, isWide, isMiddle, sliceNum) {
         /** @type {FaceStr | AxisStr} */
         this.alpha = alpha; 
         /** @type {boolean} */ 
@@ -62,8 +187,12 @@ export class Move {
         this.isWide = isWide;
         /** @type {boolean} */ 
         this.isRotation = isRotation;
+        /** @type {boolean} */ 
+        this.isMiddle = isMiddle;
         /** @type {number} */ 
         this.sliceNum = sliceNum;
+        /** @type {Transition | null} */
+        this.transition = null;
     }
 
     /**
@@ -95,10 +224,14 @@ export class Move {
             move.alpha = char.toUpperCase();
             move.isWide = char === char.toLowerCase(); // lowercase = wide move
         } 
+        else if (Move.MIDDLE_MOVE_LIST.includes(char)) {
+            move.alpha = char;
+            move.isMiddle = true;
+        }
         else if (Move.ROTATION_LIST.includes(char)) {
             move.alpha = char;
             move.isRotation = true;
-        } 
+        }
         else {
             throw new SyntaxError(`Char '${char}' at index ${index}: unknown move type`);
         }

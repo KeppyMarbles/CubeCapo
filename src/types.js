@@ -2,6 +2,7 @@
 
 /** @typedef {'F' | 'U' | 'D' | 'Bu' | 'Bd'} ThumbPosition */
 /** @typedef {"" | "'" | "2" | "2'"} ModifierStr */
+/** @typedef {"M" | "E" | "S"} MiddleStr */
 /** @typedef {"R" | "L" | "U" | "B" | "D" | "F"} FaceStr */
 /** @typedef {"r" | "l" | "u" | "b" | "d" | "f"} WideFaceStr */
 /** @typedef {"x" | "y" | "z"} AxisStr */
@@ -15,6 +16,9 @@
  *   | "right_ring"
  *   | "right_ring_middle"
  *   | "right_ring_push"
+ *   | "right_middle"
+ *   | "right_middle_push"
+ *   | "right_thumb"
  *   | "right_up"
  *   | "right_up_double"
  *   | "right_down"
@@ -26,17 +30,19 @@
  *   | "left_ring"
  *   | "left_ring_middle"
  *   | "left_ring_push"
+ *   | "left_middle"
+ *   | "left_middle_push"
+ *   | "left_thumb"
  *   | "left_up"
  *   | "left_up_double"
  *   | "left_down"
  *   | "left_down_double"
- *   | "rotation"
  * )} Fingertrick
  */
 
 /** @typedef {`${ThumbPosition} ${ThumbPosition}` | "start"} GripState */
-/** @typedef {`${FaceStr}${ModifierStr}`} MoveKey */
-/** @typedef {`${FaceStr | WideFaceStr}${"w" | ""}${ModifierStr}`} MoveStr */
+/** @typedef {`${FaceStr | MiddleStr}${ModifierStr}`} MoveKey */
+/** @typedef {`${FaceStr | MiddleStr | WideFaceStr}${"w" | ""}${ModifierStr}`} MoveStr */
 /** @typedef {`${AxisStr}${ModifierStr}`} RotationStr */
 
 /** @typedef {Record<Fingertrick, number>} FingertrickCosts */
@@ -46,6 +52,7 @@
 /**
  * @typedef {Object} GeneralCosts
  * @property {number} regrip Cost of a regrip occuring
+ * @property {number} [regripPerStep] Cost multiplier per chain step distance during regrip
  * @property {number} double Cost of a double move
  * @property {number} repeatPenalty Cost of the same fingertrick occuring twice in a row
  * @property {boolean} perSliceFingertrick If fingertrick cost should be applied for each effective slice
@@ -62,11 +69,13 @@
 /**
  * @typedef {Object} Transition
  * @property {GripState} next The resulting grip after the fingertrick
- * @property {Fingertrick} type The fingertrick used
- * @property {boolean} regrip If a regrip happened when getting to the resulting grip
+ * @property {Fingertrick | ""} type The fingertrick used
+ * @property {GripState} [regripFrom] Starting grip before a regrip
+ * @property {GripState} [regripPrompt] Target grip for pre-move regrip prompt
+ * @property {number} [regripCost] Pre-calculated cost of the regrip
  */
 
-/** @typedef {Record<GripState, Record<MoveKey, Transition>>} TransitionConfig */
+/** @typedef {Record<GripState, Partial<Record<MoveKey, Fingertrick>>>} TransitionConfig */
 
 /** 
  * @typedef {Object} Orientation
@@ -93,8 +102,8 @@
  * @property {number} [cubeSize] Size of the cube (e.g. 3 for 3x3, 7 for 7x7), detected automatically if omitted
  * @property {number} depth The branch pruning threshold
  * @property {number} maxIterations Number of iterations to try before bailing out
+ * @property {number} [maxRegripBranches] Maximum number of candidate regrips to explore when a regrip is required
  * @property {boolean} searchRotations If all orientations should be searched
- * @property {boolean} searchStartingGrips If all starting thumb placements (grips) should be searched
  * @property {boolean} pruneRotations If an orientation search should be stopped if worse than best orientation
  * @property {boolean} memoize If search shouldn't continue if same index, orientation and grip is reached
  * @property {boolean} [wideReplace] If search should try replacing single moves with wide moves

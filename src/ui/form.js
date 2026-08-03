@@ -74,13 +74,15 @@ export async function setupForm(onSubmit, onFormatChange) {
 
     {
         const formAlias = {
-            "regrip": "Regrip",
+            "regrip": "Base Regrip",
+            "regripPerStep": "Regrip Per Step",
             "double": "Double Move",
             "repeatPenalty": "Repeat Fingertrick",
             "perSliceFingertrick": "Per-Slice Fingertrick Cost"
         }
 
         const formTitles = {
+            "regripPerStep": "Cost added for each step moved along the thumb chain (Bd <-> D <-> F <-> U <-> Bu)",
             "double": "Only effective if Wide Replace Double is active",
             "repeatPenalty": "The cost of doing the same fingertrick twice in a row",
             "perSliceFingertrick": "If the fingertrick cost should be applied per effective slice"
@@ -101,7 +103,6 @@ export async function setupForm(onSubmit, onFormatChange) {
                 return idx !== -1 ? idx : 0;
             },
             "fingertrick": (key) => {
-                if (key === "rotation") return 2;
                 if (key.startsWith("right_")) return 1;
                 return 0;
             }
@@ -160,7 +161,7 @@ export async function setupForm(onSubmit, onFormatChange) {
     const formatOpts = await loadOptions("formatOptions", ScrambleOptimizer.defaultFormatOptions);
     applyFormatOptionsValues(formatOpts);
 
-    // Check if computation configuration has unsaved changes
+    // Live update check for unsaved bar
     const checkUnsavedChanges = () => {
         const currentConfig = collectCostConfig(form, savedConfig);
         const currentRunOpts = collectRunOptionsValues();
@@ -182,8 +183,8 @@ export async function setupForm(onSubmit, onFormatChange) {
     const computeInputIds = [
         "depth",
         "iterations",
+        "maxRegripBranches",
         "searchRotations",
-        "searchStartingGrips",
         "pruneRotations",
         "memoize",
         "wideReplace",
@@ -273,14 +274,16 @@ export async function setupForm(onSubmit, onFormatChange) {
     });
 
     addGroupControls(form, "fingertrick", [
-        { label: "Pushes", targets: ["right_index_push", "right_ring_push", "left_index_push", "left_ring_push"]},
+        { label: "Pushes", targets: ["right_index_push", "right_middle_push", "right_ring_push", "left_index_push", "left_middle_push", "left_ring_push"]},
+        { label: "Index Finger", targets: ["right_index", "right_index_push", "right_index_front", "right_index_middle", "left_index", "left_index_push", "left_index_front", "left_index_middle"]},
+        { label: "Middle Finger", targets: ["right_middle", "right_middle_push", "left_middle", "left_middle_push"]},
         { label: "Ring Finger", targets: ["right_ring", "right_ring_middle", "right_ring_push", "left_ring", "left_ring_middle", "left_ring_push"]},
-        { label: "Index Finger", targets: ["right_index", "right_index_push", "right_index_front", "right_index_middle", "left_index", "left_index_front", "left_index_middle"]},
+        { label: "Thumbs", targets: ["right_thumb", "left_thumb"]},
         { label: "Twist Up", targets: ["right_up", "right_up_double", "left_up", "left_up_double"]},
         { label: "Twist Down", targets: ["right_down", "right_down_double", "left_down", "left_down_double"]},
         { label: ""},
-        { label: "Right Hand", targets: ["right_index", "right_index_push", "right_index_front", "right_index_middle", "right_ring", "right_ring_middle", "right_ring_push", "right_up", "right_up_double", "right_down", "right_down_double"]},
-        { label: "Left Hand", targets: ["left_index", "left_index_push", "left_index_front", "left_index_middle", "left_ring", "left_ring_middle", "left_ring_push", "left_up", "left_up_double", "left_down", "left_down_double"]},
+        { label: "Right Hand", targets: ["right_index", "right_index_push", "right_index_front", "right_index_middle", "right_middle", "right_middle_push", "right_ring", "right_ring_middle", "right_ring_push", "right_thumb", "right_up", "right_up_double", "right_down", "right_down_double"]},
+        { label: "Left Hand", targets: ["left_index", "left_index_push", "left_index_front", "left_index_middle", "left_middle", "left_middle_push", "left_ring", "left_ring_middle", "left_ring_push", "left_thumb", "left_up", "left_up_double", "left_down", "left_down_double"]},
     ]);
 
     addGroupControls(form, "grip", [
@@ -625,14 +628,14 @@ function collectRunOptionsValues() {
     return {
         depth:                     parseFloat(document.getElementById("depth").value),
         maxIterations:             parseFloat(document.getElementById("iterations").value),
+        maxRegripBranches:         parseFloat(document.getElementById("maxRegripBranches").value),
         searchRotations:           document.getElementById("searchRotations").checked,
-        searchStartingGrips:       document.getElementById("searchStartingGrips").checked,
         pruneRotations:            document.getElementById("pruneRotations").checked,
         memoize:                   document.getElementById("memoize").checked,
         wideReplace:               document.getElementById("wideReplace").checked,
         wideReplaceDouble:         document.getElementById("wideReplaceDouble").checked,
         allowMidScrambleRotations: document.getElementById("allowMidScrambleRotations").checked,
-        partitionLength:           parseFloat(document.getElementById("partitionLength").value) || 0,
+        partitionLength:           parseFloat(document.getElementById("partitionLength").value),
     };
 }
 
@@ -655,8 +658,8 @@ export function collectFormatOptionsValues() {
 function applyRunOptionsValues(runOpts) {
     document.getElementById("depth").value = runOpts.depth;
     document.getElementById("iterations").value = runOpts.maxIterations;
+    document.getElementById("maxRegripBranches").value = runOpts.maxRegripBranches;
     document.getElementById("searchRotations").checked = runOpts.searchRotations;
-    document.getElementById("searchStartingGrips").checked = runOpts.searchStartingGrips;
     document.getElementById("pruneRotations").checked = runOpts.pruneRotations;
     document.getElementById("memoize").checked = runOpts.memoize;
     document.getElementById("wideReplace").checked = runOpts.wideReplace;
