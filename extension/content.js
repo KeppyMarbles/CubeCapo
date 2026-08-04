@@ -1,3 +1,5 @@
+/** @import { OptimizationResult } from "../src/types.js" */
+
 const extAPI = globalThis.browser || globalThis.chrome;
 
 let currentObserver = null;
@@ -199,7 +201,7 @@ function showOptimizingState(scrambleElement) {
 /**
  * Renders the optimized scramble badge indicator, visual overlay, and details popup table card.
  * @param {Element} scrambleElement - Target scramble DOM element.
- * @param {Object} data - Optimization result payload from background service worker.
+ * @param {OptimizationResult} data - Optimization result payload from background service worker.
  */
 function showOptimizedState(scrambleElement, data) {
     // 1. Hide original text nodes immediately
@@ -227,15 +229,20 @@ function showOptimizedState(scrambleElement, data) {
 
     bar.replaceChildren();
 
+    const cubeSize = data.cubeSize || 3;
+    const sizeStr = `${cubeSize}x${cubeSize}`;
+    const transposedBadgeText = `(Transposed | Cost: ${data.bestCost.toFixed(1)} | Size: ${sizeStr})`;
+    const originalBadgeText = "(Original)";
+
     const badge = document.createElement("span");
     badge.className = "cubecapo-badge";
-    badge.textContent = `(Transposed | Cost: ${data.bestCost.toFixed(1)})`; //TODO don't show this if showing original
+    badge.textContent = isShowingOptimized ? transposedBadgeText : originalBadgeText;
 
     const toggleOriginalBtn = document.createElement("button");
     toggleOriginalBtn.type = "button";
     toggleOriginalBtn.id = "cubecapo-toggle-original";
     toggleOriginalBtn.className = "cubecapo-details-link";
-    toggleOriginalBtn.textContent = "Show Original";
+    toggleOriginalBtn.textContent = isShowingOptimized ? "Show Original" : "Show Transposed";
 
     const toggleDetailsBtn = document.createElement("button");
     toggleDetailsBtn.type = "button";
@@ -318,9 +325,11 @@ function showOptimizedState(scrambleElement, data) {
             if (isShowingOptimized) {
                 visualSpan.textContent = data.bestScrambleStr;
                 toggleTextBtn.textContent = "Show Original";
+                badge.textContent = transposedBadgeText;
             } else {
                 visualSpan.textContent = lastOriginalText;
                 toggleTextBtn.textContent = "Show Transposed";
+                badge.textContent = originalBadgeText;
             }
         });
     }
@@ -334,18 +343,32 @@ function showOptimizedState(scrambleElement, data) {
             toggleBtn.textContent = isActive ? "Close" : "Details";
 
             if (isActive) {
-                // Dynamically position the details popup card below the details link button
+                // Dynamically position the details popup card relative to the details button and viewport boundaries
                 const rect = toggleBtn.getBoundingClientRect();
                 details.style.position = "fixed";
-                details.style.top = `${rect.bottom + 8}px`;
 
-                // Handle boundary alignments so it does not overflow the right margin of the browser window
+                const spaceBelow = window.innerHeight - rect.bottom - 16;
+                const spaceAbove = rect.top - 16;
+
+                if (spaceBelow < 200 && spaceAbove > spaceBelow) {
+                    // Position above button if bottom viewport space is constrained
+                    details.style.top = "auto";
+                    details.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+                    details.style.maxHeight = `${Math.min(spaceAbove, window.innerHeight - 32)}px`;
+                } else {
+                    // Position below button
+                    details.style.top = `${rect.bottom + 8}px`;
+                    details.style.bottom = "auto";
+                    details.style.maxHeight = `${Math.max(120, spaceBelow)}px`;
+                }
+
+                // Handle horizontal boundary alignments so it does not overflow the right margin of the browser window
                 const cardWidth = 380;
                 if (rect.left + cardWidth > window.innerWidth) {
                     details.style.left = "auto";
-                    details.style.right = `${window.innerWidth - rect.right}px`;
+                    details.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
                 } else {
-                    details.style.left = `${rect.left}px`;
+                    details.style.left = `${Math.max(8, rect.left)}px`;
                     details.style.right = "auto";
                 }
 

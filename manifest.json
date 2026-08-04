@@ -40,7 +40,7 @@
     {
       "resources": [
         "src/ui/stats.js",
-        "src/data/gripTransitions.json",
+        "src/cube/defaults.js",
         "src/cube/scramble.js",
         "src/cube/move.js",
         "src/types.js",

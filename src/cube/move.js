@@ -1,3 +1,4 @@
+import { defaultColorScheme } from "./defaults.js";
 /** @import { FaceStr, RotationStr, AxisStr, MoveStr, MiddleStr, MoveKey, ThumbPosition, GripState, Transition, Rotation } from "../types.js" */
 
 export class Move {
@@ -421,25 +422,12 @@ export class Move {
 }
 
 /**
- * Default Western color scheme (WCA standard)
- * @type {Record<FaceStr, string>}
- */
-export const DEFAULT_COLOR_SCHEME = {
-    U: "White",
-    D: "Yellow",
-    F: "Green",
-    B: "Blue",
-    R: "Red",
-    L: "Orange"
-};
-
-/**
  * Returns top and front colors for a starting cube rotation.
  * @param {Rotation} rotation - The starting cube rotation { up, front }
- * @param {Record<FaceStr, string>} [colorScheme=DEFAULT_COLOR_SCHEME] - Color mapping for faces
+ * @param {Record<FaceStr, string>} [colorScheme=defaultColorScheme] - Color mapping for faces
  * @returns {{ topColor: string, frontColor: string }}
  */
-export function getOrientationColors(rotation, colorScheme = DEFAULT_COLOR_SCHEME) {
+export function getOrientationColors(rotation, colorScheme = defaultColorScheme) {
     if (!rotation) {
         return { topColor: "", frontColor: "" };
     }

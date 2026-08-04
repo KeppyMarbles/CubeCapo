@@ -1,5 +1,6 @@
 import { ScrambleOptimizer } from "../cube/scramble.js";
 import { costToColor } from "./stats.js";
+import { defaultCostConfiguration, defaultFormatOptions, defaultRunOptions } from "../cube/defaults.js";
 /** @import { CostConfig, RunOptions, FormatOptions } from "../types.js" */
 
 /**
@@ -16,9 +17,9 @@ import { costToColor } from "./stats.js";
 export async function setupForm(onSubmit, onFormatChange) {
     let initialConfig = await loadCostConfig();
     if(initialConfig)
-        initialConfig = migrateConfig(initialConfig, ScrambleOptimizer.defaultCostConfiguration);
+        initialConfig = migrateConfig(initialConfig, defaultCostConfiguration);
     else
-        initialConfig = ScrambleOptimizer.defaultCostConfiguration;
+        initialConfig = defaultCostConfiguration;
 
     let savedConfig = structuredClone(initialConfig);
 
@@ -154,11 +155,11 @@ export async function setupForm(onSubmit, onFormatChange) {
         }
     }
 
-    const runOpts = await loadOptions("runOptions", ScrambleOptimizer.defaultRunOptions);
+    const runOpts = await loadOptions("runOptions", defaultRunOptions);
     let savedRunOpts = structuredClone(runOpts);
     applyRunOptionsValues(runOpts);
 
-    const formatOpts = await loadOptions("formatOptions", ScrambleOptimizer.defaultFormatOptions);
+    const formatOpts = await loadOptions("formatOptions", defaultFormatOptions);
     applyFormatOptionsValues(formatOpts);
 
     // Live update check for unsaved bar
@@ -260,7 +261,7 @@ export async function setupForm(onSubmit, onFormatChange) {
     });
 
     document.getElementById("resetDefaultButton").addEventListener("click", (e) => {
-        applyConfig(form, ScrambleOptimizer.defaultCostConfiguration);
+        applyConfig(form, defaultCostConfiguration);
         form.dispatchEvent(new Event("input", { bubbles: true }));
     });
 

@@ -1,20 +1,8 @@
 import { ScrambleOptimizer } from "../src/cube/scramble.js";
 import { Move } from "../src/cube/move.js";
+import { defaultCostConfiguration, defaultFormatOptions, defaultFingertricks, defaultRunOptions } from "../src/cube/defaults.js";
 
 const extAPI = globalThis.browser || globalThis.chrome;
-
-let gripTransitions = null;
-
-/**
- * Load grip transitions from the JSON file packaged with the extension.
- */
-async function loadGripTransitions() {
-    if (gripTransitions) return gripTransitions;
-    const url = extAPI.runtime.getURL("src/data/gripTransitions.json");
-    const response = await fetch(url);
-    gripTransitions = await response.json();
-    return gripTransitions;
-}
 
 // Listen for messages from content scripts or popup
 extAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -67,20 +55,19 @@ extAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
                 // Validate supported cube size (currently 3x3)
                 const cubeSize = ScrambleOptimizer.detectCubeSize(scramble);
-                const supportedSizes = [3];
+                const supportedSizes = [2, 3, 4, 5, 6, 7];
                 if (!supportedSizes.includes(cubeSize)) {
                     sendResponse({ success: false, error: `${cubeSize}x${cubeSize} scrambles are not supported yet` });
                     return;
                 }
 
                 const store = await extAPI.storage.local.get(["costConfig", "runOptions", "formatOptions"]);
-                const config = store.costConfig || ScrambleOptimizer.defaultCostConfiguration;
+                const config = store.costConfig || defaultCostConfiguration;
 
-                const runOptions = { ...ScrambleOptimizer.defaultRunOptions, ...store.runOptions, scramble };
-                const formatOptions = { ...ScrambleOptimizer.defaultFormatOptions, ...store.formatOptions };
+                const runOptions = { ...defaultRunOptions, ...store.runOptions, scramble };
+                const formatOptions = { ...defaultFormatOptions, ...store.formatOptions };
 
-                const transitions = await loadGripTransitions();
-                const optimizer = new ScrambleOptimizer(config, transitions, null);
+                const optimizer = new ScrambleOptimizer(config, defaultFingertricks, null);
 
                 const start = performance.now();
                 await optimizer.optimize(runOptions);

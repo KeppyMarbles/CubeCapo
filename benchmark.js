@@ -2,14 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ScrambleOptimizer } from './src/cube/scramble.js';
+import { defaultCostConfiguration, defaultFingertricks, defaultRunOptions } from './src/cube/defaults.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const gripTransitionsPath = path.join(__dirname, 'src/data/gripTransitions.json');
-const scramblesPath = path.join(__dirname, 'src/data/scrambles.txt');
-
-const gripTransitions = JSON.parse(fs.readFileSync(gripTransitionsPath, 'utf8'));
+const scramblesPath = path.join(__dirname, 'data/scrambles.txt');
 const rawScramblesText = fs.readFileSync(scramblesPath, 'utf8');
 
 const scrambleLines = rawScramblesText
@@ -25,7 +23,7 @@ let totalCost = 0;
 let totalIterations = 0;
 
 const options = {
-    ...ScrambleOptimizer.defaultRunOptions,
+    ...defaultRunOptions,
     searchRotations: false, //speedup
     maxRegripBranches: 1, //speedup
     partitionLength: 10, //speedup
@@ -36,11 +34,7 @@ console.table(options);
 for (let i = 0; i < scrambleLines.length; i++) {
     const line = scrambleLines[i];
     const parsedMoves = ScrambleOptimizer.parseScramble(line);
-    const optimizer = new ScrambleOptimizer(
-        ScrambleOptimizer.defaultCostConfiguration,
-        gripTransitions
-    );
-
+    const optimizer = new ScrambleOptimizer(defaultCostConfiguration, defaultFingertricks);
     await optimizer.optimize({...options, scramble: parsedMoves});
     totalCost += optimizer.bestCost;
     totalIterations += optimizer.iterations;

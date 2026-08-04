@@ -1,7 +1,99 @@
-{
+/** @import { FormatOptions, RunOptions, CostConfig, TransitionConfig, ColorSchemeConfig } from "../types.js" */
+
+/**
+ * Default Western color scheme (WCA standard)
+ * @type {ColorSchemeConfig}
+ */
+export const defaultColorScheme = Object.freeze({
+    U: "White",
+    D: "Yellow",
+    F: "Green",
+    B: "Blue",
+    R: "Red",
+    L: "Orange"
+});
+
+/** @type {FormatOptions} */
+export const defaultFormatOptions = Object.freeze({
+    showGrips: true,
+    showBoundaries: false,
+    wedgeNotation: true,
+    showOrientationColors: false,
+    reorient: false
+});
+
+/** @type {RunOptions} */
+export const defaultRunOptions = Object.freeze({
+    depth: 1,
+    maxIterations: 999999,
+    maxRegripBranches: 2,
+    searchRotations: true,
+    pruneRotations: true,
+    memoize: true,
+    wideReplace: true,
+    wideReplaceDouble: false,
+    allowMidScrambleRotations: false,
+    partitionLength: 20
+});
+
+/** @type {CostConfig} */
+export const defaultCostConfiguration = Object.freeze({
+    "general": {
+        "regrip": 4,
+        "regripPerStep": 1,
+        "double": 0,
+        "repeatPenalty": 1,
+        "perSliceFingertrick": true
+    },
+    "alpha": { 
+        "F": 0, "B": 1, "R": 0, "L": 1, "U": 0, "D": 1,
+        "f": 3, "b": 3, "r": 1, "l": 2, "u": 3, "d": 3,
+        "x": 2, "y": 2, "z": 2
+    },
+    "grip": {
+        "F F": 0, "F U": 0, "F D": 0, "F Bd": 2, "F Bu": 2, 
+        "U F": 0, "U U": 1, "U D": 0.5, "U Bd": 2, "U Bu": 2, 
+        "D F": 0, "D U": 0.5, "D D": 1, "D Bd": 2, "D Bu": 2, 
+        "Bd F": 2, "Bd U": 2, "Bd D": 2, "Bd Bd": 3, "Bd Bu": 3, 
+        "Bu F": 2, "Bu U": 2, "Bu D": 2, "Bu Bd": 3, "Bu Bu": 3
+    },
+    "fingertrick": {
+        "right_index": 0,
+        "right_index_push": 2,
+        "right_index_front": 3,
+        "right_index_middle": 0,
+        "right_middle": 0,
+        "right_middle_push": 3,
+        "right_ring": 1,
+        "right_ring_middle": 1,
+        "right_ring_push": 3,
+        "right_thumb": 2,
+        "right_up": 0,
+        "right_up_double": 0,
+        "right_down": 0,
+        "right_down_double": 0,
+        "left_index": 0,
+        "left_index_push": 2,
+        "left_index_front": 3,
+        "left_index_middle": 0,
+        "left_middle": 0,
+        "left_middle_push": 3,
+        "left_ring": 1,
+        "left_ring_middle": 1,
+        "left_ring_push": 3,
+        "left_thumb": 2,
+        "left_up": 0,
+        "left_up_double": 0,
+        "left_down": 0,
+        "left_down_double": 0
+    }
+});
+
+/** @type {TransitionConfig} */
+export const defaultFingertricks = Object.freeze({
   "F F": {
     "B": null,
-    "B2": null,
+    "B2": null, 
     "B2'": null,
     "B'": null,
     "D": "left_ring",
@@ -949,4 +1041,4 @@
     "S2'": null,
     "S'": null
   }
-}
+});

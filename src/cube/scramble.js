@@ -1,3 +1,4 @@
+import { defaultFormatOptions } from "./defaults.js";
 import { Move, getOrientationColors, getRestoringRotation } from "./move.js";
 /** @import { CostConfig, TransitionConfig, Orientation, GripState, MoveKey, Transition, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, CostDetails, RotationStr, Rotation } from "../types.js" */
 
@@ -14,84 +15,8 @@ import { Move, getOrientationColors, getRestoringRotation } from "./move.js";
  */
 
 export class ScrambleOptimizer {
-    /** @type {CostConfig} */
-    static defaultCostConfiguration = {
-        "general": {
-            "regrip": 6,
-            "regripPerStep": 1,
-            "double": 0,
-            "repeatPenalty": 1,
-            "perSliceFingertrick": true
-        },
-        "alpha": { 
-            "F": 0, "B": 1, "R": 0, "L": 1, "U": 0, "D": 1,
-            "f": 3, "b": 3, "r": 1, "l": 2, "u": 3, "d": 3,
-            "x": 2, "y": 2, "z": 2
-        },
-        "grip": {
-            "F F": 0, "F U": 0, "F D": 0, "F Bd": 2, "F Bu": 2, 
-            "U F": 0, "U U": 1, "U D": 0.5, "U Bd": 2, "U Bu": 2, 
-            "D F": 0, "D U": 0.5, "D D": 1, "D Bd": 2, "D Bu": 2, 
-            "Bd F": 2, "Bd U": 2, "Bd D": 2, "Bd Bd": 3, "Bd Bu": 3, 
-            "Bu F": 2, "Bu U": 2, "Bu D": 2, "Bu Bd": 3, "Bu Bu": 3
-        },
-        "fingertrick": {
-            "right_index": 0,
-            "right_index_push": 2,
-            "right_index_front": 3,
-            "right_index_middle": 0,
-            "right_middle": 0,
-            "right_middle_push": 3,
-            "right_ring": 1,
-            "right_ring_middle": 1,
-            "right_ring_push": 3,
-            "right_thumb": 2,
-            "right_up": 0,
-            "right_up_double": 0,
-            "right_down": 0,
-            "right_down_double": 0,
-            "left_index": 0,
-            "left_index_push": 2,
-            "left_index_front": 3,
-            "left_index_middle": 0,
-            "left_middle": 0,
-            "left_middle_push": 3,
-            "left_ring": 1,
-            "left_ring_middle": 1,
-            "left_ring_push": 3,
-            "left_thumb": 2,
-            "left_up": 0,
-            "left_up_double": 0,
-            "left_down": 0,
-            "left_down_double": 0
-        }
-    }
-
     /** @type {Move[]} */
-    static ROTATION_CANDIDATES = ["x", "x'", "x2", "x2'", "y", "y'", "y2", "y2'"].map(Move.fromString);
-
-    /** @type {FormatOptions} */
-    static defaultFormatOptions = {
-        showGrips: true,
-        showBoundaries: false,
-        wedgeNotation: false,
-        showOrientationColors: false,
-        reorient: false
-    };
-
-    /** @type {RunOptions} */
-    static defaultRunOptions = {
-        depth: 1,
-        maxIterations: 999999,
-        maxRegripBranches: 2,
-        searchRotations: true,
-        pruneRotations: true,
-        memoize: true,
-        wideReplace: true,
-        wideReplaceDouble: false,
-        allowMidScrambleRotations: false,
-        partitionLength: 0
-    };
+    static rotationCandidates = ["x", "x'", "x2", "x2'", "y", "y'", "y2", "y2'"].map(Move.fromString);
 
     /**
      * Detects the cube size (2, 3, 4, 5, 6, 7) from a parsed Move array.
@@ -425,7 +350,7 @@ export class ScrambleOptimizer {
 
         // Mid-scramble rotation insertion (e.g. x, x', x2)
         if (this.allowMidScrambleRotations) {
-            for (const rot of ScrambleOptimizer.ROTATION_CANDIDATES) {
+            for (const rot of ScrambleOptimizer.rotationCandidates) {
                 branchWithClone((arr, idx, or) => ScrambleOptimizer.insertRotation(arr, idx, or, rot), 2);
             }
         }
@@ -736,7 +661,7 @@ export class ScrambleOptimizer {
      * @param {GripState} [startGrip]
      * @param {FormatOptions} [formatOptions]
      */
-    analyze(scramble, startGrip = this.bestStartingGrip, options = ScrambleOptimizer.defaultFormatOptions) {
+    analyze(scramble, startGrip = this.bestStartingGrip, options = defaultFormatOptions) {
         const boundaries = this.bestPartitionBoundaries || [];
         let totalCost = 0;
 
@@ -773,14 +698,14 @@ export class ScrambleOptimizer {
     /**
      * @param {FormatOptions} [formatOptions]
      */
-    analyzeBest(formatOptions = ScrambleOptimizer.defaultFormatOptions) {
+    analyzeBest(formatOptions = defaultFormatOptions) {
         return this.analyze(this.bestScramble, this.bestStartingGrip, formatOptions);
     }
 
     /**
      * @param {FormatOptions} [formatOptions]
      */
-    getBestAsString(options = ScrambleOptimizer.defaultFormatOptions) {
+    getBestAsString(options = defaultFormatOptions) {
         if (!this.bestScramble) return "";
 
         const formatGrip = (g) => `[${g.replace(" ", "/")}]`;

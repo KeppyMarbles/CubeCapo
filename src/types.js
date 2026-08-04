@@ -99,7 +99,7 @@
  */
 
 /**
- * @typedef {Record<FaceStr, string>} ColorScheme
+ * @typedef {Record<FaceStr, string>} ColorSchemeConfig
  */
 
 /**
@@ -143,6 +143,17 @@
  * @property {number} addedCost The total cost of the transition
  * @property {CostDetails} [costBreakdown] Itemized breakdown of the cost components (fingertrick, grip, alpha, etc.)
  * @property {boolean} [isPartitionBoundary] If this move starts a new partition
+ */
+
+/**
+ * @typedef OptimizationResult
+ * @property {boolean} success Whether optimization completed successfully
+ * @property {string} [bestScrambleStr] Transposed best scramble string
+ * @property {ScrambleBreakdownEntry[]} [breakdown] Move-by-move breakdown entries
+ * @property {number} [bestCost] Total cost of the optimized scramble
+ * @property {number} [searchTime] Search runtime in milliseconds
+ * @property {number} [cubeSize] Detected cube dimension (e.g. 3 for 3x3)
+ * @property {string} [error] Error message if optimization failed
  */
 
 export {}

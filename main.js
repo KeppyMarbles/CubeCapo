@@ -1,7 +1,7 @@
 import { setupForm, drawSearchTime, collectFormatOptionsValues } from "./src/ui/form.js";
 import { ScrambleOptimizer } from "./src/cube/scramble.js";
 import { drawOptimizerStats } from "./src/ui/stats.js";
-import gripTransitions from './src/data/gripTransitions.json' with { type: 'json' };
+import { defaultFingertricks } from "./src/cube/defaults.js";
 /** @import { CostConfig, RunOptions } from "./src/types.js" */
 
 /** @type {ScrambleOptimizer | null} */
@@ -15,7 +15,7 @@ let currentOptimizer = null;
 async function onSubmit(config, options) {
     await drawOptimizerStats(null);
 
-    currentOptimizer = new ScrambleOptimizer(config, gripTransitions, async () => {
+    currentOptimizer = new ScrambleOptimizer(config, defaultFingertricks, async () => {
         await drawOptimizerStats(currentOptimizer, collectFormatOptionsValues());
     });
 
