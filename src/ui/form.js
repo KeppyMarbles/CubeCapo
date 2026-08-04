@@ -603,18 +603,14 @@ function collectRunOptions() {
 
     const scramble = ScrambleOptimizer.parseScramble(rawText);
     const cubeSize = ScrambleOptimizer.detectCubeSize(scramble);
-    //const supportedSizes = [3]; // Currently 3x3 supported
-    //if (!supportedSizes.includes(cubeSize)) {
-    //    throw new Error(`${cubeSize}x${cubeSize} scrambles are not supported yet.`);
-    //}
     const runOpts = collectRunOptionsValues();
 
     if (Number.isNaN(runOpts.depth) || Number.isNaN(runOpts.maxIterations)) {
         throw new Error("Depth and iterations must be numbers.");
     }
     for (const move of scramble) {
-        if (move.isRotation) {
-            throw new Error("Rotations in input not supported yet.");
+        if (move.isMiddle || move.isWide) {
+            throw new Error("Slice/wide moves in input not supported yet.");
         }
     }
 

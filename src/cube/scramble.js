@@ -208,6 +208,32 @@ export class ScrambleOptimizer {
     }
 
     /**
+     * Calculates the resulting orientation after applying a sequence of moves (including rotations and wide moves)
+     * starting from an initial orientation.
+     * @param {Move[]} moves 
+     * @param {Orientation} [initialOrientation] 
+     * @returns {Orientation}
+     */
+    static getFinalOrientation(moves, initialOrientation = { up: "U", front: "F" }) {
+        const orientation = { ...initialOrientation };
+        if (!Array.isArray(moves)) return orientation;
+        for (let i = 0; i < moves.length; i++) {
+            const move = moves[i];
+            if (!move) continue;
+            if (move.isRotation) {
+                Move.transposeOrientation(orientation, move.toKey());
+            } 
+            else if (move.isWide) {
+                const rotKey = move.getAssociatedRotation();
+                if (rotKey) {
+                    Move.transposeOrientation(orientation, rotKey);
+                }
+            }
+        }
+        return orientation;
+    }
+
+    /**
      * @param {string} string 
      * @returns {Move[]}
      */
@@ -515,16 +541,43 @@ export class ScrambleOptimizer {
         /** @type {RotationStr[]} */
         const front_rotations = [null, "y", "y2", "y'"];
 
+        /** @type {Orientation} */
+        const orientation = {up: "U", front: "F"};
+        const rawScramble = options.scramble || [];
+        const preprocessedScramble = [];
+
+        this.originalFinalOrientation = ScrambleOptimizer.getFinalOrientation(rawScramble);
+
+        // Remove all orientation changes in the input scramble
+        for (let i = 0; i < rawScramble.length; i++) {
+            const move = rawScramble[i];
+            if (move.isRotation) {
+                Move.transposeOrientation(orientation, move.toKey());
+            }
+        }
+
+        for (let i = rawScramble.length - 1; i >= 0; i--) {
+            const move = rawScramble[i];
+            if (move.isRotation) {
+                const rotKey = move.toKey();
+                for (let j = 0; j < preprocessedScramble.length; j++) {
+                    preprocessedScramble[j].transposeInverse(rotKey);
+                }
+            } else {
+                preprocessedScramble.unshift(move.clone());
+            }
+        }
+
         this.depth = options.depth;
         this.maxIterations = options.maxIterations;
         this.maxRegripBranches = options.maxRegripBranches ?? 2;
         this.pruneRotations = options.pruneRotations;
-        this.bestScramble = options.scramble;
+        this.bestScramble = preprocessedScramble;
         this.memoize = options.memoize;
         this.doWideReplace = options.wideReplace !== false;
         this.doWideReplaceDouble = options.wideReplaceDouble;
         this.allowMidScrambleRotations = options.allowMidScrambleRotations || false;
-        this.cubeSize = options.cubeSize || ScrambleOptimizer.detectCubeSize(options.scramble);
+        this.cubeSize = options.cubeSize || ScrambleOptimizer.detectCubeSize(preprocessedScramble);
         const partitionLength = Math.max(0, options.partitionLength || 0);
 
         this.bestRotation = {up: null, front: null};
@@ -537,14 +590,11 @@ export class ScrambleOptimizer {
         this.memo = new Map();
         this.iterations = 0;
 
-        /** @type {Orientation} */
-        const orientation = {up: "U", front: "F"};
-
         const candidateGrips = this.allGripKeys;
 
         for (const top_rot of top_rotations) {
             for(const front_rot of front_rotations) {
-                const rotatedScramble = ScrambleOptimizer.copyScramble(options.scramble);
+                const rotatedScramble = ScrambleOptimizer.copyScramble(preprocessedScramble);
                 const newOrientation = { ...orientation };
 
                 // transpose all moves according to the starting rotation
@@ -733,7 +783,12 @@ export class ScrambleOptimizer {
             moves.push(moveStr);
         }
 
-        const restoringRot = getRestoringRotation(this.bestFinalOrientation);
+        const solverStartOrientation = { up: "U", front: "F" };
+        if (this.bestRotation?.up) Move.transposeOrientation(solverStartOrientation, this.bestRotation.up);
+        if (this.bestRotation?.front) Move.transposeOrientation(solverStartOrientation, this.bestRotation.front);
+
+        const solverFinalOrientation = ScrambleOptimizer.getFinalOrientation(this.bestScramble, solverStartOrientation);
+        const restoringRot = getRestoringRotation(solverFinalOrientation, this.originalFinalOrientation);
         const endRotations = options.reorient
             ? [restoringRot.up, restoringRot.front].filter(Boolean)
             : [];

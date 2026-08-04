@@ -1,5 +1,5 @@
 import { defaultColorScheme } from "./defaults.js";
-/** @import { FaceStr, RotationStr, AxisStr, MoveStr, MiddleStr, MoveKey, ThumbPosition, GripState, Transition, Rotation } from "../types.js" */
+/** @import { FaceStr, RotationStr, AxisStr, MoveStr, MiddleStr, MoveKey, ThumbPosition, GripState, Transition, Rotation, Orientation } from "../types.js" */
 
 export class Move {
     /** @type {FaceStr[]} */
@@ -26,6 +26,18 @@ export class Move {
         "z2":  { "R": "L", "L": "R", "U": "D", "B": "B", "D": "U", "F": "F" },
         "z2'": { "R": "L", "L": "R", "U": "D", "B": "B", "D": "U", "F": "F" },
     };
+
+    /** @type {Record<RotationStr, Record<FaceStr | AxisStr, FaceStr | AxisStr>>} */
+    static INV_TRANSPOSITIONS = (() => {
+        const inv = {};
+        for (const rotKey in Move.TRANSPOSITIONS) {
+            inv[rotKey] = {};
+            for (const [from, to] of Object.entries(Move.TRANSPOSITIONS[rotKey])) {
+                inv[rotKey][to] = from;
+            }
+        }
+        return inv;
+    })();
 
     /** @type {Record<MoveKey, RotationStr>} */
     static WIDE_ROTATIONS = {
@@ -364,6 +376,14 @@ export class Move {
     }
 
     /**
+     * Update this move to its inverse equivalent when removing a rotation
+     * @param {RotationStr} string 
+     */
+    transposeInverse(string) {
+        this.alpha = Move.INV_TRANSPOSITIONS[string][this.alpha];
+    }
+
+    /**
      * Calculates the actual physical number of slices being turned.
      * @param {number} [cubeSize=3] - The dimensions of the cube (e.g., 3 for 3x3x3)
      * @returns {number} The number of slices affected by the move
@@ -422,18 +442,18 @@ export class Move {
 }
 
 /**
- * Returns top and front colors for a starting cube rotation.
- * @param {Rotation} rotation - The starting cube rotation { up, front }
+ * Returns top and front colors for a starting cube orientation.
+ * @param {Orientation} orientation
  * @param {Record<FaceStr, string>} [colorScheme=defaultColorScheme] - Color mapping for faces
  * @returns {{ topColor: string, frontColor: string }}
  */
-export function getOrientationColors(rotation, colorScheme = defaultColorScheme) {
-    if (!rotation) {
+export function getOrientationColors(orientation, colorScheme = defaultColorScheme) {
+    if (!orientation) {
         return { topColor: "", frontColor: "" };
     }
 
     let state = { U: "U", D: "D", F: "F", B: "B", R: "R", L: "L" };
-    for (const rot of [rotation.up, rotation.front]) {
+    for (const rot of [orientation.up, orientation.front]) {
         if (rot && Move.TRANSPOSITIONS[rot]) {
             const trans = Move.TRANSPOSITIONS[rot];
             const next = {};
@@ -451,12 +471,17 @@ export function getOrientationColors(rotation, colorScheme = defaultColorScheme)
 }
 
 /**
- * Returns the rotation pair (up, front) required to restore a given cube orientation back to standard (U, F).
- * @param {Orientation} orientation 
+ * Returns the rotation pair (up, front) required to restore a given cube orientation back to a target orientation (default standard U, F).
+ * @param {Orientation} fromOrientation 
+ * @param {Orientation} [toOrientation]
  * @returns {Rotation}
  */
-export function getRestoringRotation(orientation) {
-    if (!orientation || (orientation.up === "U" && orientation.front === "F")) {
+export function getRestoringRotation(fromOrientation, toOrientation = { up: "U", front: "F" }) {
+    if (!fromOrientation) {
+        return { up: null, front: null };
+    }
+    const target = toOrientation || { up: "U", front: "F" };
+    if (fromOrientation.up === target.up && fromOrientation.front === target.front) {
         return { up: null, front: null };
     }
     const topRotations = [null, "x", "x'", "x2", "z", "z'"];
@@ -464,10 +489,10 @@ export function getRestoringRotation(orientation) {
 
     for (const topRot of topRotations) {
         for (const frontRot of frontRotations) {
-            const test = { ...orientation };
+            const test = { ...fromOrientation };
             if (topRot) Move.transposeOrientation(test, topRot);
             if (frontRot) Move.transposeOrientation(test, frontRot);
-            if (test.up === "U" && test.front === "F") {
+            if (test.up === target.up && test.front === target.front) {
                 return { up: topRot, front: frontRot };
             }
         }
