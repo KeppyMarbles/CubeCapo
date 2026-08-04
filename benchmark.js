@@ -24,6 +24,15 @@ const startTime = performance.now();
 let totalCost = 0;
 let totalIterations = 0;
 
+const options = {
+    ...ScrambleOptimizer.defaultRunOptions,
+    searchRotations: false, //speedup
+    maxRegripBranches: 1, //speedup
+    partitionLength: 10, //speedup
+    depth: 0, //speedup
+};
+console.table(options);
+
 for (let i = 0; i < scrambleLines.length; i++) {
     const line = scrambleLines[i];
     const parsedMoves = ScrambleOptimizer.parseScramble(line);
@@ -32,14 +41,7 @@ for (let i = 0; i < scrambleLines.length; i++) {
         gripTransitions
     );
 
-    const options = {
-        ...ScrambleOptimizer.defaultRunOptions,
-        searchRotations: false, //speedup
-        maxRegripBranches: 1, //speedup
-        scramble: parsedMoves
-    };
-
-    await optimizer.optimize(options);
+    await optimizer.optimize({...options, scramble: parsedMoves});
     totalCost += optimizer.bestCost;
     totalIterations += optimizer.iterations;
 }

@@ -4,15 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cube Capo Settings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
       <div class="left-section">
           <h2>Scramble</h2>
           <div>
-            <label>Scramble
+            <label>
               <input type="text" id="scramble" placeholder="Enter scramble" value=""/>
             </label>
 
@@ -53,6 +55,14 @@
 
                 <label title="Convert wide moves to wedge count notation (e.g. Rw instead of r)">Wedge Notation
                   <input type="checkbox" id="wedgeNotation"/>
+                </label>
+
+                <label title="Display starting cube orientation as colors (e.g. White top, Green front)">Show Orientation Colors
+                  <input type="checkbox" id="showOrientationColors"/>
+                </label>
+
+                <label title="Append rotations at the end of the scramble to restore original cube orientation">Reorient
+                  <input type="checkbox" id="reorient"/>
                 </label>
               </div>
             </details>
@@ -138,8 +148,8 @@
                 <div class="tab-content" id="fingertricks" data-group="fingertrick"></div>
             </div>
           </form>
-          <details style="text-align: right; margin-top: 12px;">
-            <summary style="cursor: pointer; font-size: 13px; color: var(--text-muted);">Config Options</summary>
+          <details class="config-details">
+            <summary class="config-summary">Config Options</summary>
             <div id="configOptions">
               <button type="button" id="resetDefaultButton">Reset To Defaults</button>
               <button type="button" id="exportButton">Export</button>

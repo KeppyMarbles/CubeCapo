@@ -1,4 +1,4 @@
-/** @import { FaceStr, RotationStr, AxisStr, MoveStr, MiddleStr, MoveKey, ThumbPosition, GripState, Transition } from "../types.js" */
+/** @import { FaceStr, RotationStr, AxisStr, MoveStr, MiddleStr, MoveKey, ThumbPosition, GripState, Transition, Rotation } from "../types.js" */
 
 export class Move {
     /** @type {FaceStr[]} */
@@ -24,7 +24,7 @@ export class Move {
         "z'":  { "R": "U", "L": "D", "U": "L", "B": "B", "D": "R", "F": "F" },
         "z2":  { "R": "L", "L": "R", "U": "D", "B": "B", "D": "U", "F": "F" },
         "z2'": { "R": "L", "L": "R", "U": "D", "B": "B", "D": "U", "F": "F" },
-    }
+    };
 
     /** @type {Record<MoveKey, RotationStr>} */
     static WIDE_ROTATIONS = {
@@ -165,6 +165,20 @@ export class Move {
     static computeNextGrip(currentGrip, moveKey) {
         if (!currentGrip) return null;
         return Move.NEXT_GRIP_CACHE[currentGrip]?.[moveKey] ?? null;
+    }
+
+    /**
+     * Transposes an orientation object in-place according to a given cube rotation string.
+     * @param {Orientation} orientation 
+     * @param {RotationStr} rotKey 
+     * @returns {Orientation}
+     */
+    static transposeOrientation(orientation, rotKey) {
+        if (!rotKey || !Move.TRANSPOSITIONS[rotKey]) return orientation;
+        const trans = Move.TRANSPOSITIONS[rotKey];
+        orientation.up = trans[orientation.up] || orientation.up;
+        orientation.front = trans[orientation.front] || orientation.front;
+        return orientation;
     }
 
     /**
@@ -357,4 +371,118 @@ export class Move {
         const parsedSliceNum = this.sliceNum || 1;
         return this.isWide ? (cubeSize - parsedSliceNum) : parsedSliceNum;
     }
+
+    /**
+     * Copies properties from a target Move instance into this move.
+     * @param {Move} target
+     */
+    copy(target) {
+        this.alpha = target.alpha;
+        this.isPrime = target.isPrime;
+        this.isDouble = target.isDouble;
+        this.isWide = target.isWide;
+        this.isRotation = target.isRotation;
+        this.isMiddle = target.isMiddle;
+        this.sliceNum = target.sliceNum;
+        this.transition = target.transition ? target.transition : null;
+        return this;
+    }
+
+    /**
+     * Creates a new Move instance cloned from this move.
+     */
+    clone() {
+        return new Move().copy(this);
+    }
+
+    /**
+     * Inverts this move in-place by toggling its prime state.
+     */
+    invert() {
+        this.isPrime = !this.isPrime;
+        return this;
+    }
+
+    /**
+     * Converts this move in-place to its wide move equivalent.
+     */
+    toWide() {
+        this.alpha = Move.WIDE_EQUIVALENTS[this.alpha] || this.alpha;
+        this.isWide = true;
+        return this;
+    }
+
+    /**
+     * Gets the cube rotation string associated with this move.
+     */
+    getAssociatedRotation() {
+        return this.isWide ? Move.WIDE_ROTATIONS[this.toKey()] : null;
+    }
+}
+
+/**
+ * Default Western color scheme (WCA standard)
+ * @type {Record<FaceStr, string>}
+ */
+export const DEFAULT_COLOR_SCHEME = {
+    U: "White",
+    D: "Yellow",
+    F: "Green",
+    B: "Blue",
+    R: "Red",
+    L: "Orange"
+};
+
+/**
+ * Returns top and front colors for a starting cube rotation.
+ * @param {Rotation} rotation - The starting cube rotation { up, front }
+ * @param {Record<FaceStr, string>} [colorScheme=DEFAULT_COLOR_SCHEME] - Color mapping for faces
+ * @returns {{ topColor: string, frontColor: string }}
+ */
+export function getOrientationColors(rotation, colorScheme = DEFAULT_COLOR_SCHEME) {
+    if (!rotation) {
+        return { topColor: "", frontColor: "" };
+    }
+
+    let state = { U: "U", D: "D", F: "F", B: "B", R: "R", L: "L" };
+    for (const rot of [rotation.up, rotation.front]) {
+        if (rot && Move.TRANSPOSITIONS[rot]) {
+            const trans = Move.TRANSPOSITIONS[rot];
+            const next = {};
+            for (const [p, tag] of Object.entries(state)) {
+                next[trans[p]] = tag;
+            }
+            state = next;
+        }
+    }
+
+    return {
+        topColor: colorScheme[state.U] || state.U || "",
+        frontColor: colorScheme[state.F] || state.F || ""
+    };
+}
+
+/**
+ * Returns the rotation pair (up, front) required to restore a given cube orientation back to standard (U, F).
+ * @param {Orientation} orientation 
+ * @returns {Rotation}
+ */
+export function getRestoringRotation(orientation) {
+    if (!orientation || (orientation.up === "U" && orientation.front === "F")) {
+        return { up: null, front: null };
+    }
+    const topRotations = [null, "x", "x'", "x2", "z", "z'"];
+    const frontRotations = [null, "y", "y'", "y2"];
+
+    for (const topRot of topRotations) {
+        for (const frontRot of frontRotations) {
+            const test = { ...orientation };
+            if (topRot) Move.transposeOrientation(test, topRot);
+            if (frontRot) Move.transposeOrientation(test, frontRot);
+            if (test.up === "U" && test.front === "F") {
+                return { up: topRot, front: frontRot };
+            }
+        }
+    }
+    return { up: null, front: null };
 }

@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Fira+Code:wght@400;500&display=swap');
-
 :root {
   --bg: #f8fafc;
   --card-bg: #ffffff;
@@ -487,6 +485,17 @@ summary {
 .chart-label.chart-label-last {
   transform: translateX(-100%);
   left: 100%;
+}
+
+.config-details {
+  text-align: right;
+  margin-top: 12px;
+}
+
+.config-summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 #configOptions {

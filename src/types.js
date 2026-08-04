@@ -94,6 +94,12 @@
  * @property {boolean} [showGrips] If grip prompts (starting grip and regrip transitions) should be included in output
  * @property {boolean} [showBoundaries] If the scramble should show `|` where partitions were made
  * @property {boolean} [wedgeNotation] If wide moves should be output using wedge count notation (e.g. Rw, 3Rw)
+ * @property {boolean} [showOrientationColors] If starting orientation should be displayed as color names (e.g. White top, Green front)
+ * @property {boolean} [reorient] If ending rotation moves should be appended to undo starting rotation
+ */
+
+/**
+ * @typedef {Record<FaceStr, string>} ColorScheme
  */
 
 /**

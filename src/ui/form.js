@@ -201,7 +201,7 @@ export async function setupForm(onSubmit, onFormatChange) {
     });
 
     // Format options: auto-save on change and trigger live update (no unsaved bar)
-    const formatInputIds = ["showGrips", "showBoundaries", "wedgeNotation"];
+    const formatInputIds = ["showGrips", "showBoundaries", "wedgeNotation", "showOrientationColors", "reorient"];
     formatInputIds.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -645,9 +645,11 @@ function collectRunOptionsValues() {
  */
 export function collectFormatOptionsValues() {
     return {
-        showGrips:      document.getElementById("showGrips").checked,
-        showBoundaries: document.getElementById("showBoundaries").checked,
-        wedgeNotation:  document.getElementById("wedgeNotation").checked,
+        showGrips:             document.getElementById("showGrips").checked,
+        showBoundaries:        document.getElementById("showBoundaries").checked,
+        wedgeNotation:         document.getElementById("wedgeNotation").checked,
+        showOrientationColors: document.getElementById("showOrientationColors").checked,
+        reorient:              document.getElementById("reorient").checked,
     };
 }
 
@@ -676,6 +678,8 @@ function applyFormatOptionsValues(formatOpts) {
     document.getElementById("showGrips").checked = formatOpts.showGrips;
     document.getElementById("showBoundaries").checked = formatOpts.showBoundaries;
     document.getElementById("wedgeNotation").checked = formatOpts.wedgeNotation;
+    document.getElementById("showOrientationColors").checked = formatOpts.showOrientationColors ?? false;
+    document.getElementById("reorient").checked = formatOpts.reorient ?? false;
 }
 
 /**
