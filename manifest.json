@@ -43,6 +43,7 @@
         "src/cube/defaults.js",
         "src/cube/scramble.js",
         "src/cube/move.js",
+        "src/cube/util.js",
         "src/types.js",
         "extension/content.css"
       ],

@@ -1,5 +1,6 @@
 import { defaultFormatOptions, defaultRunOptions } from "./defaults.js";
-import { Move, getOrientationColors, getRestoringRotation } from "./move.js";
+import { Move } from "./move.js";
+import { getOrientationColors, getRestoringRotation, detectCubeSize } from "./util.js";
 /** @import { CostConfig, TransitionConfig, Orientation, GripState, MoveKey, Transition, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, CostDetails, RotationStr, Rotation, ScrambleCandidate } from "../types.js" */
 
 /** @typedef {(moves: Move[], index: number, orientation: Orientation) => void} MoveTransform */
@@ -25,40 +26,7 @@ export class ScrambleOptimizer {
      * @returns {number} Cube size N
      */
     static detectCubeSize(moves) {
-        if (!Array.isArray(moves) || moves.length === 0) return 3;
-
-        let maxSlice = 1;
-        let hasLeftDwBw = false;
-        let has3LeftDwBw = false;
-        let hasW = false;
-
-        for (const move of moves) {
-            if (!move || move.isRotation) continue;
-
-            const slices = (move.isWide || move.sliceNum > 1) ? (move.sliceNum || 1) : 1;
-            if (slices > maxSlice) maxSlice = slices;
-
-            if (move.isWide || move.sliceNum > 1) {
-                hasW = true;
-                if (["L", "D", "B"].includes(move.alpha)) {
-                    hasLeftDwBw = true;
-                    if (slices >= 3) {
-                        has3LeftDwBw = true;
-                    }
-                }
-            }
-        }
-
-        if (maxSlice >= 4) return maxSlice * 2 - 1;
-        if (maxSlice === 3) return has3LeftDwBw ? 7 : 6;
-        if (hasW) return hasLeftDwBw ? 5 : 4;
-
-        // 2x2 vs 3x3 check: 2x2 scrambles have <= 12 moves and no wide moves
-        if (moves.length <= 12) {
-            return 2;
-        }
-
-        return 3;
+        return detectCubeSize(moves);
     }
 
     /**
