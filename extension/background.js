@@ -1,11 +1,18 @@
 import { ScrambleOptimizer } from "../src/cube/scramble.js";
 import { Move } from "../src/cube/move.js";
 import { defaultCostConfiguration, defaultFormatOptions, defaultFingertricks, defaultRunOptions } from "../src/cube/defaults.js";
+/** @import { CostConfig, RunOptions, FormatOptions, ScrambleCandidate, SendOptimizationResponse } from "../src/types.js" */
 
 const extAPI = globalThis.browser || globalThis.chrome;
 
 // Listen for messages from content scripts or popup
-extAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
+extAPI.runtime.onMessage.addListener(
+    /**
+     * @param {any} message
+     * @param {any} sender
+     * @param {SendOptimizationResponse} sendResponse
+     */
+    (message, sender, sendResponse) => {
     if (message.action === "OPEN_OPTIONS_PAGE") {
         (async () => {
             if (message.scrambleText) {
@@ -73,9 +80,10 @@ extAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 await optimizer.optimize(runOptions);
                 const end = performance.now();
 
-                const bestScrambleStr = optimizer.getBestAsString(formatOptions);
-                const breakdown = optimizer.analyzeBest(formatOptions);
-                const bestCost = optimizer.bestCost;
+                const topCandidate = optimizer.candidates[0];
+                const bestScrambleStr = topCandidate ? optimizer.formatCandidate(topCandidate, formatOptions) : "";
+                const breakdown = topCandidate ? optimizer.analyzeCandidate(topCandidate, formatOptions) : [];
+                const bestCost = topCandidate ? topCandidate.cost : Infinity;
 
                 sendResponse({
                     success: true,

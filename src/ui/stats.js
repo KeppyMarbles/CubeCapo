@@ -1,24 +1,52 @@
-/** @import { ScrambleBreakdownEntry, OrientationResultInfo, FormatOptions } from "../types.js" */
+/** @import { ScrambleBreakdownEntry, OrientationResultInfo, FormatOptions, ScrambleCandidate } from "../types.js" */
 /** @import { ScrambleOptimizer } from "../cube/scramble.js" */
 
 /**
  * Show all the results of the scramble optimizer
- * @param {ScrambleOptimizer} optimizer 
+ * @param {ScrambleOptimizer | null} optimizer 
  * @param {FormatOptions} [formatOptions]
+ * @param {number} [candidateIndex]
  */
-export async function drawOptimizerStats(optimizer, formatOptions) {
-    if(optimizer) {
+export async function drawOptimizerStats(optimizer, formatOptions, candidateIndex = 0) {
+    const paginationContainer = document.getElementById("scramblePagination");
+    const indicator = document.getElementById("scramblePageIndicator");
+    const prevBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById("prevScrambleBtn"));
+    const nextBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById("nextScrambleBtn"));
+
+    if (optimizer && optimizer.candidates && optimizer.candidates.length > 0) {
+        const total = optimizer.candidates.length;
+        const validIndex = Math.max(0, Math.min(candidateIndex, total - 1));
+        const candidate = optimizer.candidates[validIndex];
+
         drawDistributionChart(optimizer.distribution);
         drawRotationInfoTable(optimizer.rotationInfo);
-        document.getElementById("output").textContent = optimizer.getBestAsString(formatOptions);
-        drawCostTable(optimizer.analyzeBest(formatOptions));
+        document.getElementById("output").textContent = optimizer.formatCandidate(candidate, formatOptions);
+        drawCostTable(optimizer.analyzeCandidate(candidate, formatOptions));
+
+        if (paginationContainer) {
+            paginationContainer.style.display = "flex";
+            if (indicator) {
+                indicator.textContent = `Scramble ${validIndex + 1} of ${total}`;
+            }
+            if (prevBtn) {
+                prevBtn.disabled = validIndex <= 0;
+            }
+            if (nextBtn) {
+                nextBtn.disabled = validIndex >= total - 1;
+            }
+        }
     }
     else {
         drawDistributionChart([]);
         drawRotationInfoTable([]);
         drawCostTable([]);
         document.getElementById("output").textContent = "";
-        document.getElementById("searchTime").textContent = "";
+        const searchTimeEl = document.getElementById("searchTime");
+        if (searchTimeEl) searchTimeEl.textContent = "";
+
+        if (paginationContainer) {
+            paginationContainer.style.display = "none";
+        }
     }
     await new Promise(requestAnimationFrame);
 }

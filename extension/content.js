@@ -134,6 +134,9 @@ async function processScramble(element) {
             action: "OPTIMIZE_SCRAMBLE",
             scrambleText: text
         },
+        /**
+         * @param {OptimizationResult} response
+         */
         async (response) => {
             if (extAPI.runtime.lastError) {
                 console.warn("[Cube Capo] Chrome extension message error:", extAPI.runtime.lastError);

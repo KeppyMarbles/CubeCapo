@@ -53,7 +53,7 @@
  * @typedef {Object} GeneralCosts
  * @property {number} regrip Cost of a regrip occuring
  * @property {number} [regripPerStep] Cost multiplier per chain step distance during regrip
- * @property {number} double Cost of a double move
+ * //@property {number} double Cost of a double move
  * @property {number} repeatPenalty Cost of the same fingertrick occuring twice in a row
  * @property {boolean} perSliceFingertrick If fingertrick cost should be applied for each effective slice
  */
@@ -113,8 +113,10 @@
  * @property {boolean} pruneRotations If an orientation search should be stopped if worse than best orientation
  * @property {boolean} memoize If search shouldn't continue if same index, orientation and grip is reached
  * @property {boolean} [wideReplace] If search should try replacing single moves with wide moves
- * @property {boolean} wideReplaceDouble If search should try replacing double moves with 1 wide and 1 normal move
+ * //@property {boolean} wideReplaceDouble If search should try replacing double moves with 1 wide and 1 normal move
+ * //@property {boolean} allowMidScrambleRotations
  * @property {number} [partitionLength] Maximum length of scramble partitions (0 or undefined to disable)
+ * @property {number} [maxCapacity] Maximum number of candidate scrambles to retain (default 50)
  */
 
 /**
@@ -137,6 +139,18 @@
  */
 
 /**
+ * @typedef {Object} ScrambleCandidate
+ * @property {Move[]} scramble Transposed candidate scramble moves
+ * @property {number} cost Total cost of candidate
+ * @property {Rotation} rotation Starting rotation applied
+ * @property {Orientation} finalOrientation Final orientation of the cube after scramble
+ * @property {GripState} startingGrip Starting thumb placement grip
+ * @property {number[]} partitionBoundaries Indices where partition boundaries occur
+ * @property {GripState} finalGrip Final thumb placement grip after candidate execution
+ * @property {Transition | null} lastTransition Last executed transition
+ */
+
+/**
  * @typedef ScrambleBreakdownEntry
  * @property {MoveStr} move The move for this step
  * @property {Transition} transition The transition occuring from this move
@@ -154,6 +168,10 @@
  * @property {number} [searchTime] Search runtime in milliseconds
  * @property {number} [cubeSize] Detected cube dimension (e.g. 3 for 3x3)
  * @property {string} [error] Error message if optimization failed
+ */
+
+/**
+ * @typedef {(response: OptimizationResult) => void} SendOptimizationResponse
  */
 
 export {}

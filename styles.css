@@ -200,7 +200,7 @@ button {
   transition: background-color 0.15s ease;
 }
 
-button:hover {
+button:hover:not(:disabled) {
   background: var(--primary-hover);
 }
 
@@ -216,7 +216,7 @@ button:hover {
   color: var(--text);
 }
 
-.btn-adjust:hover {
+.btn-adjust:hover:not(:disabled) {
   background: var(--border);
 }
 
@@ -229,7 +229,7 @@ button:hover {
   color: var(--text);
 }
 
-.btn-zero:hover {
+.btn-zero:hover:not(:disabled) {
   background: var(--border);
 }
 
@@ -343,15 +343,62 @@ summary {
   margin: 12px 0;
 }
 
-#output {
-  font-family: 'Fira Code', monospace;
-  font-size: 18px;
-  font-weight: 600;
+.scramble-container {
+  margin-top: 12px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 12px;
-  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scramble-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.scramble-page-indicator {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.pagination-btn {
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 10px;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: var(--border);
+  color: var(--primary);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.35;
+  cursor: auto;
+}
+
+#output {
+  font-family: 'Fira Code', monospace;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
   word-break: break-word;
   color: var(--primary);
 }

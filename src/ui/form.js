@@ -77,7 +77,7 @@ export async function setupForm(onSubmit, onFormatChange) {
         const formAlias = {
             "regrip": "Base Regrip",
             "regripPerStep": "Regrip Per Step",
-            "double": "Double Move",
+            //"double": "Double Move",
             "repeatPenalty": "Repeat Fingertrick",
             "perSliceFingertrick": "Per-Slice Fingertrick Cost"
         }
@@ -189,8 +189,8 @@ export async function setupForm(onSubmit, onFormatChange) {
         "pruneRotations",
         "memoize",
         "wideReplace",
-        "wideReplaceDouble",
-        "allowMidScrambleRotations",
+        //"wideReplaceDouble",
+        //"allowMidScrambleRotations",
         "partitionLength"
     ];
     computeInputIds.forEach(id => {
@@ -312,7 +312,7 @@ export async function setupForm(onSubmit, onFormatChange) {
         { label: ""},
         { label: "Normal", targets: ["F", "B", "R", "L", "U", "D"]},
         { label: "Wide", targets: ["f", "b", "r", "l", "u", "d"]},
-        { label: "Rotation", targets: ["x", "y", "z"]},
+        //{ label: "Rotation", targets: ["x", "y", "z"]},
     ]);
 
     document.getElementById("exportButton").addEventListener("click", () => {
@@ -630,8 +630,8 @@ function collectRunOptionsValues() {
         pruneRotations:            document.getElementById("pruneRotations").checked,
         memoize:                   document.getElementById("memoize").checked,
         wideReplace:               document.getElementById("wideReplace").checked,
-        wideReplaceDouble:         document.getElementById("wideReplaceDouble").checked,
-        allowMidScrambleRotations: document.getElementById("allowMidScrambleRotations").checked,
+        //wideReplaceDouble:         document.getElementById("wideReplaceDouble").checked,
+        //allowMidScrambleRotations: document.getElementById("allowMidScrambleRotations").checked,
         partitionLength:           parseFloat(document.getElementById("partitionLength").value),
     };
 }
@@ -662,8 +662,8 @@ function applyRunOptionsValues(runOpts) {
     document.getElementById("pruneRotations").checked = runOpts.pruneRotations;
     document.getElementById("memoize").checked = runOpts.memoize;
     document.getElementById("wideReplace").checked = runOpts.wideReplace;
-    document.getElementById("wideReplaceDouble").checked = runOpts.wideReplaceDouble;
-    document.getElementById("allowMidScrambleRotations").checked = runOpts.allowMidScrambleRotations;
+    //document.getElementById("wideReplaceDouble").checked = runOpts.wideReplaceDouble;
+    //document.getElementById("allowMidScrambleRotations").checked = runOpts.allowMidScrambleRotations;
     document.getElementById("partitionLength").value = runOpts.partitionLength;
 }
 
