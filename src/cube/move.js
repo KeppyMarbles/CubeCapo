@@ -49,6 +49,20 @@ export class Move {
         "B": "z'", "B'": "z",  "B2": "z2'", "B2'": "z2",
     };
 
+    /** @type {Record<MoveKey, RotationStr>} */
+    static MIDDLE_ROTATIONS = {
+        "M": "x'", "M'": "x", "M2": "x2", "M2'": "x2'",
+        "E": "y'", "E'": "y", "E2": "y2", "E2'": "y2'",
+        "S": "z",  "S'": "z'", "S2": "z2", "S2'": "z2'",
+    };
+
+    /** @type {Partial<Record<MoveKey, MoveKey[]>>} */
+    static DECOMPOSED_FACE_MOVES = {
+        "M": ["R", "L'"], "M'": ["R'", "L"], "M2": ["R2", "L2'"], "M2'": ["R2'", "L2"],
+        "E": ["U", "D'"], "E'": ["U'", "D"], "E2": ["U2", "D2'"], "E2'": ["U2'", "D2"],
+        "S": ["F'", "B"], "S'": ["F", "B'"], "S2": ["F2'", "B2"], "S2'": ["F2", "B2'"],
+    };
+
     /** @type {Record<FaceStr, FaceStr>} */
     static WIDE_EQUIVALENTS = {
         R: 'L',
@@ -425,6 +439,46 @@ export class Move {
     }
 
     /**
+     * Decomposes any move into its constituent face moves and associated cube rotation.
+     * @param {{ faceMoves?: Move[], rotation?: RotationStr | null }} [target] Optional target container
+     */
+    decompose(target = {}) {
+        const rotation = this.getAssociatedRotation();
+        target.rotation = rotation;
+
+        if (!target.faceMoves) {
+            target.faceMoves = [];
+        } else {
+            target.faceMoves.length = 0;
+        }
+
+        if (this.isRotation) {
+            return target;
+        }
+
+        if (this.isMiddle) {
+            const keys = Move.DECOMPOSED_FACE_MOVES[this.toKey()];
+            if (keys) {
+                for (let i = 0; i < keys.length; i++) {
+                    target.faceMoves.push(Move.fromString(keys[i]));
+                }
+                return target;
+            }            
+        }
+
+        if (this.isWide) {
+            const oppFace = Move.WIDE_EQUIVALENTS[this.alpha];
+            if(oppFace) {
+                target.faceMoves.push(new Move(oppFace, this.isPrime, this.isDouble, false, false, false, this.sliceNum));
+                return target;
+            }
+        }
+
+        target.faceMoves.push(this.clone());
+        return target;
+    }
+
+    /**
      * Converts this move in-place to its wide move equivalent.
      */
     toWide() {
@@ -435,9 +489,13 @@ export class Move {
 
     /**
      * Gets the cube rotation string associated with this move.
+     * @returns {RotationStr | null}
      */
     getAssociatedRotation() {
-        return this.isWide ? Move.WIDE_ROTATIONS[this.toKey()] : null;
+        if (this.isRotation) return /** @type {RotationStr} */ (this.toKey());
+        if (this.isWide) return Move.WIDE_ROTATIONS[this.toKey()] || null;
+        if (this.isMiddle) return Move.MIDDLE_ROTATIONS[this.toKey()] || null;
+        return null;
     }
 }
 

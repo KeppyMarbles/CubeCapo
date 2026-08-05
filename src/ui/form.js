@@ -608,11 +608,6 @@ function collectRunOptions() {
     if (Number.isNaN(runOpts.depth) || Number.isNaN(runOpts.maxIterations)) {
         throw new Error("Depth and iterations must be numbers.");
     }
-    for (const move of scramble) {
-        if (move.isMiddle || move.isWide) {
-            throw new Error("Slice/wide moves in input not supported yet.");
-        }
-    }
 
     return { scramble, cubeSize, ...runOpts };
 }

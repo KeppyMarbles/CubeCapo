@@ -210,14 +210,9 @@ export class ScrambleOptimizer {
         for (let i = 0; i < moves.length; i++) {
             const move = moves[i];
             if (!move) continue;
-            if (move.isRotation) {
-                Move.transposeOrientation(orientation, move.toKey());
-            } 
-            else if (move.isWide) {
-                const rotKey = move.getAssociatedRotation();
-                if (rotKey) {
-                    Move.transposeOrientation(orientation, rotKey);
-                }
+            const { rotation } = move.decompose();
+            if (rotation) {
+                Move.transposeOrientation(orientation, rotation);
             }
         }
         return orientation;
@@ -559,22 +554,26 @@ export class ScrambleOptimizer {
 
         this.originalFinalOrientation = ScrambleOptimizer.getFinalOrientation(rawScramble);
 
-        // Remove all orientation changes in the input scramble
+        // Remove all orientation changes, wide moves, and slice moves in the input scramble
+        const decompContainer = { faceMoves: [], rotation: null };
+
         for (let i = 0; i < rawScramble.length; i++) {
             const move = rawScramble[i];
-            if (move.isRotation) {
-                Move.transposeOrientation(orientation, move.toKey());
+            const { rotation } = move.decompose(decompContainer);
+            if (rotation) {
+                Move.transposeOrientation(orientation, rotation);
             }
         }
         for (let i = rawScramble.length - 1; i >= 0; i--) {
             const move = rawScramble[i];
-            if (move.isRotation) {
-                const rotKey = move.toKey();
+            const { faceMoves, rotation } = move.decompose(decompContainer);
+            if (rotation) {
                 for (let j = 0; j < preprocessedScramble.length; j++) {
-                    preprocessedScramble[j].transposeInverse(rotKey);
+                    preprocessedScramble[j].transposeInverse(rotation);
                 }
-            } else {
-                preprocessedScramble.unshift(move.clone());
+            }
+            for (let k = faceMoves.length - 1; k >= 0; k--) {
+                preprocessedScramble.unshift(faceMoves[k]);
             }
         }
 
