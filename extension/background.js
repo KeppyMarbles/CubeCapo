@@ -60,18 +60,12 @@ extAPI.runtime.onMessage.addListener(
                     return;
                 }
 
-                // Validate supported cube size (currently 3x3)
-                const cubeSize = ScrambleOptimizer.detectCubeSize(scramble);
-                const supportedSizes = [2, 3, 4, 5, 6, 7];
-                if (!supportedSizes.includes(cubeSize)) {
-                    sendResponse({ success: false, error: `${cubeSize}x${cubeSize} scrambles are not supported yet` });
-                    return;
-                }
-
                 const store = await extAPI.storage.local.get(["costConfig", "runOptions", "formatOptions"]);
                 const config = store.costConfig || defaultCostConfiguration;
 
-                const runOptions = { ...defaultRunOptions, ...store.runOptions, scramble };
+                const cubeSize = Number(store.runOptions?.cubeSize ?? 0);
+
+                const runOptions = { ...defaultRunOptions, ...store.runOptions, scramble, cubeSize };
                 const formatOptions = { ...defaultFormatOptions, ...store.formatOptions };
 
                 const optimizer = new ScrambleOptimizer(config, defaultFingertricks, null);

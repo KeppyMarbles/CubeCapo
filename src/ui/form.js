@@ -11,7 +11,7 @@ import { defaultCostConfiguration, defaultFormatOptions, defaultRunOptions } fro
 
 /**
  * Set up everything needed for the user to configure the optimizer
- * @param {() => void} onSubmit
+ * @param {(config: CostConfig, options: RunOptions) => Promise<void> | void} onSubmit
  * @param {() => void} [onFormatChange] Called whenever a format option changes
  */
 export async function setupForm(onSubmit, onFormatChange) {
@@ -191,7 +191,8 @@ export async function setupForm(onSubmit, onFormatChange) {
         "wideReplace",
         //"wideReplaceDouble",
         //"allowMidScrambleRotations",
-        "partitionLength"
+        "partitionLength",
+        "cubeSize"
     ];
     computeInputIds.forEach(id => {
         const el = document.getElementById(id);
@@ -247,13 +248,13 @@ export async function setupForm(onSubmit, onFormatChange) {
     });
 
     // Submit handler
-    document.getElementById("submitButton").addEventListener("click", (e) => {
+    document.getElementById("submitButton").addEventListener("click", async (e) => {
         e.preventDefault();
         document.getElementById("errorMessage").textContent = "";
         try {
             const config = collectCostConfig(form, savedConfig);
             const options = collectRunOptions();
-            onSubmit(config, options);
+            await onSubmit(config, options);
         } 
         catch (err) {
             document.getElementById("errorMessage").textContent = "Error: " + err.message;
@@ -602,14 +603,14 @@ function collectRunOptions() {
     }
 
     const scramble = ScrambleOptimizer.parseScramble(rawText);
-    const cubeSize = ScrambleOptimizer.detectCubeSize(scramble);
     const runOpts = collectRunOptionsValues();
+    const cubeSize = runOpts?.cubeSize ?? 0;
 
     if (Number.isNaN(runOpts.depth) || Number.isNaN(runOpts.maxIterations)) {
         throw new Error("Depth and iterations must be numbers.");
     }
 
-    return { scramble, cubeSize, ...runOpts };
+    return { scramble, ...runOpts, cubeSize };
 }
 
 /**
@@ -628,6 +629,7 @@ function collectRunOptionsValues() {
         //wideReplaceDouble:         document.getElementById("wideReplaceDouble").checked,
         //allowMidScrambleRotations: document.getElementById("allowMidScrambleRotations").checked,
         partitionLength:           parseFloat(document.getElementById("partitionLength").value),
+        cubeSize:                  Number(document.getElementById("cubeSize").value)
     };
 }
 
@@ -660,6 +662,7 @@ function applyRunOptionsValues(runOpts) {
     //document.getElementById("wideReplaceDouble").checked = runOpts.wideReplaceDouble;
     //document.getElementById("allowMidScrambleRotations").checked = runOpts.allowMidScrambleRotations;
     document.getElementById("partitionLength").value = runOpts.partitionLength;
+    document.getElementById("cubeSize").value = String(runOpts.cubeSize);
 }
 
 /**

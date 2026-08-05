@@ -17,17 +17,8 @@ import { getOrientationColors, getRestoringRotation, detectCubeSize } from "./ut
  */
 
 export class ScrambleOptimizer {
-    /** @type {Move[]} */
-    static rotationCandidates = ["x", "x'", "x2", "x2'", "y", "y'", "y2", "y2'"].map(Move.fromString);
-
-    /**
-     * Detects the cube size (2, 3, 4, 5, 6, 7) from a parsed Move array.
-     * @param {Move[]} moves 
-     * @returns {number} Cube size N
-     */
-    static detectCubeSize(moves) {
-        return detectCubeSize(moves);
-    }
+    /** @type {readonly number[]} */
+    static supportedSizes = Object.freeze([2, 3, 4, 5, 6, 7]);
 
     /**
      * Computes a unique signature string for deduplicating scramble candidates.
@@ -545,7 +536,12 @@ export class ScrambleOptimizer {
             }
         }
 
-        this.options = { ...defaultRunOptions, ...options, cubeSize: options.cubeSize || ScrambleOptimizer.detectCubeSize(preprocessedScramble) };
+        const cubeSize = options?.cubeSize || detectCubeSize(preprocessedScramble);
+        if(!ScrambleOptimizer.supportedSizes.includes(cubeSize)) {
+            throw new Error(`Unsupported cube size: ${cubeSize}x${cubeSize}`);
+        }
+
+        this.options = { ...defaultRunOptions, ...options, cubeSize };
         this.candidates = [];
         this.distribution = new Map();
         this.rotationInfo = [];

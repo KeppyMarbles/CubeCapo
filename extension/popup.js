@@ -82,4 +82,53 @@ document.addEventListener("DOMContentLoaded", async () => {
     optionsBtn.addEventListener("click", () => {
         extAPI.runtime.openOptionsPage();
     });
+
+    // Bind quick computation & format options
+    await setupOptionsBinding("runOptions", {
+        cubeSize: { id: "cubeSizeSelect", type: "number" }
+    }, tab);
 });
+
+/**
+ * Bind DOM inputs to chrome.storage.local options and broadcast changes
+ * @param {string} storageKey - Target storage key (e.g. 'runOptions', 'formatOptions')
+ * @param {Record<string, { id: string, type?: string }>} bindings - Map of option property to DOM element ID
+ * @param {any} [activeTab] - Active tab to notify on settings change
+ */
+async function setupOptionsBinding(storageKey, bindings, activeTab) {
+    const store = await extAPI.storage.local.get([storageKey]);
+    const currentOptions = store[storageKey] || {};
+
+    for (const [optKey, config] of Object.entries(bindings)) {
+        const el = document.getElementById(config.id);
+        if (!el) continue;
+
+        const val = currentOptions[optKey];
+        if (el.type === "checkbox") {
+            el.checked = Boolean(val);
+        } else if (val !== undefined && val !== null) {
+            el.value = String(val);
+        }
+
+        el.addEventListener("change", async () => {
+            const freshStore = await extAPI.storage.local.get([storageKey]);
+            const updatedOpts = { ...(freshStore[storageKey] || {}) };
+
+            if (el.type === "checkbox") {
+                updatedOpts[optKey] = el.checked;
+            } else if (config.type === "number" || el.tagName === "SELECT") {
+                updatedOpts[optKey] = Number(el.value);
+            } else {
+                updatedOpts[optKey] = el.value;
+            }
+
+            await extAPI.storage.local.set({ [storageKey]: updatedOpts });
+
+            if (activeTab?.id) {
+                extAPI.tabs.sendMessage(activeTab.id, { action: "SETTINGS_CHANGED" }, () => {
+                    if (extAPI.runtime.lastError) { /* ignore */ }
+                });
+            }
+        });
+    }
+}

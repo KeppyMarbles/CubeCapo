@@ -185,3 +185,14 @@ input:checked + .slider:before {
 .hidden {
   display: none !important;
 }
+
+.popup-select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}

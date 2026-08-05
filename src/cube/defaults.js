@@ -34,7 +34,8 @@ export const defaultRunOptions = Object.freeze({
     //wideReplaceDouble: false,
     //allowMidScrambleRotations: false,
     partitionLength: 20,
-    maxCapacity: 50
+    maxCapacity: 50,
+    cubeSize: 0,
 });
 
 /** @type {CostConfig} */

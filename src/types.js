@@ -105,7 +105,7 @@
 /**
  * @typedef {Object} RunOptions
  * @property {Move[]} scramble The scramble to optimize
- * @property {number} [cubeSize] Size of the cube (e.g. 3 for 3x3, 7 for 7x7), detected automatically if omitted
+ * @property {number} cubeSize Size of the cube (e.g. 3 for 3x3, 7 for 7x7), detected automatically if 0
  * @property {number} depth The branch pruning threshold
  * @property {number} maxIterations Number of iterations to try before bailing out
  * @property {number} [maxRegripBranches] Maximum number of candidate regrips to explore when a regrip is required

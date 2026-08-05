@@ -26,7 +26,9 @@ export async function drawOptimizerStats(optimizer, formatOptions, candidateInde
         if (paginationContainer) {
             paginationContainer.style.display = "flex";
             if (indicator) {
-                indicator.textContent = `Scramble ${validIndex + 1} of ${total}`;
+                const size = optimizer.options?.cubeSize || 0;
+                const sizeStr = `${size}x${size}`;
+                indicator.textContent = `Scramble ${validIndex + 1} of ${total} (Size: ${sizeStr})`;
             }
             if (prevBtn) {
                 prevBtn.disabled = validIndex <= 0;
