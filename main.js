@@ -1,10 +1,10 @@
-import { setupForm, drawSearchTime, collectFormatOptionsValues } from "./src/ui/form.js";
-import { getOptionalElement } from "./src/ui/dom.js";
-import { ScrambleOptimizer } from "./src/cube/scramble.js";
-import { drawOptimizerStats } from "./src/ui/stats.js";
-import { defaultFingertricks } from "./src/cube/defaults.js";
-/** @import { CostConfig, RunOptions } from "./src/types.js" */
-/** @import { Move } from "./src/cube/move.js" */
+import { setupForm, drawSearchTime, collectFormatOptionsValues } from "./shared/ui/form.js";
+import { getOptionalElement } from "./shared/ui/dom.js";
+import { ScrambleOptimizer } from "./shared/cube/scramble.js";
+import { drawOptimizerStats } from "./shared/ui/stats.js";
+import { defaultFingertricks } from "./shared/cube/defaults.js";
+/** @import { CostConfig, RunOptions } from "./shared/types.js" */
+/** @import { Move } from "./shared/cube/move.js" */
 
 /** @type {ScrambleOptimizer | null} */
 let currentOptimizer = null;

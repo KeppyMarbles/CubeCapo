@@ -1,4 +1,4 @@
-import { getElement, getOptionalElement } from "../src/ui/dom.js";
+import { getElement, getOptionalElement } from "../shared/ui/dom.js";
 
 const extAPI = /** @type {any} */ (globalThis).browser || globalThis.chrome;
 
