@@ -1,6 +1,6 @@
-import { getElement, getOptionalElement, queryElementOptional } from "../src/ui/dom.js";
-import { renderBreakdownTable } from "../src/ui/stats.js";
-/** @import { OptimizationResult } from "../src/types.js" */
+import { getElement, getOptionalElement, queryElementOptional } from "../shared/ui/dom.js";
+import { renderBreakdownTable } from "../shared/ui/stats.js";
+/** @import { OptimizationResult } from "../shared/types.js" */
 
 const extAPI = /** @type {any} */ (globalThis).browser || globalThis.chrome;
 

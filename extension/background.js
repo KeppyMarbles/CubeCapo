@@ -1,6 +1,6 @@
-import { ScrambleOptimizer } from "../src/cube/scramble.js";
-import { defaultCostConfiguration, defaultFormatOptions, defaultFingertricks, defaultRunOptions } from "../src/cube/defaults.js";
-/** @import { SendOptimizationResponse } from "../src/types.js" */
+import { ScrambleOptimizer } from "../shared/cube/scramble.js";
+import { defaultCostConfiguration, defaultFormatOptions, defaultFingertricks, defaultRunOptions } from "../shared/cube/defaults.js";
+/** @import { SendOptimizationResponse } from "../shared/types.js" */
 
 const extAPI = /** @type {any} */ (globalThis).browser || chrome;
 

@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { ScrambleOptimizer } from './src/cube/scramble.js';
-import { defaultCostConfiguration, defaultFingertricks, defaultRunOptions } from './src/cube/defaults.js';
-/** @import {RunOptions} from './src/types.js' */
+import { ScrambleOptimizer } from './shared/cube/scramble.js';
+import { defaultCostConfiguration, defaultFingertricks, defaultRunOptions } from './shared/cube/defaults.js';
+/** @import {RunOptions} from './shared/types.js' */
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
