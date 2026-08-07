@@ -1,8 +1,10 @@
 import { setupForm, drawSearchTime, collectFormatOptionsValues } from "./src/ui/form.js";
+import { getOptionalElement } from "./src/ui/dom.js";
 import { ScrambleOptimizer } from "./src/cube/scramble.js";
 import { drawOptimizerStats } from "./src/ui/stats.js";
 import { defaultFingertricks } from "./src/cube/defaults.js";
-/** @import { CostConfig, RunOptions, ScrambleCandidate } from "./src/types.js" */
+/** @import { CostConfig, RunOptions } from "./src/types.js" */
+/** @import { Move } from "./src/cube/move.js" */
 
 /** @type {ScrambleOptimizer | null} */
 let currentOptimizer = null;
@@ -11,9 +13,10 @@ let currentCandidateIndex = 0;
 /**
  * Called when submit scramble button is pressed
  * @param {CostConfig} config
+ * @param {Move[]} scramble
  * @param {RunOptions} options 
  */
-async function onSubmit(config, options) {
+async function onSubmit(config, scramble, options) {
     currentCandidateIndex = 0;
     await drawOptimizerStats(null);
 
@@ -22,7 +25,7 @@ async function onSubmit(config, options) {
     });
 
     const start = performance.now();
-    await currentOptimizer.optimize(options);
+    await currentOptimizer.optimize(scramble, options);
     const end = performance.now();
 
     await drawOptimizerStats(currentOptimizer, collectFormatOptionsValues(), currentCandidateIndex);
@@ -37,8 +40,8 @@ async function onSubmit(config, options) {
     };
 
     const setupPaginationControls = () => {
-        const prevBtn = document.getElementById("prevScrambleBtn");
-        const nextBtn = document.getElementById("nextScrambleBtn");
+        const prevBtn = getOptionalElement("prevScrambleBtn", HTMLButtonElement);
+        const nextBtn = getOptionalElement("nextScrambleBtn", HTMLButtonElement);
 
         if (prevBtn) {
             prevBtn.addEventListener("click", () => {
@@ -61,4 +64,4 @@ async function onSubmit(config, options) {
 
     setupPaginationControls();
     await setupForm(onSubmit, updateFormatLive);
-})();
+})();

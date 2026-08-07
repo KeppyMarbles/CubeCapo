@@ -36,7 +36,7 @@ for (let i = 0; i < scrambleLines.length; i++) {
     const line = scrambleLines[i];
     const parsedMoves = ScrambleOptimizer.parseScramble(line);
     const optimizer = new ScrambleOptimizer(defaultCostConfiguration, defaultFingertricks);
-    await optimizer.optimize({...options, scramble: parsedMoves});
+    await optimizer.optimize(parsedMoves, options);
     const topCandidate = optimizer.candidates[0];
     totalCost += topCandidate ? topCandidate.cost : 0;
     totalIterations += optimizer.iterations;

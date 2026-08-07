@@ -1,19 +1,18 @@
 import { defaultFormatOptions, defaultRunOptions } from "./defaults.js";
 import { Move } from "./move.js";
 import { getOrientationColors, getRestoringRotation, detectCubeSize } from "./util.js";
-/** @import { CostConfig, TransitionConfig, Orientation, GripState, MoveKey, Transition, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, CostDetails, RotationStr, Rotation, ScrambleCandidate } from "../types.js" */
+/** @import { CostConfig, TransitionConfig, Orientation, GripState, MoveKey, Transition, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, CostDetails, RotationStr, ScrambleCandidate, Fingertrick, FaceStr, MoveStr, TransitionCache, TransitionCacheRow } from "../types.js" */
 
 /** @typedef {(moves: Move[], index: number, orientation: Orientation) => void} MoveTransform */
 
 /**
  * @typedef {Object} SearchContext
  * @property {number} minCost
- * @property {ScrambleCandidate[]} [minResults]
+ * @property {ScrambleCandidate[]} minResults
  * @property {Move[] | null} minScramble
  * @property {GripState} minStartingGrip
  * @property {GripState} minFinalGrip
  * @property {Orientation | null} minFinalOrientation
- * @property {Transition | null} minLastTransition
  */
 
 export class ScrambleOptimizer {
@@ -64,23 +63,23 @@ export class ScrambleOptimizer {
         this.config = config;
         /** @type {TransitionConfig} Transition config */
         this.transitions = transitions;
-        /** @type {() => Promise<void> | void} Function to call when a rotation optimization finishes */
-        this.callback = callback;
+        /** @type {((() => Promise<void> | void)) | null} Function to call when a rotation optimization finishes */
+        this.callback = callback || null;
         /** @type {RunOptions} Active run options for scramble search */
         this.options = { ...defaultRunOptions };
         /** @type {number} The current number of iterations from bruteforceOptimize */
         this.iterations = 0;
-        /** @type {Map<number, number>} Amount of found scrambles with a specific cost */
+        /** @type {Map<number, number> | null} Amount of found scrambles with a specific cost */
         this.distribution = null;
         /** @type {ScrambleCandidate[]} All candidate scrambles tied for lowest cost */
         this.candidates = [];
-        /** @type {OrientationResultInfo[]} */
+        /** @type {OrientationResultInfo[] | null} */
         this.rotationInfo = null;
         /** @type {Map<string, number>} Memoization for all orientations */
         this.memo = new Map();
         /** @type {GripState[]} Invariant list of grip keys */
-        this.allGripKeys = Object.keys(this.config.grip);
-        /** @type {Record<GripState, Partial<Record<MoveKey, Transition>>> | null} Cache for transitions */
+        this.allGripKeys = /** @type {GripState[]} */ (Object.keys(this.config.grip));
+        /** @type {TransitionCache | null} Cache for transitions */
         this.transitionCache = null;
         this.initTransitionCache();
     }
@@ -90,30 +89,35 @@ export class ScrambleOptimizer {
      */
     initTransitionCache() {
         if (!this.transitions) return;
-        this.transitionCache = {};
+        /** @type {TransitionCache} */
+        const cache = /** @type {TransitionCache} */ ({});
 
         for (const grip of this.allGripKeys) {
+            /** @type {TransitionCacheRow} */
             const cacheRow = {};
             const gripTrans = this.transitions[grip];
 
             // Standard face transitions
             if (gripTrans) {
                 for (const moveKey in gripTrans) {
-                    const ftType = gripTrans[moveKey];
+                    const key = /** @type {MoveKey} */ (moveKey);
+                    const ftType = gripTrans[key];
                     if (ftType === undefined || ftType === null) continue;
-                    const nextGrip = Move.computeNextGrip(grip, moveKey);
-                    if (nextGrip) cacheRow[moveKey] = { next: nextGrip, type: ftType };
+                    const nextGrip = Move.computeNextGrip(grip, key);
+                    if (nextGrip) cacheRow[key] = { next: nextGrip, type: ftType };
                 }
             }
 
             // Full-cube X rotations (0 fingertrick penalty)
             for (const rotKey in Move.X_ROTATION_MAP) {
-                const nextGrip = Move.computeNextGrip(grip, rotKey);
-                if (nextGrip) cacheRow[rotKey] = { next: nextGrip, type: "" };
+                const key = /** @type {RotationStr} */ (rotKey);
+                const nextGrip = Move.computeNextGrip(grip, key);
+                if (nextGrip) cacheRow[key] = { next: nextGrip, type: "" };
             }
 
-            this.transitionCache[grip] = cacheRow;
+            cache[grip] = cacheRow;
         }
+        this.transitionCache = cache;
     }
 
     /**
@@ -137,7 +141,7 @@ export class ScrambleOptimizer {
      */
     static wideReplace(moves, index, orientation) {
         const rotKey = moves[index].toWide().getAssociatedRotation();
-        ScrambleOptimizer.applyRotation(moves, index, orientation, rotKey);
+        if (rotKey) ScrambleOptimizer.applyRotation(moves, index, orientation, rotKey);
     }
 
     /**
@@ -182,7 +186,7 @@ export class ScrambleOptimizer {
      * @returns {Move[]}
      */
     static parseScramble(string) {
-        return string.split(" ").map(Move.fromString);
+        return string.split(" ").map(str => Move.fromString(/** @type {any} */ (str)));
     }
 
     /**
@@ -198,6 +202,7 @@ export class ScrambleOptimizer {
      * @param {number} cost 
      */
     recordCost(cost) {
+        if (!this.distribution) return;
         const rounded = Math.round(cost * 2) / 2;
         this.distribution.set(rounded, (this.distribution.get(rounded) || 0) + 1);
     }
@@ -217,12 +222,11 @@ export class ScrambleOptimizer {
      * @param {GripState} currentGrip 
      * @param {number} currentCost 
      * @param {Orientation} orientation 
-     * @param {Transition} lastTransition 
      * @param {GripState} [startGrip]
      * @param {number} [endIndex]
      * @param {SearchContext} [ctx]
      */
-    bruteforceOptimize(moves, index, currentGrip, currentCost, orientation, lastTransition, startGrip = "F F", endIndex = moves.length, ctx) {
+    bruteforceOptimize(moves, index, currentGrip, currentCost, orientation, startGrip = "F F", endIndex = moves.length, ctx) {
         if (this.iterations >= this.options.maxIterations) {
             return;
         }
@@ -239,12 +243,11 @@ export class ScrambleOptimizer {
                 const candidateItem = {
                     scramble: ScrambleOptimizer.copyScramble(moves),
                     cost: currentCost,
-                    rotation: null,
+                    rotation: { up: null, front: null },
                     startingGrip: startGrip,
                     finalOrientation: { ...orientation },
                     partitionBoundaries: [],
-                    finalGrip: currentGrip,
-                    lastTransition: lastTransition
+                    finalGrip: currentGrip
                 };
                 ScrambleOptimizer.addCandidate(ctx.minResults, candidateItem, this.options.maxCapacity);
                 ctx.minCost = ctx.minResults[0].cost;
@@ -254,9 +257,9 @@ export class ScrambleOptimizer {
         }
         if (this.options.memoize) {
             const key = `${index}|${currentGrip}|${orientation.up}${orientation.front}|${moves.length}`;
-            if ((this.memo[key] ?? Infinity) + this.options.depth <= currentCost) 
+            if ((this.memo.get(key) ?? Infinity) + this.options.depth <= currentCost) 
                 return;
-            this.memo[key] = currentCost;
+            this.memo.set(key, currentCost);
         }
 
         /**
@@ -275,21 +278,20 @@ export class ScrambleOptimizer {
              * @param {number} idx Index of the move in clone
              * @param {GripState} cGrip Current grip state
              * @param {number} cCost Cumulative cost up to this move
-             * @param {Transition} lTrans Last transition executed
              */
-            const evaluateMoveAt = (idx, cGrip, cCost, lTrans) => {
+            const evaluateMoveAt = (idx, cGrip, cCost) => {
                 const moved = clone[idx];
                 const movedKey = moved.toKey();
                 const directTrans = this.getTransitionFor(cGrip, movedKey);
                 if (directTrans) {
-                    const addedCost = this.computeTransitionCost(lTrans, directTrans, moved);
+                    const addedCost = this.computeTransitionCost(directTrans, moved);
                     return [{
                         transition: directTrans,
                         nextGrip: directTrans.next,
                         cost: cCost + addedCost
                     }];
                 }
-                return this.findCandidateRegrips(cGrip, movedKey, moved, lTrans, cCost);
+                return this.findCandidateRegrips(cGrip, movedKey, moved, cCost);
             };
 
             /**
@@ -297,22 +299,21 @@ export class ScrambleOptimizer {
              * @param {number} subIdx Current index in clone
              * @param {GripState} cGrip Current grip state
              * @param {number} cCost Cumulative cost
-             * @param {Transition} lTrans Last transition executed
              */
-            const evaluateSequenceBranch = (subIdx, cGrip, cCost, lTrans) => {
+            const evaluateSequenceBranch = (subIdx, cGrip, cCost) => {
                 if (subIdx >= index + skip) {
-                    this.bruteforceOptimize(clone, subIdx, cGrip, cCost, newOrientation, lTrans, startGrip, endIndex, ctx);
+                    this.bruteforceOptimize(clone, subIdx, cGrip, cCost, newOrientation, startGrip, endIndex, ctx);
                     return;
                 }
-                const branches = evaluateMoveAt(subIdx, cGrip, cCost, lTrans);
+                const branches = evaluateMoveAt(subIdx, cGrip, cCost);
                 for (let i = 0; i < branches.length; i++) {
                     const b = branches[i];
                     clone[subIdx].transition = b.transition;
-                    evaluateSequenceBranch(subIdx + 1, b.nextGrip, b.cost, b.transition);
+                    evaluateSequenceBranch(subIdx + 1, b.nextGrip, b.cost);
                 }
             };
 
-            evaluateSequenceBranch(index, currentGrip, currentCost, lastTransition);
+            evaluateSequenceBranch(index, currentGrip, currentCost);
         };
 
         this.iterations++;
@@ -347,10 +348,9 @@ export class ScrambleOptimizer {
      * @param {GripState} currentGrip 
      * @param {MoveKey} movedKey 
      * @param {Move} moved 
-     * @param {Transition} lTrans 
      * @param {number} cCost 
      */
-    findCandidateRegrips(currentGrip, movedKey, moved, lTrans, cCost) {
+    findCandidateRegrips(currentGrip, movedKey, moved, cCost) {
         const maxBranches = this.options.maxRegripBranches ?? 2;
         const baseRegrip = this.config.general.regrip ?? 0;
         const regripPerStep = this.config.general.regripPerStep ?? 0;
@@ -375,7 +375,7 @@ export class ScrambleOptimizer {
                 regripPrompt: targetGrip,
                 regripCost: rCost
             };
-            const addedCost = this.computeTransitionCost(lTrans, regripTrans, moved, null, currentGrip);
+            const addedCost = this.computeTransitionCost(regripTrans, moved, currentGrip);
             const cand = {
                 transition: regripTrans,
                 nextGrip: targetTrans.next,
@@ -415,28 +415,27 @@ export class ScrambleOptimizer {
      * @param {number} partitionLength
      */
     runPartitionSequence(scramble, startGrip, initialCost, orientation, partitionLength) {
+        /** @type {ScrambleCandidate[]} */
         let currCandidates = [{
             scramble: ScrambleOptimizer.copyScramble(scramble),
             cost: initialCost,
-            rotation: null,
+            rotation: { up: null, front: null },
             startingGrip: startGrip,
             finalOrientation: { ...orientation },
             partitionBoundaries: [],
-            finalGrip: startGrip,
-            lastTransition: null
+            finalGrip: startGrip
         }];
 
         let startIndex = 0;
         const scrambleLen = scramble.length;
 
         while (startIndex < scrambleLen) {
-            /** @type {typeof currCandidates} */
+            /** @type {ScrambleCandidate[]} */
             let nextCandidates = [];
             let nextStartIndex = startIndex;
 
             for (const cand of currCandidates) {
                 const currentGrip = cand.finalGrip;
-                const lastTrans = cand.lastTransition;
                 const targetEndIndex = Math.min(startIndex + partitionLength, cand.scramble.length);
                 const origLen = cand.scramble.length;
 
@@ -447,11 +446,10 @@ export class ScrambleOptimizer {
                     minScramble: null,
                     minStartingGrip: startGrip,
                     minFinalGrip: currentGrip,
-                    minFinalOrientation: null,
-                    minLastTransition: null
+                    minFinalOrientation: null
                 };
 
-                this.bruteforceOptimize(cand.scramble, startIndex, currentGrip, cand.cost, cand.finalOrientation, lastTrans, startGrip, targetEndIndex, ctx);
+                this.bruteforceOptimize(cand.scramble, startIndex, currentGrip, cand.cost, cand.finalOrientation, startGrip, targetEndIndex, ctx);
 
                 if (!ctx.minResults || ctx.minResults.length === 0) {
                     continue;
@@ -469,12 +467,11 @@ export class ScrambleOptimizer {
                     const candidateItem = {
                         scramble: res.scramble,
                         cost: res.cost,
-                        rotation: null,
+                        rotation: cand.rotation || { up: null, front: null },
                         startingGrip: startGrip,
                         finalOrientation: res.finalOrientation,
                         partitionBoundaries: newBoundaries,
-                        finalGrip: res.finalGrip,
-                        lastTransition: res.lastTransition
+                        finalGrip: res.finalGrip
                     };
 
                     const prevBestCost = nextCandidates[0]?.cost ?? Infinity;
@@ -498,17 +495,13 @@ export class ScrambleOptimizer {
 
     /**
      * Calls bruteforceOptimize for all orientations of the cube to find the best one
-     * @param {RunOptions} options 
+     * @param {Move[]} scramble The input scramble moves
+     * @param {Partial<RunOptions>} [options] Options for execution
      */
-    async optimize(options) {
-        /** @type {RotationStr[]} */
-        const top_rotations = [null, "x2", "x'", "x", "z", "z'"];
-        /** @type {RotationStr[]} */
-        const front_rotations = [null, "y", "y2", "y'"];
-
+    async optimize(scramble, options = {}) {
         /** @type {Orientation} */
         const orientation = {up: "U", front: "F"};
-        const rawScramble = options.scramble || [];
+        const rawScramble = scramble || [];
         const preprocessedScramble = [];
 
         this.originalFinalOrientation = ScrambleOptimizer.getFinalOrientation(rawScramble);
@@ -531,8 +524,10 @@ export class ScrambleOptimizer {
                     preprocessedScramble[j].transposeInverse(rotation);
                 }
             }
-            for (let k = faceMoves.length - 1; k >= 0; k--) {
-                preprocessedScramble.unshift(faceMoves[k]);
+            if (faceMoves) {
+                for (let k = faceMoves.length - 1; k >= 0; k--) {
+                    preprocessedScramble.unshift(faceMoves[k]);
+                }
             }
         }
 
@@ -551,8 +546,8 @@ export class ScrambleOptimizer {
         const candidateGrips = this.allGripKeys;
         const partitionLength = Math.max(0, this.options.partitionLength || 0);
 
-        for (const top_rot of top_rotations) {
-            for(const front_rot of front_rotations) {
+        for (const top_rot of Move.TOP_ROTATIONS) {
+            for (const front_rot of Move.FRONT_ROTATIONS) {
                 const rotatedScramble = ScrambleOptimizer.copyScramble(preprocessedScramble);
                 const newOrientation = { ...orientation };
 
@@ -590,13 +585,15 @@ export class ScrambleOptimizer {
 
                 const orientationIterations = this.iterations - prevIterations;
 
-                this.rotationInfo.push({
-                    rotation: {up: top_rot || "", front: front_rot || ""}, 
-                    startingGrip: bestGripStartingGrip,
-                    cost: bestGripCost, 
-                    iterations: orientationIterations,
-                    maxed: this.iterations >= this.options.maxIterations,
-                });
+                if (this.rotationInfo) {
+                    this.rotationInfo.push({
+                        rotation: { up: top_rot, front: front_rot }, 
+                        startingGrip: bestGripStartingGrip,
+                        cost: bestGripCost, 
+                        iterations: orientationIterations,
+                        maxed: this.iterations >= this.options.maxIterations,
+                    });
+                }
 
                 if(this.callback)
                     await this.callback();
@@ -608,14 +605,13 @@ export class ScrambleOptimizer {
     }
 
     /**
-     * @param {Transition} lastTransition 
      * @param {Transition} transition 
      * @param {Move} move
-     * @param {CostDetails} [outDetails] Optional object to populate with itemized cost components
      * @param {GripState} [regripFromGrip] Optional starting grip if a regrip occurred before this move
+     * @param {CostDetails} [outDetails] Optional object to populate with itemized cost components
      * @returns {number}
      */
-    computeTransitionCost(lastTransition, transition, move, outDetails = null, regripFromGrip = null) {
+    computeTransitionCost(transition, move, regripFromGrip, outDetails) {
         if (!transition) return Infinity;
 
         let added = 0;
@@ -631,11 +627,13 @@ export class ScrambleOptimizer {
         const gripCost = this.config.grip[transition.next] ?? 0;
         added += gripCost;
 
-        const ftCost = this.config.fingertrick[transition.type] ?? 0;
+        const ftType = /** @type {Fingertrick} */ (transition.type);
+        const ftCost = (ftType && this.config.fingertrick[ftType]) ?? 0;
         const totalFtCost = this.config.general.perSliceFingertrick ? move.getPhysicalSlices(this.options.cubeSize) * ftCost : ftCost;
         added += totalFtCost;
 
-        const alphaCost = this.config.alpha[move.isWide ? move.alpha.toLowerCase() : move.alpha] ?? 0;
+        const alphaKey = /** @type {FaceStr} */ (move.isWide ? move.alpha.toLowerCase() : move.alpha);
+        const alphaCost = this.config.alpha[alphaKey] ?? 0;
         added += alphaCost;
 
         //if(move.isDouble) added += this.config.general.double ?? 0;
@@ -664,8 +662,6 @@ export class ScrambleOptimizer {
         /** @type {ScrambleBreakdownEntry[]} */
         const breakdown = [];
 
-        let lastTransition = null;
-
         for (let i = 0; i < candidate.scramble.length; i++) {
             const move = candidate.scramble[i];
             const transition = move.transition;
@@ -674,11 +670,10 @@ export class ScrambleOptimizer {
             }
 
             const costBreakdown = {};
-            const addedCost = this.computeTransitionCost(lastTransition, transition, move, costBreakdown, transition.regripFrom || null);
-            lastTransition = transition;
+            const addedCost = this.computeTransitionCost(transition, move, transition.regripFrom, costBreakdown);
 
             breakdown.push({
-                move: move.toString(formatOptions.wedgeNotation, this.options.cubeSize), 
+                move: /** @type {MoveStr} */ (move.toString(formatOptions.wedgeNotation, this.options.cubeSize)), 
                 transition, 
                 addedCost,
                 costBreakdown,
@@ -699,7 +694,7 @@ export class ScrambleOptimizer {
     formatCandidate(candidate = this.candidates[0], options = defaultFormatOptions) {
         if (!candidate || !candidate.scramble) return "";
 
-        const formatGrip = (g) => `[${g.replace(" ", "/")}]`;
+        const formatGrip = (/** @type {GripState} */ g) => `[${g.replace(" ", "/")}]`;
 
         const { topColor, frontColor } = getOrientationColors(candidate.rotation);
         const orientationColorStr = topColor && frontColor ? `${topColor} U ${frontColor} F` : "";
@@ -724,7 +719,7 @@ export class ScrambleOptimizer {
             moves.push(moveStr);
         }
 
-        const solverStartOrientation = { up: "U", front: "F" };
+        const solverStartOrientation = { up: /** @type {FaceStr} */ ("U"), front: /** @type {FaceStr} */ ("F") };
         if (candidate.rotation?.up) Move.transposeOrientation(solverStartOrientation, candidate.rotation.up);
         if (candidate.rotation?.front) Move.transposeOrientation(solverStartOrientation, candidate.rotation.front);
 

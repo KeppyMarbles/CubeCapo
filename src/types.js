@@ -40,14 +40,14 @@
  * )} Fingertrick
  */
 
-/** @typedef {`${ThumbPosition} ${ThumbPosition}` | "start"} GripState */
+/** @typedef {`${ThumbPosition} ${ThumbPosition}`} GripState */
 /** @typedef {`${FaceStr | MiddleStr}${ModifierStr}`} MoveKey */
 /** @typedef {`${FaceStr | MiddleStr | WideFaceStr}${"w" | ""}${ModifierStr}`} MoveStr */
 /** @typedef {`${AxisStr}${ModifierStr}`} RotationStr */
 
-/** @typedef {Record<Fingertrick, number>} FingertrickCosts */
-/** @typedef {Record<GripState, number>} GripCosts */
-/** @typedef {Record<WideFaceStr | FaceStr | AxisStr, number>} AlphaCosts */
+/** @typedef {Partial<Record<Fingertrick, number>>} FingertrickCosts */
+/** @typedef {Partial<Record<GripState, number>>} GripCosts */
+/** @typedef {Partial<Record<WideFaceStr | FaceStr | AxisStr, number>>} AlphaCosts */
 
 /**
  * @typedef {Object} GeneralCosts
@@ -75,7 +75,16 @@
  * @property {number} [regripCost] Pre-calculated cost of the regrip
  */
 
-/** @typedef {Record<GripState, Partial<Record<MoveKey, Fingertrick>>>} TransitionConfig */
+/** @typedef {Record<MoveKey, Fingertrick | null>} GripTransitions */
+/** @typedef {Record<GripState, GripTransitions>} TransitionConfig */
+/** @typedef {Record<RotationStr, Record<FaceStr | AxisStr, FaceStr | AxisStr>>} TranspositionMap */
+/** @typedef {Partial<Record<MoveKey, Record<ThumbPosition, ThumbPosition | null>>>} ThumbTransitions */
+/** @typedef {Record<GripState, number>} RegripDistanceCacheRow */
+/** @typedef {Record<GripState, RegripDistanceCacheRow>} RegripDistanceCache */
+/** @typedef {Record<MoveKey | RotationStr, GripState | null>} NextGripCacheRow */
+/** @typedef {Record<GripState, NextGripCacheRow>} NextGripCache */
+/** @typedef {Partial<Record<MoveKey | RotationStr, Transition>>} TransitionCacheRow */
+/** @typedef {Record<GripState, TransitionCacheRow>} TransitionCache */
 
 /** 
  * @typedef {Object} Orientation
@@ -84,9 +93,9 @@
  */
 
 /** 
- * @typedef {Object} Rotation
- * @property {RotationStr} up The top rotation
- * @property {RotationStr} front The front rotation
+ * @typedef {Object} StartingRotation
+ * @property {RotationStr | null} up The top rotation
+ * @property {RotationStr | null} front The front rotation
  */
 
 /**
@@ -104,7 +113,6 @@
 
 /**
  * @typedef {Object} RunOptions
- * @property {Move[]} scramble The scramble to optimize
  * @property {number} cubeSize Size of the cube (e.g. 3 for 3x3, 7 for 7x7), detected automatically if 0
  * @property {number} depth The branch pruning threshold
  * @property {number} maxIterations Number of iterations to try before bailing out
@@ -121,7 +129,7 @@
 
 /**
  * @typedef OrientationResultInfo
- * @property {Rotation} rotation The rotation applied at the beginning of the scramble
+ * @property {StartingRotation} rotation The rotation applied at the beginning of the scramble
  * @property {GripState} [startingGrip] The starting grip used
  * @property {number} cost The scramble cost
  * @property {number} iterations The number of iterations of bruteforceOptimize
@@ -142,12 +150,11 @@
  * @typedef {Object} ScrambleCandidate
  * @property {Move[]} scramble Transposed candidate scramble moves
  * @property {number} cost Total cost of candidate
- * @property {Rotation} rotation Starting rotation applied
+ * @property {StartingRotation} rotation Starting rotation applied
  * @property {Orientation} finalOrientation Final orientation of the cube after scramble
  * @property {GripState} startingGrip Starting thumb placement grip
  * @property {number[]} partitionBoundaries Indices where partition boundaries occur
  * @property {GripState} finalGrip Final thumb placement grip after candidate execution
- * @property {Transition | null} lastTransition Last executed transition
  */
 
 /**

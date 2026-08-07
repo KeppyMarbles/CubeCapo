@@ -1,9 +1,8 @@
 import { ScrambleOptimizer } from "../src/cube/scramble.js";
-import { Move } from "../src/cube/move.js";
 import { defaultCostConfiguration, defaultFormatOptions, defaultFingertricks, defaultRunOptions } from "../src/cube/defaults.js";
-/** @import { CostConfig, RunOptions, FormatOptions, ScrambleCandidate, SendOptimizationResponse } from "../src/types.js" */
+/** @import { SendOptimizationResponse } from "../src/types.js" */
 
-const extAPI = globalThis.browser || globalThis.chrome;
+const extAPI = /** @type {any} */ (globalThis).browser || chrome;
 
 // Listen for messages from content scripts or popup
 extAPI.runtime.onMessage.addListener(
@@ -22,14 +21,16 @@ extAPI.runtime.onMessage.addListener(
                 extAPI.runtime.openOptionsPage();
             }
             if (message.scrambleText && extAPI.tabs) {
-                extAPI.tabs.query({}, (tabs) => {
-                    tabs.forEach(tab => {
-                        extAPI.tabs.sendMessage(tab.id, {
-                            action: "LOAD_PENDING_SCRAMBLE",
-                            scrambleText: message.scrambleText
-                        }, () => {
-                            if (extAPI.runtime.lastError) { /* ignore */ }
-                        });
+                extAPI.tabs.query({}, (/** @type {chrome.tabs.Tab[]} */ tabs) => {
+                    tabs.forEach((/** @type {chrome.tabs.Tab} */ tab) => {
+                        if (tab.id) {
+                            extAPI.tabs.sendMessage(tab.id, {
+                                action: "LOAD_PENDING_SCRAMBLE",
+                                scrambleText: message.scrambleText
+                            }, () => {
+                                if (extAPI.runtime.lastError) { /* ignore */ }
+                            });
+                        }
                     });
                 });
             }
@@ -56,7 +57,8 @@ extAPI.runtime.onMessage.addListener(
                         return;
                     }
                 } catch (parseErr) {
-                    sendResponse({ success: false, error: parseErr.message });
+                    const msg = parseErr instanceof Error ? parseErr.message : String(parseErr);
+                    sendResponse({ success: false, error: msg });
                     return;
                 }
 
@@ -65,13 +67,13 @@ extAPI.runtime.onMessage.addListener(
 
                 const cubeSize = Number(store.runOptions?.cubeSize ?? 0);
 
-                const runOptions = { ...defaultRunOptions, ...store.runOptions, scramble, cubeSize };
+                const runOptions = { ...defaultRunOptions, ...store.runOptions, cubeSize };
                 const formatOptions = { ...defaultFormatOptions, ...store.formatOptions };
 
                 const optimizer = new ScrambleOptimizer(config, defaultFingertricks, null);
 
                 const start = performance.now();
-                await optimizer.optimize(runOptions);
+                await optimizer.optimize(scramble, runOptions);
                 const end = performance.now();
 
                 const topCandidate = optimizer.candidates[0];
@@ -85,13 +87,14 @@ extAPI.runtime.onMessage.addListener(
                     breakdown,
                     bestCost,
                     searchTime: end - start,
-                    cubeSize
+                    cubeSize: optimizer.options.cubeSize // TODO?
                 });
             } catch (error) {
                 console.error("Optimization background task error:", error);
+                const msg = error instanceof Error ? error.message : String(error);
                 sendResponse({
                     success: false,
-                    error: error.message
+                    error: msg
                 });
             }
         })();

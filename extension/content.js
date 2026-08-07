@@ -1,14 +1,21 @@
+import { getElement, getOptionalElement, queryElementOptional } from "../src/ui/dom.js";
+import { renderBreakdownTable } from "../src/ui/stats.js";
 /** @import { OptimizationResult } from "../src/types.js" */
 
-const extAPI = globalThis.browser || globalThis.chrome;
+const extAPI = /** @type {any} */ (globalThis).browser || globalThis.chrome;
 
+/** @type {MutationObserver | null} */
 let currentObserver = null;
+/** @type {MutationObserver | null} */
 let scrambleObserver = null;
+/** @type {Element | null} */
 let targetElement = null;
 let lastOriginalText = "";
 let isShowingOptimized = true;
 let pickerActive = false;
+/** @type {Element | null} */
 let hoverElement = null;
+/** @type {HTMLDivElement | null} */
 let pickerBanner = null;
 
 /**
@@ -24,26 +31,29 @@ function getUniqueSelector(el) {
         return `#${CSS.escape(el.id)}`;
     }
     const path = [];
-    while (el && el.nodeType === Node.ELEMENT_NODE && el !== document.body) {
-        let selector = el.nodeName.toLowerCase();
-        if (el.id) {
-            selector += `#${CSS.escape(el.id)}`;
+    /** @type {Element | null} */
+    let curr = el;
+    while (curr && curr.nodeType === Node.ELEMENT_NODE && curr !== document.body) {
+        let selector = curr.nodeName.toLowerCase();
+        if (curr.id) {
+            selector += `#${CSS.escape(curr.id)}`;
             path.unshift(selector);
             break;
         } else {
-            let sibling = el;
+            /** @type {Element | null} */
+            let sibling = curr;
             let nth = 1;
-            while (sibling = sibling.previousElementSibling) {
-                if (sibling.nodeName.toLowerCase() === el.nodeName.toLowerCase()) {
+            while ((sibling = sibling.previousElementSibling)) {
+                if (sibling.nodeName.toLowerCase() === curr.nodeName.toLowerCase()) {
                     nth++;
                 }
             }
-            if (nth > 1 || el.nextElementSibling) {
+            if (nth > 1 || curr.nextElementSibling) {
                 selector += `:nth-of-type(${nth})`;
             }
         }
         path.unshift(selector);
-        el = el.parentElement;
+        curr = curr.parentElement;
     }
     return path.join(" > ");
 }
@@ -58,7 +68,7 @@ async function findScrambleElement() {
     const savedSelector = store[`selector_${location.hostname}`];
     if (savedSelector) {
         try {
-            const el = document.querySelector(savedSelector);
+            const el = queryElementOptional(document, savedSelector, HTMLElement);
             if (el) {
                 console.log(`[Cube Capo] Found element using saved selector '${savedSelector}'`);
                 return el;
@@ -105,14 +115,14 @@ let lastOptimizedText = "";
 async function processScramble(element) {
     // Clone node or extract text excluding our own injected visual overlay span
     let rawText = "";
-    for (const node of element.childNodes) {
+    for (const node of Array.from(element.childNodes)) {
         if (node.nodeType === Node.TEXT_NODE) {
-            rawText += node.textContent;
-        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            rawText += node.textContent || "";
+        } else if (node instanceof HTMLElement) {
             if (node.classList.contains("cubecapo-hidden-text")) {
-                rawText += node.textContent;
+                rawText += node.textContent || "";
             } else if (!node.classList.contains("cubecapo-visual-overlay")) {
-                rawText += node.textContent;
+                rawText += node.textContent || "";
             }
         }
     }
@@ -145,7 +155,7 @@ async function processScramble(element) {
             }
             if (response && response.success) {
                 console.log("[Cube Capo] Optimization success:", response.bestScrambleStr);
-                lastOptimizedText = response.bestScrambleStr;
+                lastOptimizedText = response.bestScrambleStr || "";
                 showOptimizedState(element, response);
             } else {
                 console.log("[Cube Capo] Scramble ignored or not supported:", response ? response.error : "No response");
@@ -172,13 +182,13 @@ function costToColorStyle(cost) {
  */
 function hideOriginalText(scrambleElement) {
     for (const child of Array.from(scrambleElement.childNodes)) {
-        if (child.nodeType === Node.TEXT_NODE && child.textContent.trim()) {
+        if (child.nodeType === Node.TEXT_NODE && (child.textContent || "").trim()) {
             const hideSpan = document.createElement("span");
             hideSpan.className = "cubecapo-hidden-text";
             hideSpan.style.display = "none";
-            hideSpan.textContent = child.textContent;
+            hideSpan.textContent = child.textContent || "";
             scrambleElement.replaceChild(hideSpan, child);
-        } else if (child.nodeType === Node.ELEMENT_NODE && !child.classList.contains("cubecapo-visual-overlay")) {
+        } else if (child instanceof HTMLElement && !child.classList.contains("cubecapo-visual-overlay")) {
             child.style.display = "none";
         }
     }
@@ -192,7 +202,7 @@ function showOptimizingState(scrambleElement) {
     hideIndicator();
     hideOriginalText(scrambleElement);
 
-    let visualSpan = scrambleElement.querySelector(".cubecapo-visual-overlay");
+    let visualSpan = queryElementOptional(scrambleElement, ".cubecapo-visual-overlay", HTMLElement);
     if (!visualSpan) {
         visualSpan = document.createElement("span");
         visualSpan.className = "cubecapo-visual-overlay";
@@ -210,31 +220,34 @@ function showOptimizedState(scrambleElement, data) {
     // 1. Hide original text nodes immediately
     hideOriginalText(scrambleElement);
     
-    let visualSpan = scrambleElement.querySelector(".cubecapo-visual-overlay");
+    let visualSpan = queryElementOptional(scrambleElement, ".cubecapo-visual-overlay", HTMLElement);
     if (!visualSpan) {
         visualSpan = document.createElement("span");
         visualSpan.className = "cubecapo-visual-overlay";
         scrambleElement.appendChild(visualSpan);
     }
-    visualSpan.textContent = data.bestScrambleStr;
+    visualSpan.textContent = data.bestScrambleStr || "";
 
     // 2. Ensure indicator bar exists above the element
-    let bar = document.getElementById("cubecapo-indicator");
+    let bar = getOptionalElement("cubecapo-indicator", HTMLDivElement);
     if (!bar) {
         bar = document.createElement("div");
         bar.id = "cubecapo-indicator";
         bar.className = "cubecapo-indicator-bar";
-        scrambleElement.parentNode.insertBefore(bar, scrambleElement);
+        if (scrambleElement.parentNode) {
+            scrambleElement.parentNode.insertBefore(bar, scrambleElement);
+        }
     }
 
     // Stop propagation on clicks inside the indicator bar
-    bar.addEventListener("click", (e) => e.stopPropagation());
+    bar.addEventListener("click", (/** @type {Event} */ e) => e.stopPropagation());
 
     bar.replaceChildren();
 
-    const cubeSize = data.cubeSize || 3;
+    const cubeSize = data.cubeSize;
     const sizeStr = `${cubeSize}x${cubeSize}`;
-    const transposedBadgeText = `(Transposed | Cost: ${data.bestCost.toFixed(1)} | Size: ${sizeStr})`;
+    const bestCost = data.bestCost ?? 0;
+    const transposedBadgeText = `(Transposed | Cost: ${bestCost.toFixed(1)} | Size: ${sizeStr})`;
     const originalBadgeText = "(Original)";
 
     const badge = document.createElement("span");
@@ -259,7 +272,7 @@ function showOptimizedState(scrambleElement, data) {
     openSettingsBtn.className = "cubecapo-details-link";
     openSettingsBtn.textContent = "Settings";
 
-    openSettingsBtn.addEventListener("click", (e) => {
+    openSettingsBtn.addEventListener("click", (/** @type {Event} */ e) => {
         e.stopPropagation();
         extAPI.runtime.sendMessage({ 
             action: "OPEN_OPTIONS_PAGE",
@@ -273,7 +286,7 @@ function showOptimizedState(scrambleElement, data) {
     bar.appendChild(openSettingsBtn);
 
     // 3. Setup details table card (as a floating popup appended to body to prevent clipping)
-    let details = document.getElementById("cubecapo-details-card");
+    let details = getOptionalElement("cubecapo-details-card", HTMLDivElement);
     if (details) {
         details.remove();
     }
@@ -283,7 +296,7 @@ function showOptimizedState(scrambleElement, data) {
     details.className = "cubecapo-details-card";
 
     // Stop propagation so clicking inside the details card doesn't copy text or trigger csTimer start/stop
-    details.addEventListener("click", (e) => e.stopPropagation());
+    details.addEventListener("click", (/** @type {Event} */ e) => e.stopPropagation());
 
     const table = document.createElement("table");
     table.className = "cubecapo-table";
@@ -308,9 +321,7 @@ function showOptimizedState(scrambleElement, data) {
     thead.appendChild(headerRow);
 
     const tbody = document.createElement("tbody");
-    if (typeof renderBreakdownTable === "function") {
-        renderBreakdownTable(tbody, data.breakdown, costToColorStyle);
-    }
+    renderBreakdownTable(tbody, data.breakdown || [], costToColorStyle);
 
     table.appendChild(thead);
     table.appendChild(tbody);
@@ -320,16 +331,16 @@ function showOptimizedState(scrambleElement, data) {
     document.body.appendChild(details);
 
     // Bind original vs optimized toggle button
-    const toggleTextBtn = document.getElementById("cubecapo-toggle-original");
+    const toggleTextBtn = getOptionalElement("cubecapo-toggle-original", HTMLButtonElement);
     if (toggleTextBtn) {
-        toggleTextBtn.addEventListener("click", (e) => {
+        toggleTextBtn.addEventListener("click", (/** @type {Event} */ e) => {
             e.stopPropagation();
             isShowingOptimized = !isShowingOptimized;
-            if (isShowingOptimized) {
-                visualSpan.textContent = data.bestScrambleStr;
+            if (isShowingOptimized && visualSpan) {
+                visualSpan.textContent = data.bestScrambleStr || "";
                 toggleTextBtn.textContent = "Show Original";
                 badge.textContent = transposedBadgeText;
-            } else {
+            } else if (visualSpan) {
                 visualSpan.textContent = lastOriginalText;
                 toggleTextBtn.textContent = "Show Transposed";
                 badge.textContent = originalBadgeText;
@@ -338,9 +349,9 @@ function showOptimizedState(scrambleElement, data) {
     }
 
     // Bind details toggle button click event
-    const toggleBtn = document.getElementById("cubecapo-toggle-details");
+    const toggleBtn = getOptionalElement("cubecapo-toggle-details", HTMLButtonElement);
     if (toggleBtn) {
-        toggleBtn.addEventListener("click", (e) => {
+        toggleBtn.addEventListener("click", (/** @type {Event} */ e) => {
             e.stopPropagation();
             const isActive = details.classList.toggle("active");
             toggleBtn.textContent = isActive ? "Close" : "Details";
@@ -376,9 +387,9 @@ function showOptimizedState(scrambleElement, data) {
                 }
 
                 // Add close on click outside event handler
-                const clickOutside = (event) => {
+                const clickOutside = (/** @type {MouseEvent} */ event) => {
                     // Do not close if clicking inside the details popup itself or clicking the details button again
-                    if (!details.contains(event.target) && event.target !== toggleBtn) {
+                    if (event.target instanceof Node && !details.contains(event.target) && event.target !== toggleBtn) {
                         details.classList.remove("active");
                         toggleBtn.textContent = "Details";
                         document.removeEventListener("click", clickOutside, true);
@@ -398,24 +409,24 @@ function showOptimizedState(scrambleElement, data) {
  */
 function hideIndicator() {
     if (targetElement) {
-        const visualSpan = targetElement.querySelector(".cubecapo-visual-overlay");
+        const visualSpan = queryElementOptional(targetElement, ".cubecapo-visual-overlay", HTMLElement);
         if (visualSpan) visualSpan.remove();
 
         for (const child of Array.from(targetElement.childNodes)) {
-            if (child.nodeType === Node.ELEMENT_NODE && child.classList.contains("cubecapo-hidden-text")) {
-                const textNode = document.createTextNode(child.textContent);
+            if (child.nodeType === Node.ELEMENT_NODE && child instanceof HTMLElement && child.classList.contains("cubecapo-hidden-text")) {
+                const textNode = document.createTextNode(child.textContent || "");
                 targetElement.replaceChild(textNode, child);
-            } else if (child.nodeType === Node.ELEMENT_NODE) {
+            } else if (child.nodeType === Node.ELEMENT_NODE && child instanceof HTMLElement) {
                 child.style.opacity = "";
                 child.style.userSelect = "";
             }
         }
     }
 
-    const bar = document.getElementById("cubecapo-indicator");
+    const bar = getOptionalElement("cubecapo-indicator", HTMLDivElement);
     if (bar) bar.remove();
 
-    const details = document.getElementById("cubecapo-details-card");
+    const details = getOptionalElement("cubecapo-details-card", HTMLDivElement);
     if (details) details.remove();
 }
 
@@ -441,10 +452,9 @@ async function startMonitoring() {
     if (targetElement) {
         console.log("[Cube Capo] Target scramble element found/connected:", targetElement);
         // Observe text changes directly on scramble element
-        if (scrambleObserver) scrambleObserver.disconnect();
-        
+        const elem = targetElement;
         scrambleObserver = new MutationObserver(() => {
-            processScramble(targetElement);
+            if (elem) processScramble(elem);
         });
         
         scrambleObserver.observe(targetElement, {
@@ -510,19 +520,19 @@ function startPicker() {
     overlay.appendChild(pickerBanner);
     document.body.appendChild(overlay);
 
-    const onMouseOver = (e) => {
+    const onMouseOver = (/** @type {MouseEvent} */ e) => {
         e.stopPropagation();
         if (hoverElement) {
             hoverElement.classList.remove("cubecapo-picker-hover");
         }
-        hoverElement = e.target;
+        hoverElement = /** @type {Element | null} */ (e.target);
         // Avoid highlighting our own picker overlay
         if (hoverElement && !overlay.contains(hoverElement)) {
             hoverElement.classList.add("cubecapo-picker-hover");
         }
     };
 
-    const onClick = (e) => {
+    const onClick = (/** @type {MouseEvent} */ e) => {
         e.preventDefault();
         e.stopPropagation();
         
@@ -538,7 +548,7 @@ function startPicker() {
         }
     };
 
-    const onKeyDown = (e) => {
+    const onKeyDown = (/** @type {KeyboardEvent} */ e) => {
         if (e.key === "Escape") {
             cleanupPicker();
         }
@@ -562,7 +572,7 @@ function startPicker() {
 }
 
 // Message listener from popup/settings
-extAPI.runtime.onMessage.addListener((message, sender, sendResponse) => {
+extAPI.runtime.onMessage.addListener((/** @type {any} */ message, /** @type {any} */ sender, /** @type {any} */ sendResponse) => {
     if (message.action === "START_PICKER") {
         startPicker();
         sendResponse({ success: true });

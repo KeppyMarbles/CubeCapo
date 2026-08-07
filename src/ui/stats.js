@@ -1,4 +1,5 @@
-/** @import { ScrambleBreakdownEntry, OrientationResultInfo, FormatOptions, ScrambleCandidate } from "../types.js" */
+import { getOptionalElement, queryElementOptional } from "./dom.js";
+/** @import { ScrambleBreakdownEntry, OrientationResultInfo, FormatOptions } from "../types.js" */
 /** @import { ScrambleOptimizer } from "../cube/scramble.js" */
 
 /**
@@ -8,19 +9,22 @@
  * @param {number} [candidateIndex]
  */
 export async function drawOptimizerStats(optimizer, formatOptions, candidateIndex = 0) {
-    const paginationContainer = document.getElementById("scramblePagination");
-    const indicator = document.getElementById("scramblePageIndicator");
-    const prevBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById("prevScrambleBtn"));
-    const nextBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById("nextScrambleBtn"));
+    const paginationContainer = getOptionalElement("scramblePagination", HTMLDivElement);
+    const indicator = getOptionalElement("scramblePageIndicator", HTMLElement);
+    const prevBtn = getOptionalElement("prevScrambleBtn", HTMLButtonElement);
+    const nextBtn = getOptionalElement("nextScrambleBtn", HTMLButtonElement);
+    const outputEl = getOptionalElement("output", HTMLElement);
 
     if (optimizer && optimizer.candidates && optimizer.candidates.length > 0) {
         const total = optimizer.candidates.length;
         const validIndex = Math.max(0, Math.min(candidateIndex, total - 1));
         const candidate = optimizer.candidates[validIndex];
 
-        drawDistributionChart(optimizer.distribution);
-        drawRotationInfoTable(optimizer.rotationInfo);
-        document.getElementById("output").textContent = optimizer.formatCandidate(candidate, formatOptions);
+        drawDistributionChart(optimizer.distribution || new Map());
+        drawRotationInfoTable(optimizer.rotationInfo || []);
+        if (outputEl) {
+            outputEl.textContent = optimizer.formatCandidate(candidate, formatOptions);
+        }
         drawCostTable(optimizer.analyzeCandidate(candidate, formatOptions));
 
         if (paginationContainer) {
@@ -39,11 +43,13 @@ export async function drawOptimizerStats(optimizer, formatOptions, candidateInde
         }
     }
     else {
-        drawDistributionChart([]);
+        drawDistributionChart(new Map());
         drawRotationInfoTable([]);
         drawCostTable([]);
-        document.getElementById("output").textContent = "";
-        const searchTimeEl = document.getElementById("searchTime");
+        if (outputEl) {
+            outputEl.textContent = "";
+        }
+        const searchTimeEl = getOptionalElement("searchTime", HTMLElement);
         if (searchTimeEl) searchTimeEl.textContent = "";
 
         if (paginationContainer) {
@@ -58,7 +64,8 @@ export async function drawOptimizerStats(optimizer, formatOptions, candidateInde
  * @param {Map<number, number>} distribution 
  */
 function drawDistributionChart(distribution) {
-    const chartContainer = document.getElementById("myChart");
+    const chartContainer = getOptionalElement("myChart", HTMLElement);
+    if (!chartContainer) return;
     chartContainer.replaceChildren();
 
     const isMap = distribution instanceof Map;
@@ -67,11 +74,16 @@ function drawDistributionChart(distribution) {
         emptyDiv.className = "chart-empty";
         emptyDiv.textContent = "No stats available";
         chartContainer.appendChild(emptyDiv);
-        document.getElementById("samples").textContent = "-";
-        document.getElementById("averageCost").textContent = "-";
-        document.getElementById("standardDeviation").textContent = "-";
-        document.getElementById("skewness").textContent = "-";
-        document.getElementById("minZ").textContent = "-";
+        const samplesEl = getOptionalElement("samples", HTMLElement);
+        if (samplesEl) samplesEl.textContent = "-";
+        const avgEl = getOptionalElement("averageCost", HTMLElement);
+        if (avgEl) avgEl.textContent = "-";
+        const stdEl = getOptionalElement("standardDeviation", HTMLElement);
+        if (stdEl) stdEl.textContent = "-";
+        const skewEl = getOptionalElement("skewness", HTMLElement);
+        if (skewEl) skewEl.textContent = "-";
+        const minZEl = getOptionalElement("minZ", HTMLElement);
+        if (minZEl) minZEl.textContent = "-";
         return;
     }
 
@@ -84,11 +96,16 @@ function drawDistributionChart(distribution) {
     const minCost = Math.min(...distribution.keys());
     const zScore = stdDev > 0 ? (minCost - mean) / stdDev : 0;
 
-    document.getElementById("samples").textContent = samples;
-    document.getElementById("averageCost").textContent = mean.toFixed(3);
-    document.getElementById("standardDeviation").textContent = stdDev.toFixed(3);
-    document.getElementById("skewness").textContent = skewness.toFixed(3);
-    document.getElementById("minZ").textContent = zScore.toFixed(3);
+    const samplesEl = getOptionalElement("samples", HTMLElement);
+    if (samplesEl) samplesEl.textContent = String(samples);
+    const avgEl = getOptionalElement("averageCost", HTMLElement);
+    if (avgEl) avgEl.textContent = mean.toFixed(3);
+    const stdEl = getOptionalElement("standardDeviation", HTMLElement);
+    if (stdEl) stdEl.textContent = stdDev.toFixed(3);
+    const skewEl = getOptionalElement("skewness", HTMLElement);
+    if (skewEl) skewEl.textContent = skewness.toFixed(3);
+    const minZEl = getOptionalElement("minZ", HTMLElement);
+    if (minZEl) minZEl.textContent = zScore.toFixed(3);
 
     // Aggregate into integer bins for UI chart display
     const intMap = new Map();
@@ -174,12 +191,88 @@ export function costToColor(cost, maxAbsCost, shift) {
 }
 
 /**
+ * Renders scramble breakdown rows and total summary row into a target tbody element.
+ * @param {HTMLTableSectionElement} tbody 
+ * @param {ScrambleBreakdownEntry[]} breakdownEntries 
+ * @param {(cost: number) => string} [costToStyleFn] Optional styling function returning CSS string or color
+ */
+export function renderBreakdownTable(tbody, breakdownEntries, costToStyleFn) {
+    tbody.replaceChildren();
+
+    let accumulated = 0;
+    for (const entry of breakdownEntries || []) {
+        accumulated += entry.addedCost;
+        const tr = document.createElement("tr");
+        if (entry.isPartitionBoundary) {
+            tr.classList.add("cubecapo-partition-boundary");
+        }
+
+        const tdMove = document.createElement("td");
+        tdMove.className = "cubecapo-semibold";
+        tdMove.textContent = entry.move;
+
+        const tdGrip = document.createElement("td");
+        tdGrip.textContent = entry.transition?.next || "(none)";
+
+        const tdTrick = document.createElement("td");
+        tdTrick.textContent = entry.transition?.type || "(none)";
+
+        const tdCost = document.createElement("td");
+        tdCost.className = "cubecapo-right cubecapo-semibold";
+        if (costToStyleFn) {
+            const styleRes = costToStyleFn(entry.addedCost);
+            if (styleRes.startsWith("hsl") || styleRes.startsWith("#") || styleRes.startsWith("rgb")) {
+                tdCost.style.background = styleRes;
+                tdCost.style.textAlign = "right";
+            } else if (styleRes) {
+                tdCost.style.cssText = styleRes;
+            }
+        } else {
+            tdCost.style.textAlign = "right";
+        }
+        tdCost.textContent = String(entry.addedCost);
+
+        if (entry.costBreakdown && Object.keys(entry.costBreakdown).length > 0) {
+            const tooltipParts = Object.entries(entry.costBreakdown).filter(([k, v]) => { return v > 0 }).map(([k, v]) => `${k}: ${v}`);
+            tdCost.title = tooltipParts.join(", ");
+        }
+
+        tr.appendChild(tdMove);
+        tr.appendChild(tdGrip);
+        tr.appendChild(tdTrick);
+        tr.appendChild(tdCost);
+        tbody.appendChild(tr);
+    }
+
+    const totalRow = document.createElement("tr");
+    totalRow.className = "cubecapo-total-row";
+
+    const tdTotalLabel = document.createElement("td");
+    tdTotalLabel.colSpan = 3;
+    const bLabel = document.createElement("b");
+    bLabel.textContent = "Total cost";
+    tdTotalLabel.appendChild(bLabel);
+
+    const tdTotalCost = document.createElement("td");
+    tdTotalCost.className = "cubecapo-right";
+    const bCost = document.createElement("b");
+    bCost.textContent = accumulated.toFixed(1);
+    tdTotalCost.appendChild(bCost);
+
+    totalRow.appendChild(tdTotalLabel);
+    totalRow.appendChild(tdTotalCost);
+    tbody.appendChild(totalRow);
+}
+
+/**
  * Display grip, fingertrick, and cost of each move
  * @param {ScrambleBreakdownEntry[]} breakdowns
  */
 function drawCostTable(breakdowns) {
-    const tbody = document.querySelector("#costTable tbody");
-    renderBreakdownTable(tbody, breakdowns, (cost) => costToColor(cost, 5, -2));
+    const tbody = queryElementOptional(document, "#costTable tbody", HTMLTableSectionElement);
+    if (tbody) {
+        renderBreakdownTable(tbody, breakdowns, (/** @type {number} */ cost) => costToColor(cost, 5, -2));
+    }
 }
 
 /**
@@ -187,7 +280,8 @@ function drawCostTable(breakdowns) {
  * @param {OrientationResultInfo[]} info
  */
 function drawRotationInfoTable(info) {
-    const tbody = document.querySelector("#rotationTable tbody");
+    const tbody = queryElementOptional(document, "#rotationTable tbody", HTMLTableSectionElement);
+    if (!tbody) return;
     tbody.replaceChildren();
 
     let total = 0;
@@ -196,7 +290,8 @@ function drawRotationInfoTable(info) {
         const tr = document.createElement("tr");
 
         const tdRotation = document.createElement("td");
-        tdRotation.textContent = `${row.rotation.up} ${row.rotation.front}`;
+        const rotStr = [row.rotation?.up, row.rotation?.front].filter(Boolean).join(" ");
+        tdRotation.textContent = rotStr || "(none)";
 
         const tdIterations = document.createElement("td");
         if (row.maxed) {

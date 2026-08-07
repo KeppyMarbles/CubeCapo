@@ -1,7 +1,9 @@
 import { ScrambleOptimizer } from "../cube/scramble.js";
 import { costToColor } from "./stats.js";
 import { defaultCostConfiguration, defaultFormatOptions, defaultRunOptions } from "../cube/defaults.js";
+import { getElement, getOptionalElement, queryElementOptional, queryElements } from "./dom.js";
 /** @import { CostConfig, RunOptions, FormatOptions } from "../types.js" */
+/** @import { Move } from "../cube/move.js" */
 
 /**
  * @typedef {Object} GroupControl
@@ -11,12 +13,12 @@ import { defaultCostConfiguration, defaultFormatOptions, defaultRunOptions } fro
 
 /**
  * Set up everything needed for the user to configure the optimizer
- * @param {(config: CostConfig, options: RunOptions) => Promise<void> | void} onSubmit
+ * @param {(config: CostConfig, scramble: Move[], options: RunOptions) => Promise<void> | void} onSubmit
  * @param {() => void} [onFormatChange] Called whenever a format option changes
  */
 export async function setupForm(onSubmit, onFormatChange) {
     let initialConfig = await loadCostConfig();
-    if(initialConfig)
+    if (initialConfig)
         initialConfig = migrateConfig(initialConfig, defaultCostConfiguration);
     else
         initialConfig = defaultCostConfiguration;
@@ -28,7 +30,7 @@ export async function setupForm(onSubmit, onFormatChange) {
      * @param {string} text 
      */
     const applyScrambleAndSubmit = (text) => {
-        const input = document.getElementById("scramble");
+        const input = getOptionalElement("scramble", HTMLInputElement);
         if (!input) return;
 
         input.value = text || "";
@@ -38,7 +40,7 @@ export async function setupForm(onSubmit, onFormatChange) {
                 chrome.storage.local.remove(["pendingScramble"]);
             }
             setTimeout(() => {
-                document.getElementById("submitButton")?.click();
+                getOptionalElement("submitButton", HTMLButtonElement)?.click();
             }, 50);
         }
     };
@@ -49,7 +51,7 @@ export async function setupForm(onSubmit, onFormatChange) {
         applyScrambleAndSubmit(urlScramble);
     } else if (typeof chrome !== "undefined" && chrome.storage?.local) {
         chrome.storage.local.get(["pendingScramble"], (store) => {
-            applyScrambleAndSubmit(store?.pendingScramble || "");
+            applyScrambleAndSubmit(String(store?.pendingScramble || ""));
         });
     } else {
         applyScrambleAndSubmit("");
@@ -59,39 +61,42 @@ export async function setupForm(onSubmit, onFormatChange) {
     if (typeof chrome !== "undefined") {
         chrome.storage?.onChanged?.addListener((changes, area) => {
             if (area === "local" && changes.pendingScramble?.newValue) {
-                applyScrambleAndSubmit(changes.pendingScramble.newValue);
+                applyScrambleAndSubmit(String(changes.pendingScramble.newValue || ""));
             }
         });
 
         chrome.runtime?.onMessage?.addListener((msg) => {
             if (msg.action === "LOAD_PENDING_SCRAMBLE" && msg.scrambleText) {
-                applyScrambleAndSubmit(msg.scrambleText);
+                applyScrambleAndSubmit(String(msg.scrambleText || ""));
             }
         });
     }
 
-    /** @type {HTMLFormElement} */
-    const form = document.getElementById("costForm");
+    const form = getOptionalElement("costForm", HTMLFormElement);
+    if (!form) return;
 
     {
+        /** @type {Record<string, string>} */
         const formAlias = {
             "regrip": "Base Regrip",
             "regripPerStep": "Regrip Per Step",
             //"double": "Double Move",
             "repeatPenalty": "Repeat Fingertrick",
             "perSliceFingertrick": "Per-Slice Fingertrick Cost"
-        }
+        };
 
+        /** @type {Record<string, string>} */
         const formTitles = {
             "regripPerStep": "Cost added for each step moved along the thumb chain (Bd <-> D <-> F <-> U <-> Bu)",
             "double": "Only effective if Wide Replace Double is active",
             "repeatPenalty": "The cost of doing the same fingertrick twice in a row",
             "perSliceFingertrick": "If the fingertrick cost should be applied per effective slice"
-        }
+        };
 
+        /** @type {Record<string, string>} */
         const formTypes = {
             "perSliceFingertrick": "checkbox"
-        }
+        };
       
         /** @type {Record<string, (key: string) => number>} */
         const columnClassifiers = {
@@ -110,8 +115,8 @@ export async function setupForm(onSubmit, onFormatChange) {
         };
 
         for (const [groupName, groupValue] of Object.entries(initialConfig)) {
-            const groupDiv = form.querySelector(`[data-group="${groupName}"]`);
-            if (!groupDiv || typeof groupValue !== "object") continue;
+            const groupDiv = queryElementOptional(form, `[data-group="${groupName}"]`, HTMLElement);
+            if (!groupDiv || typeof groupValue !== "object" || !groupValue) continue;
 
             const gridDiv = document.createElement("div");
             gridDiv.className = "cost-category-grid";
@@ -128,6 +133,7 @@ export async function setupForm(onSubmit, onFormatChange) {
                     colMap.set(colIdx, col);
                 }
                 const colDiv = colMap.get(colIdx);
+                if (!colDiv) continue;
 
                 const label = document.createElement("label");
                 label.textContent = formAlias[key] || key;
@@ -139,8 +145,8 @@ export async function setupForm(onSubmit, onFormatChange) {
                     input.checked = Boolean(val);
                 } else {
                     input.step = "0.5";
-                    input.value = val;
-                    input.valueType = "additive";
+                    input.value = String(val);
+                    input.dataset.valueType = "additive";
                 }
                 label.appendChild(input);
                 colDiv.appendChild(label);
@@ -149,17 +155,18 @@ export async function setupForm(onSubmit, onFormatChange) {
             // Append columns sorted by index
             const sortedIndices = Array.from(colMap.keys()).sort((a, b) => a - b);
             for (const idx of sortedIndices) {
-                gridDiv.appendChild(colMap.get(idx));
+                const col = colMap.get(idx);
+                if (col) gridDiv.appendChild(col);
             }
             groupDiv.appendChild(gridDiv);
         }
     }
 
-    const runOpts = await loadOptions("runOptions", defaultRunOptions);
+    const runOpts = /** @type {RunOptions} */ (await loadOptions("runOptions", defaultRunOptions));
     let savedRunOpts = structuredClone(runOpts);
     applyRunOptionsValues(runOpts);
 
-    const formatOpts = await loadOptions("formatOptions", defaultFormatOptions);
+    const formatOpts = /** @type {FormatOptions} */ (await loadOptions("formatOptions", defaultFormatOptions));
     applyFormatOptionsValues(formatOpts);
 
     // Live update check for unsaved bar
@@ -170,7 +177,7 @@ export async function setupForm(onSubmit, onFormatChange) {
         const configDiff = JSON.stringify(currentConfig) !== JSON.stringify(savedConfig);
         const optsDiff = JSON.stringify(currentRunOpts) !== JSON.stringify(savedRunOpts);
 
-        const bar = document.getElementById("unsavedChangesBar");
+        const bar = getOptionalElement("unsavedChangesBar", HTMLElement);
         if (bar) {
             if (configDiff || optsDiff) {
                 bar.classList.remove("hidden");
@@ -195,7 +202,7 @@ export async function setupForm(onSubmit, onFormatChange) {
         "cubeSize"
     ];
     computeInputIds.forEach(id => {
-        const el = document.getElementById(id);
+        const el = getOptionalElement(id, HTMLElement);
         if (el) {
             el.addEventListener("input", checkUnsavedChanges);
             el.addEventListener("change", checkUnsavedChanges);
@@ -205,7 +212,7 @@ export async function setupForm(onSubmit, onFormatChange) {
     // Format options: auto-save on change and trigger live update (no unsaved bar)
     const formatInputIds = ["showGrips", "showBoundaries", "wedgeNotation", "showOrientationColors", "reorient"];
     formatInputIds.forEach(id => {
-        const el = document.getElementById(id);
+        const el = getOptionalElement(id, HTMLElement);
         if (el) {
             el.addEventListener("change", async () => {
                 await saveOptions("formatOptions", collectFormatOptionsValues());
@@ -215,7 +222,7 @@ export async function setupForm(onSubmit, onFormatChange) {
     });
 
     // Unsaved Changes Bar click listeners
-    document.getElementById("saveChangesButton").addEventListener("click", async () => {
+    getOptionalElement("saveChangesButton", HTMLButtonElement)?.addEventListener("click", async () => {
         const config = collectCostConfig(form, savedConfig);
         await saveCostConfig(config);
 
@@ -229,9 +236,11 @@ export async function setupForm(onSubmit, onFormatChange) {
         if (typeof chrome !== "undefined" && chrome.tabs) {
             chrome.tabs.query({}, (tabs) => {
                 tabs.forEach(tab => {
-                    chrome.tabs.sendMessage(tab.id, { action: "SETTINGS_CHANGED" }, () => {
-                        if (chrome.runtime.lastError) { /* ignore */ }
-                    });
+                    if (tab.id) {
+                        chrome.tabs.sendMessage(tab.id, { action: "SETTINGS_CHANGED" }, () => {
+                            if (chrome.runtime.lastError) { /* ignore */ }
+                        });
+                    }
                 });
             });
         }
@@ -239,7 +248,7 @@ export async function setupForm(onSubmit, onFormatChange) {
         checkUnsavedChanges();
     });
 
-    document.getElementById("revertChangesButton").addEventListener("click", () => {
+    getOptionalElement("revertChangesButton", HTMLButtonElement)?.addEventListener("click", () => {
         applyConfig(form, savedConfig);
         applyRunOptionsValues(savedRunOpts);
 
@@ -248,30 +257,41 @@ export async function setupForm(onSubmit, onFormatChange) {
     });
 
     // Submit handler
-    document.getElementById("submitButton").addEventListener("click", async (e) => {
+    getOptionalElement("submitButton", HTMLButtonElement)?.addEventListener("click", async (e) => {
         e.preventDefault();
-        document.getElementById("errorMessage").textContent = "";
+        const errEl = getOptionalElement("errorMessage", HTMLElement);
+        if (errEl) errEl.textContent = "";
         try {
             const config = collectCostConfig(form, savedConfig);
-            const options = collectRunOptions();
-            await onSubmit(config, options);
+            const scrambleInput = getOptionalElement("scramble", HTMLInputElement);
+            const rawText = scrambleInput ? scrambleInput.value.trim() : "";
+            if (!rawText) {
+                throw new Error("Please enter a scramble to analyze.");
+            }
+            const scramble = ScrambleOptimizer.parseScramble(rawText);
+            const options = collectRunOptionsValues();
+            await onSubmit(config, scramble, options);
         } 
         catch (err) {
-            document.getElementById("errorMessage").textContent = "Error: " + err.message;
+            const msg = err instanceof Error ? err.message : String(err);
+            if (errEl) errEl.textContent = "Error: " + msg;
         }
     });
 
-    document.getElementById("resetDefaultButton").addEventListener("click", (e) => {
+    getOptionalElement("resetDefaultButton", HTMLButtonElement)?.addEventListener("click", () => {
         applyConfig(form, defaultCostConfiguration);
         form.dispatchEvent(new Event("input", { bubbles: true }));
     });
 
-    document.querySelectorAll('.tab-buttons button').forEach(btn => {
+    queryElements(document, '.tab-buttons button', HTMLButtonElement).forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-buttons button').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            queryElements(document, '.tab-buttons button', HTMLButtonElement).forEach(b => b.classList.remove('active'));
+            queryElements(document, '.tab-content', HTMLElement).forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
-            document.getElementById(btn.dataset.tab).classList.add('active');
+            const targetTab = btn.dataset.tab;
+            if (targetTab) {
+                getOptionalElement(targetTab, HTMLElement)?.classList.add('active');
+            }
         });
     });
 
@@ -283,7 +303,7 @@ export async function setupForm(onSubmit, onFormatChange) {
         { label: "Thumbs", targets: ["right_thumb", "left_thumb"]},
         { label: "Twist Up", targets: ["right_up", "right_up_double", "left_up", "left_up_double"]},
         { label: "Twist Down", targets: ["right_down", "right_down_double", "left_down", "left_down_double"]},
-        { label: ""},
+        { label: "", targets: []},
         { label: "Right Hand", targets: ["right_index", "right_index_push", "right_index_front", "right_index_middle", "right_middle", "right_middle_push", "right_ring", "right_ring_middle", "right_ring_push", "right_thumb", "right_up", "right_up_double", "right_down", "right_down_double"]},
         { label: "Left Hand", targets: ["left_index", "left_index_push", "left_index_front", "left_index_middle", "left_middle", "left_middle_push", "left_ring", "left_ring_middle", "left_ring_push", "left_thumb", "left_up", "left_up_double", "left_down", "left_down_double"]},
     ]);
@@ -293,12 +313,12 @@ export async function setupForm(onSubmit, onFormatChange) {
         { label: "Left Thumb Up", targets: ["U F", "U U", "U D", "U Bu", "U Bd"]},
         { label: "Left Thumb Down", targets: ["D F", "D U", "D D", "D Bu", "D Bd"]},
         { label: "Left Thumb Back", targets: ["Bu F", "Bu U", "Bu D", "Bu Bu", "Bu Bd", "Bd F", "Bd U", "Bd D", "Bd Bu", "Bd Bd"]},
-        { label: ""},
+        { label: "", targets: []},
         { label: "Right Thumb Front", targets: ["F F", "U F", "D F", "Bu F", "Bd F"]},
         { label: "Right Thumb Up", targets: ["F U", "U U", "D U", "Bu U", "Bd U"]},
         { label: "Right Thumb Down", targets: ["F D", "U D", "D D", "Bu D", "Bd D"]},
         { label: "Right Thumb Back", targets: ["F Bu", "U Bu", "D Bu", "Bu Bu", "Bd Bu", "F Bd", "U Bd", "D Bd", "Bu Bd", "Bd Bd"]},
-        { label: ""},
+        { label: "", targets: []},
         { label: "Both Up or Down", targets: ["U U", "D D"]},
         { label: "Both Back", targets: ["Bd Bd", "Bu Bu", "Bd Bu", "Bu Bd"]},
     ]);
@@ -310,13 +330,13 @@ export async function setupForm(onSubmit, onFormatChange) {
         { label: "Left", targets: ["L", "l"]},
         { label: "Up", targets: ["U", "u"]},
         { label: "Down", targets: ["D", "d"]},
-        { label: ""},
+        { label: "", targets: []},
         { label: "Normal", targets: ["F", "B", "R", "L", "U", "D"]},
         { label: "Wide", targets: ["f", "b", "r", "l", "u", "d"]},
         //{ label: "Rotation", targets: ["x", "y", "z"]},
     ]);
 
-    document.getElementById("exportButton").addEventListener("click", () => {
+    getOptionalElement("exportButton", HTMLButtonElement)?.addEventListener("click", () => {
         try {
             const config = collectCostConfig(form, initialConfig);
             const json = JSON.stringify(config, null, 2);
@@ -330,35 +350,47 @@ export async function setupForm(onSubmit, onFormatChange) {
             URL.revokeObjectURL(url);
         } 
         catch (err) {
-            alert("Error exporting configuration: " + err.message);
+            const msg = err instanceof Error ? err.message : String(err);
+            alert("Error exporting configuration: " + msg);
         }
     });
     
-    const importFile = document.getElementById("importFile");
+    const importFile = getOptionalElement("importFile", HTMLInputElement);
 
-    document.getElementById("importButton").addEventListener("click", () => {
-        importFile.click();
-    });
-
-    importFile.addEventListener("change", async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        try {
-            const text = await file.text();
-            const config = JSON.parse(text);
-            applyConfig(document.getElementById("costForm"), config);
-            form.dispatchEvent(new Event("input", { bubbles: true }));
-        } 
-        catch (err) {
-            alert("Error importing configuration: " + err.message);
+    getOptionalElement("importButton", HTMLButtonElement)?.addEventListener("click", () => {
+        if (importFile) {
+            importFile.click();
         }
-
-        importFile.value = "";
     });
+
+    if (importFile) {
+        importFile.addEventListener("change", async (e) => {
+            const target = e.target;
+            if (!(target instanceof HTMLInputElement)) return;
+            const file = target.files?.[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const config = JSON.parse(text);
+                const costForm = getOptionalElement("costForm", HTMLFormElement);
+                if (costForm) {
+                    applyConfig(costForm, config);
+                    form.dispatchEvent(new Event("input", { bubbles: true }));
+                }
+            } 
+            catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                alert("Error importing configuration: " + msg);
+            }
+
+            importFile.value = "";
+        });
+    }
 
     form.addEventListener("input", (e) => {
-        if (e.target.matches('input[type="number"]')) {
+        const target = e.target;
+        if (target instanceof HTMLInputElement && target.type === "number") {
             updateCostInputColors(form);
         }
         checkUnsavedChanges();
@@ -368,12 +400,12 @@ export async function setupForm(onSubmit, onFormatChange) {
 }
 
 /**
- * @param {Object} imported 
- * @param {Object} defaults 
- * @returns 
+ * @param {Record<string, any>} imported 
+ * @param {Record<string, any>} defaults 
+ * @returns {CostConfig}
  */
 function migrateConfig(imported, defaults) {
-    const output = structuredClone(defaults);
+    const output = /** @type {any} */ (structuredClone(defaults));
     for (const [key, value] of Object.entries(imported)) {
         if (key in defaults) {
             if (typeof value === "object" && value !== null) {
@@ -388,7 +420,7 @@ function migrateConfig(imported, defaults) {
             }
         }
     }
-    return output;
+    return /** @type {CostConfig} */ (output);
 }
 
 /**
@@ -396,10 +428,9 @@ function migrateConfig(imported, defaults) {
  * @param {HTMLFormElement} form 
  * @param {string} groupName 
  * @param {GroupControl[]} controls 
- * @returns 
  */
 function addGroupControls(form, groupName, controls) {
-    const groupDiv = document.querySelector(`[data-group="${groupName}"]`);
+    const groupDiv = queryElementOptional(form, `[data-group="${groupName}"]`, HTMLElement);
     if (!groupDiv) return;
 
     // Add a visual separator
@@ -414,7 +445,7 @@ function addGroupControls(form, groupName, controls) {
 
     // Create controls
     for (const ctrl of controls) {
-        if(ctrl.label == "") {
+        if (ctrl.label === "") {
             const spacer = document.createElement("div");
             spacer.style.height = "8px";
             groupDiv.appendChild(spacer);
@@ -436,33 +467,32 @@ function addGroupControls(form, groupName, controls) {
         minus.className = "btn-adjust";
         minus.textContent = "−";
         minus.dataset.group = groupName;
-        minus.dataset.delta = -0.5;
+        minus.dataset.delta = "-0.5";
 
         const plus = document.createElement("button");
         plus.type = "button";
         plus.className = "btn-adjust";
         plus.textContent = "+";
         plus.dataset.group = groupName;
-        plus.dataset.delta = 0.5;
+        plus.dataset.delta = "0.5";
 
         btnGroup.appendChild(minus);
         btnGroup.appendChild(plus);
         wrapper.appendChild(btnGroup);
         groupDiv.appendChild(wrapper);
 
-        for(const btn of [minus, plus]) {
+        for (const btn of [minus, plus]) {
             btn.addEventListener('click', () => {
-                const delta = parseFloat(btn.dataset.delta);
-                const inputs = form.querySelectorAll(`[name^="${groupName}."]`);
-                inputs.forEach(input => {
-                    if(ctrl.targets.includes(input.name.split(".")[1])) {
+                const delta = parseFloat(btn.dataset.delta || "0");
+                queryElements(form, `[name^="${groupName}."]`, HTMLInputElement).forEach(input => {
+                    if (ctrl.targets.includes(input.name.split(".")[1])) {
                         const oldVal = parseFloat(input.value) || 0;
-                        input.value = (oldVal + delta)
+                        input.value = String(oldVal + delta);
                     }
-                })
+                });
                 updateCostInputColors(form);
                 form.dispatchEvent(new Event("input", { bubbles: true }));
-            })
+            });
         }
     }
 
@@ -473,9 +503,8 @@ function addGroupControls(form, groupName, controls) {
     groupDiv.appendChild(zeroButton);
 
     zeroButton.addEventListener('click', () => {
-        const inputs = form.querySelectorAll(`[name^="${groupName}."]`);
-        inputs.forEach(input => {
-            input.value = 0;
+        queryElements(form, `[name^="${groupName}."]`, HTMLInputElement).forEach(input => {
+            input.value = "0";
         });
         updateCostInputColors(form);
         form.dispatchEvent(new Event("input", { bubbles: true }));
@@ -487,13 +516,11 @@ function addGroupControls(form, groupName, controls) {
  * @param {HTMLFormElement} form 
  */
 function updateCostInputColors(form) {
-    const inputs = form.querySelectorAll('input[type="number"]');
-
-    inputs.forEach(input => {
+    queryElements(form, 'input[type="number"]', HTMLInputElement).forEach(input => {
         const val = parseFloat(input.value);
-        if(input.valueType == "additive")
+        if (input.dataset.valueType === "additive")
             input.style.backgroundColor = costToColor(val, 5, -2);
-        else if(input.valueType == "scalar")
+        else if (input.dataset.valueType === "scalar")
             input.style.backgroundColor = costToColor(val, 3, -2);
     });
 }
@@ -505,7 +532,7 @@ function updateCostInputColors(form) {
 async function saveCostConfig(config) {
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
         await new Promise((resolve) => {
-            chrome.storage.local.set({ costConfig: config }, resolve);
+            chrome.storage.local.set({ costConfig: config }, () => resolve(undefined));
         });
     }
     localStorage.setItem("costConfig", JSON.stringify(config));
@@ -519,7 +546,7 @@ async function loadCostConfig() {
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
         return new Promise((resolve) => {
             chrome.storage.local.get(["costConfig"], (result) => {
-                resolve(result.costConfig || null);
+                resolve(/** @type {CostConfig | null} */ (result?.costConfig || null));
             });
         });
     }
@@ -540,7 +567,7 @@ async function loadCostConfig() {
 async function saveOptions(key, options) {
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
         await new Promise((resolve) => {
-            chrome.storage.local.set({ [key]: options }, resolve);
+            chrome.storage.local.set({ [key]: options }, () => resolve(undefined));
         });
     }
     localStorage.setItem(key, JSON.stringify(options));
@@ -548,15 +575,17 @@ async function saveOptions(key, options) {
 
 /**
  * Load an options object from storage, falling back to defaults
+ * @template T
  * @param {string} key
- * @param {Object} defaults
- * @returns {Promise<Object>}
+ * @param {T} defaults
+ * @returns {Promise<T>}
  */
 async function loadOptions(key, defaults) {
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
         return new Promise((resolve) => {
             chrome.storage.local.get([key], (result) => {
-                resolve({ ...defaults, ...result[key] });
+                const storedVal = result ? result[key] : null;
+                resolve({ ...defaults, ...(storedVal || {}) });
             });
         });
     }
@@ -571,14 +600,14 @@ async function loadOptions(key, defaults) {
 
 /**
  * Get the cost configuration from the cost form
- * @param {*} form 
+ * @param {HTMLFormElement} form 
  * @param {CostConfig} initialConfig 
  * @returns {CostConfig}
  */
 function collectCostConfig(form, initialConfig) {
-    const newConfig = structuredClone(initialConfig);
+    const newConfig = /** @type {any} */ (structuredClone(initialConfig));
 
-    for (const input of form.querySelectorAll("input[name]")) {
+    for (const input of queryElements(form, "input[name]", HTMLInputElement)) {
         const fullKey = input.name;
         const val = input.type === "checkbox" ? input.checked : parseFloat(input.value);
         if (fullKey.includes(".")) {
@@ -589,28 +618,7 @@ function collectCostConfig(form, initialConfig) {
         }
     }
 
-    return newConfig;
-}
-
-/**
- * Get all optimizer options from the document
- * @returns {RunOptions}
- */
-function collectRunOptions() {
-    const rawText = document.getElementById("scramble").value.trim();
-    if (!rawText) {
-        throw new Error("Please enter a scramble to analyze.");
-    }
-
-    const scramble = ScrambleOptimizer.parseScramble(rawText);
-    const runOpts = collectRunOptionsValues();
-    const cubeSize = runOpts?.cubeSize ?? 0;
-
-    if (Number.isNaN(runOpts.depth) || Number.isNaN(runOpts.maxIterations)) {
-        throw new Error("Depth and iterations must be numbers.");
-    }
-
-    return { scramble, ...runOpts, cubeSize };
+    return /** @type {CostConfig} */ (newConfig);
 }
 
 /**
@@ -619,17 +627,16 @@ function collectRunOptions() {
  */
 function collectRunOptionsValues() {
     return {
-        depth:                     parseFloat(document.getElementById("depth").value),
-        maxIterations:             parseFloat(document.getElementById("iterations").value),
-        maxRegripBranches:         parseFloat(document.getElementById("maxRegripBranches").value),
-        searchRotations:           document.getElementById("searchRotations").checked,
-        pruneRotations:            document.getElementById("pruneRotations").checked,
-        memoize:                   document.getElementById("memoize").checked,
-        wideReplace:               document.getElementById("wideReplace").checked,
-        //wideReplaceDouble:         document.getElementById("wideReplaceDouble").checked,
-        //allowMidScrambleRotations: document.getElementById("allowMidScrambleRotations").checked,
-        partitionLength:           parseFloat(document.getElementById("partitionLength").value),
-        cubeSize:                  Number(document.getElementById("cubeSize").value)
+        ...defaultRunOptions,
+        depth: parseFloat(getElement("depth", HTMLInputElement).value),
+        maxIterations: parseFloat(getElement("iterations", HTMLInputElement).value),
+        maxRegripBranches: parseFloat(getElement("maxRegripBranches", HTMLInputElement).value),
+        searchRotations: getElement("searchRotations", HTMLInputElement).checked,
+        pruneRotations: getElement("pruneRotations", HTMLInputElement).checked,
+        memoize: getElement("memoize", HTMLInputElement).checked,
+        wideReplace: getElement("wideReplace", HTMLInputElement).checked,
+        partitionLength: parseFloat(getElement("partitionLength", HTMLInputElement).value),
+        cubeSize: Number(getElement("cubeSize", HTMLSelectElement).value),
     };
 }
 
@@ -639,11 +646,12 @@ function collectRunOptionsValues() {
  */
 export function collectFormatOptionsValues() {
     return {
-        showGrips:             document.getElementById("showGrips").checked,
-        showBoundaries:        document.getElementById("showBoundaries").checked,
-        wedgeNotation:         document.getElementById("wedgeNotation").checked,
-        showOrientationColors: document.getElementById("showOrientationColors").checked,
-        reorient:              document.getElementById("reorient").checked,
+        ...defaultFormatOptions,
+        showGrips: getElement("showGrips", HTMLInputElement).checked,
+        showBoundaries: getElement("showBoundaries", HTMLInputElement).checked,
+        wedgeNotation: getElement("wedgeNotation", HTMLInputElement).checked,
+        showOrientationColors: getElement("showOrientationColors", HTMLInputElement).checked,
+        reorient: getElement("reorient", HTMLInputElement).checked,
     };
 }
 
@@ -652,17 +660,17 @@ export function collectFormatOptionsValues() {
  * @param {RunOptions} runOpts
  */
 function applyRunOptionsValues(runOpts) {
-    document.getElementById("depth").value = runOpts.depth;
-    document.getElementById("iterations").value = runOpts.maxIterations;
-    document.getElementById("maxRegripBranches").value = runOpts.maxRegripBranches;
-    document.getElementById("searchRotations").checked = runOpts.searchRotations;
-    document.getElementById("pruneRotations").checked = runOpts.pruneRotations;
-    document.getElementById("memoize").checked = runOpts.memoize;
-    document.getElementById("wideReplace").checked = runOpts.wideReplace;
-    //document.getElementById("wideReplaceDouble").checked = runOpts.wideReplaceDouble;
-    //document.getElementById("allowMidScrambleRotations").checked = runOpts.allowMidScrambleRotations;
-    document.getElementById("partitionLength").value = runOpts.partitionLength;
-    document.getElementById("cubeSize").value = String(runOpts.cubeSize);
+    const opts = { ...defaultRunOptions, ...runOpts };
+
+    getElement("depth", HTMLInputElement).value = String(opts.depth);
+    getElement("iterations", HTMLInputElement).value = String(opts.maxIterations);
+    getElement("maxRegripBranches", HTMLInputElement).value = String(opts.maxRegripBranches ?? defaultRunOptions.maxRegripBranches);
+    getElement("searchRotations", HTMLInputElement).checked = Boolean(opts.searchRotations ?? defaultRunOptions.searchRotations);
+    getElement("pruneRotations", HTMLInputElement).checked = Boolean(opts.pruneRotations ?? defaultRunOptions.pruneRotations);
+    getElement("memoize", HTMLInputElement).checked = Boolean(opts.memoize ?? defaultRunOptions.memoize);
+    getElement("wideReplace", HTMLInputElement).checked = Boolean(opts.wideReplace ?? defaultRunOptions.wideReplace);
+    getElement("partitionLength", HTMLInputElement).value = String(opts.partitionLength ?? defaultRunOptions.partitionLength);
+    getElement("cubeSize", HTMLSelectElement).value = String(opts.cubeSize);
 }
 
 /**
@@ -670,33 +678,35 @@ function applyRunOptionsValues(runOpts) {
  * @param {FormatOptions} formatOpts
  */
 function applyFormatOptionsValues(formatOpts) {
-    document.getElementById("showGrips").checked = formatOpts.showGrips;
-    document.getElementById("showBoundaries").checked = formatOpts.showBoundaries;
-    document.getElementById("wedgeNotation").checked = formatOpts.wedgeNotation;
-    document.getElementById("showOrientationColors").checked = formatOpts.showOrientationColors ?? false;
-    document.getElementById("reorient").checked = formatOpts.reorient ?? false;
+    const opts = { ...defaultFormatOptions, ...formatOpts };
+
+    getElement("showGrips", HTMLInputElement).checked = Boolean(opts.showGrips ?? defaultFormatOptions.showGrips);
+    getElement("showBoundaries", HTMLInputElement).checked = Boolean(opts.showBoundaries ?? defaultFormatOptions.showBoundaries);
+    getElement("wedgeNotation", HTMLInputElement).checked = Boolean(opts.wedgeNotation ?? defaultFormatOptions.wedgeNotation);
+    getElement("showOrientationColors", HTMLInputElement).checked = Boolean(opts.showOrientationColors ?? defaultFormatOptions.showOrientationColors);
+    getElement("reorient", HTMLInputElement).checked = Boolean(opts.reorient ?? defaultFormatOptions.reorient);
 }
 
 /**
  * Populate the form with a given configuration
  * @param {HTMLFormElement} form 
- * @param {Object} config 
+ * @param {Record<string, any>} config 
  */
 function applyConfig(form, config) {
     for (const [groupName, groupValue] of Object.entries(config)) {
-        if (typeof groupValue === "object") {
+        if (typeof groupValue === "object" && groupValue !== null) {
             for (const [key, val] of Object.entries(groupValue)) {
-                const input = form.querySelector(`[name="${groupName}.${key}"]`);
+                const input = queryElementOptional(form, `[name="${groupName}.${key}"]`, HTMLInputElement);
                 if (!input) continue;
                 if (input.type === "checkbox") input.checked = Boolean(val);
-                else input.value = val;
+                else input.value = String(val);
             }
         } 
         else {
-            const input = form.querySelector(`[name="${groupName}"]`);
+            const input = queryElementOptional(form, `[name="${groupName}"]`, HTMLInputElement);
             if (!input) continue;
             if (input.type === "checkbox") input.checked = Boolean(groupValue);
-            else input.value = groupValue;
+            else input.value = String(groupValue);
         }
     }
     updateCostInputColors(form);
@@ -707,5 +717,8 @@ function applyConfig(form, config) {
  * @param {number} time 
  */
 export function drawSearchTime(time) {
-    document.getElementById("searchTime").textContent = new Date(time).toISOString().slice(11, -1)
+    const el = getOptionalElement("searchTime", HTMLElement);
+    if (el) {
+        el.textContent = new Date(time).toISOString().slice(11, -1);
+    }
 }

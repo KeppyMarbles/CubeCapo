@@ -1,12 +1,14 @@
-const extAPI = globalThis.browser || globalThis.chrome;
+import { getElement, getOptionalElement } from "../src/ui/dom.js";
+
+const extAPI = /** @type {any} */ (globalThis).browser || globalThis.chrome;
 
 document.addEventListener("DOMContentLoaded", async () => {
-    const enableToggle = document.getElementById("enableToggle");
-    const hostNameEl = document.getElementById("hostName");
-    const selectorStateEl = document.getElementById("selectorState");
-    const pickerBtn = document.getElementById("pickerBtn");
-    const clearSelectorBtn = document.getElementById("clearSelectorBtn");
-    const optionsBtn = document.getElementById("optionsBtn");
+    const enableToggle = getElement("enableToggle", HTMLInputElement);
+    const hostNameEl = getElement("hostName", HTMLElement);
+    const selectorStateEl = getElement("selectorState", HTMLElement);
+    const pickerBtn = getElement("pickerBtn", HTMLButtonElement);
+    const clearSelectorBtn = getElement("clearSelectorBtn", HTMLButtonElement);
+    const optionsBtn = getElement("optionsBtn", HTMLButtonElement);
 
     // Get the active tab details
     const [tab] = await extAPI.tabs.query({ active: true, currentWindow: true });
@@ -36,9 +38,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                 clearSelectorBtn.classList.add("hidden");
                 
                 // Notify content script
-                extAPI.tabs.sendMessage(tab.id, { action: "SETTINGS_CHANGED" }, () => {
-                    if (extAPI.runtime.lastError) console.log(extAPI.runtime.lastError.message);
-                });
+                if (tab.id) {
+                    extAPI.tabs.sendMessage(tab.id, { action: "SETTINGS_CHANGED" }, () => {
+                        if (extAPI.runtime.lastError) console.log(extAPI.runtime.lastError.message);
+                    });
+                }
             });
         } catch (e) {
             hostNameEl.textContent = "Unsupported page";
@@ -58,7 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         await extAPI.storage.local.set({ enabled });
         
         // Notify tab to update
-        if (tab) {
+        if (tab?.id) {
             extAPI.tabs.sendMessage(tab.id, { action: "STATE_CHANGED" }, () => {
                 if (extAPI.runtime.lastError) console.log(extAPI.runtime.lastError.message);
             });
@@ -67,8 +71,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Start picker
     pickerBtn.addEventListener("click", () => {
-        if (tab) {
-            extAPI.tabs.sendMessage(tab.id, { action: "START_PICKER" }, (response) => {
+        if (tab?.id) {
+            extAPI.tabs.sendMessage(tab.id, { action: "START_PICKER" }, (/** @type {any} */ response) => {
                 if (extAPI.runtime.lastError) {
                     alert("Could not start picker. Try refreshing the page.");
                 } else {
@@ -100,13 +104,13 @@ async function setupOptionsBinding(storageKey, bindings, activeTab) {
     const currentOptions = store[storageKey] || {};
 
     for (const [optKey, config] of Object.entries(bindings)) {
-        const el = document.getElementById(config.id);
+        const el = getOptionalElement(config.id, HTMLElement);
         if (!el) continue;
 
         const val = currentOptions[optKey];
-        if (el.type === "checkbox") {
+        if (el instanceof HTMLInputElement && el.type === "checkbox") {
             el.checked = Boolean(val);
-        } else if (val !== undefined && val !== null) {
+        } else if (val !== undefined && val !== null && (el instanceof HTMLInputElement || el instanceof HTMLSelectElement)) {
             el.value = String(val);
         }
 
@@ -114,11 +118,11 @@ async function setupOptionsBinding(storageKey, bindings, activeTab) {
             const freshStore = await extAPI.storage.local.get([storageKey]);
             const updatedOpts = { ...(freshStore[storageKey] || {}) };
 
-            if (el.type === "checkbox") {
+            if (el instanceof HTMLInputElement && el.type === "checkbox") {
                 updatedOpts[optKey] = el.checked;
-            } else if (config.type === "number" || el.tagName === "SELECT") {
+            } else if ((el instanceof HTMLInputElement || el instanceof HTMLSelectElement) && (config.type === "number" || el.tagName === "SELECT")) {
                 updatedOpts[optKey] = Number(el.value);
-            } else {
+            } else if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {
                 updatedOpts[optKey] = el.value;
             }
 

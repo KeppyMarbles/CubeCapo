@@ -1,7 +1,6 @@
 import { Move } from "./move.js";
 import { defaultColorScheme } from "./defaults.js";
-/** @import { Move } from "./move.js" */
-/** @import { Orientation, Rotation, FaceStr, ColorSchemeConfig } from "../types.js" */
+/** @import { Orientation, StartingRotation, FaceStr, ColorSchemeConfig, RotationStr } from "../types.js" */
 
 /**
  * Detects the cube size (2, 3, 4, 5, 6, 7, ...) from a parsed Move array.
@@ -44,31 +43,40 @@ export function detectCubeSize(moves) {
 }
 
 /**
- * Returns top and front colors for a starting cube orientation.
- * @param {Orientation} orientation
+ * Returns top and front colors for a starting cube rotation.
+ * @param {StartingRotation} [rotation]
  * @param {ColorSchemeConfig} [colorScheme=defaultColorScheme] - Color mapping for faces
  * @returns {{ topColor: string, frontColor: string }}
  */
-export function getOrientationColors(orientation, colorScheme = defaultColorScheme) {
-    if (!orientation) {
+export function getOrientationColors(rotation, colorScheme = defaultColorScheme) {
+    if (!rotation) {
         return { topColor: "", frontColor: "" };
     }
 
+    /** @type {Record<string, string>} */
     let state = { U: "U", D: "D", F: "F", B: "B", R: "R", L: "L" };
-    for (const rot of [orientation.up, orientation.front]) {
-        if (rot && Move.TRANSPOSITIONS[rot]) {
-            const trans = Move.TRANSPOSITIONS[rot];
+    const transMap = /** @type {Record<string, Record<string, string>>} */ (/** @type {unknown} */ (Move.TRANSPOSITIONS));
+
+    for (const rot of [rotation.up, rotation.front]) {
+        if (rot && transMap[rot]) {
+            const trans = transMap[rot];
+            /** @type {Record<string, string>} */
             const next = {};
             for (const [p, tag] of Object.entries(state)) {
-                next[trans[p]] = tag;
+                if (trans[p]) {
+                    next[trans[p]] = tag;
+                }
             }
             state = next;
         }
     }
 
+    const uFace = /** @type {FaceStr} */ (state.U);
+    const fFace = /** @type {FaceStr} */ (state.F);
+
     return {
-        topColor: colorScheme[state.U] || state.U || "",
-        frontColor: colorScheme[state.F] || state.F || ""
+        topColor: (uFace && colorScheme[uFace]) || state.U || "",
+        frontColor: (fFace && colorScheme[fFace]) || state.F || ""
     };
 }
 
@@ -76,7 +84,7 @@ export function getOrientationColors(orientation, colorScheme = defaultColorSche
  * Returns the rotation pair (up, front) required to restore a given cube orientation back to a target orientation (default standard U, F).
  * @param {Orientation} fromOrientation 
  * @param {Orientation} [toOrientation]
- * @returns {Rotation}
+ * @returns {StartingRotation}
  */
 export function getRestoringRotation(fromOrientation, toOrientation = { up: "U", front: "F" }) {
     if (!fromOrientation) {
@@ -86,11 +94,8 @@ export function getRestoringRotation(fromOrientation, toOrientation = { up: "U",
     if (fromOrientation.up === target.up && fromOrientation.front === target.front) {
         return { up: null, front: null };
     }
-    const topRotations = [null, "x", "x'", "x2", "z", "z'"];
-    const frontRotations = [null, "y", "y'", "y2"];
-
-    for (const topRot of topRotations) {
-        for (const frontRot of frontRotations) {
+    for (const topRot of Move.TOP_ROTATIONS) {
+        for (const frontRot of Move.FRONT_ROTATIONS) {
             const test = { ...fromOrientation };
             if (topRot) Move.transposeOrientation(test, topRot);
             if (frontRot) Move.transposeOrientation(test, frontRot);

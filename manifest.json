@@ -31,7 +31,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["src/ui/breakdownTable.js", "extension/content.js"],
+      "js": ["extension/contentLauncher.js"],
       "css": ["extension/content.css"],
       "run_at": "document_end"
     }
@@ -39,6 +39,8 @@
   "web_accessible_resources": [
     {
       "resources": [
+        "extension/content.js",
+        "src/ui/dom.js",
         "src/ui/stats.js",
         "src/cube/defaults.js",
         "src/cube/scramble.js",
