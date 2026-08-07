@@ -75,6 +75,15 @@
  * @property {number} [regripCost] Pre-calculated cost of the regrip
  */
 
+/**
+ * A single evaluated move candidate produced by evaluateMoveAt / findCandidateRegrips.
+ * @typedef {Object} TransitionCandidate
+ * @property {Transition} transition The transition to apply for this move
+ * @property {GripState} nextGrip The resulting grip after the transition
+ * @property {number} cost Cumulative cost up to and including this move
+ * @property {number} [addedCost] Marginal cost contributed by this move alone
+ */
+
 /** @typedef {Record<MoveKey, Fingertrick | null>} GripTransitions */
 /** @typedef {Record<GripState, GripTransitions>} TransitionConfig */
 /** @typedef {Record<RotationStr, Record<FaceStr | AxisStr, FaceStr | AxisStr>>} TranspositionMap */
@@ -121,6 +130,7 @@
  * @property {boolean} pruneRotations If an orientation search should be stopped if worse than best orientation
  * @property {boolean} memoize If search shouldn't continue if same index, orientation and grip is reached
  * @property {boolean} [wideReplace] If search should try replacing single moves with wide moves
+ * @property {boolean} [searchRegrips] If regrip candidates should always be explored, even when a direct transition exists
  * //@property {boolean} wideReplaceDouble If search should try replacing double moves with 1 wide and 1 normal move
  * //@property {boolean} allowMidScrambleRotations
  * @property {number} [partitionLength] Maximum length of scramble partitions (0 or undefined to disable)

@@ -33,6 +33,7 @@ export const defaultRunOptions = Object.freeze({
     wideReplace: true,
     //wideReplaceDouble: false,
     //allowMidScrambleRotations: false,
+    searchRegrips: false,
     partitionLength: 20,
     maxCapacity: 50,
     cubeSize: 0,

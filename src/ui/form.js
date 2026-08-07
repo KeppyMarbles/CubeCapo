@@ -196,6 +196,7 @@ export async function setupForm(onSubmit, onFormatChange) {
         "pruneRotations",
         "memoize",
         "wideReplace",
+        "searchRegrips",
         //"wideReplaceDouble",
         //"allowMidScrambleRotations",
         "partitionLength",
@@ -635,6 +636,7 @@ function collectRunOptionsValues() {
         pruneRotations: getElement("pruneRotations", HTMLInputElement).checked,
         memoize: getElement("memoize", HTMLInputElement).checked,
         wideReplace: getElement("wideReplace", HTMLInputElement).checked,
+        searchRegrips: getElement("searchRegrips", HTMLInputElement).checked,
         partitionLength: parseFloat(getElement("partitionLength", HTMLInputElement).value),
         cubeSize: Number(getElement("cubeSize", HTMLSelectElement).value),
     };
@@ -669,6 +671,7 @@ function applyRunOptionsValues(runOpts) {
     getElement("pruneRotations", HTMLInputElement).checked = Boolean(opts.pruneRotations ?? defaultRunOptions.pruneRotations);
     getElement("memoize", HTMLInputElement).checked = Boolean(opts.memoize ?? defaultRunOptions.memoize);
     getElement("wideReplace", HTMLInputElement).checked = Boolean(opts.wideReplace ?? defaultRunOptions.wideReplace);
+    getElement("searchRegrips", HTMLInputElement).checked = Boolean(opts.searchRegrips ?? defaultRunOptions.searchRegrips);
     getElement("partitionLength", HTMLInputElement).value = String(opts.partitionLength ?? defaultRunOptions.partitionLength);
     getElement("cubeSize", HTMLSelectElement).value = String(opts.cubeSize);
 }

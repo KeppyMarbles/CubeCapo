@@ -1,7 +1,7 @@
 import { defaultFormatOptions, defaultRunOptions } from "./defaults.js";
 import { Move } from "./move.js";
 import { getOrientationColors, getRestoringRotation, detectCubeSize } from "./util.js";
-/** @import { CostConfig, TransitionConfig, Orientation, GripState, MoveKey, Transition, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, CostDetails, RotationStr, ScrambleCandidate, Fingertrick, FaceStr, MoveStr, TransitionCache, TransitionCacheRow } from "../types.js" */
+/** @import { CostConfig, TransitionConfig, Orientation, GripState, MoveKey, Transition, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, CostDetails, RotationStr, ScrambleCandidate, Fingertrick, FaceStr, MoveStr, TransitionCache, TransitionCacheRow, TransitionCandidate } from "../types.js" */
 
 /** @typedef {(moves: Move[], index: number, orientation: Orientation) => void} MoveTransform */
 
@@ -283,15 +283,17 @@ export class ScrambleOptimizer {
                 const moved = clone[idx];
                 const movedKey = moved.toKey();
                 const directTrans = this.getTransitionFor(cGrip, movedKey);
+                /** @type {TransitionCandidate[]} */
+                const candidates = (!directTrans || this.options.searchRegrips) ? this.findCandidateRegrips(cGrip, movedKey, moved, cCost) : [];
                 if (directTrans) {
                     const addedCost = this.computeTransitionCost(directTrans, moved);
-                    return [{
-                        transition: directTrans,
-                        nextGrip: directTrans.next,
-                        cost: cCost + addedCost
-                    }];
+                    candidates.unshift({ 
+                        transition: directTrans, 
+                        nextGrip: directTrans.next, 
+                        cost: cCost + addedCost 
+                    });
                 }
-                return this.findCandidateRegrips(cGrip, movedKey, moved, cCost);
+                return candidates;
             };
 
             /**
@@ -391,6 +393,7 @@ export class ScrambleOptimizer {
             }
         }
 
+        /** @type {TransitionCandidate[]} */
         const candidates = [];
         if (best1) candidates.push(best1);
         if (best2 && maxBranches >= 2) candidates.push(best2);
@@ -546,6 +549,7 @@ export class ScrambleOptimizer {
         const candidateGrips = this.allGripKeys;
         const partitionLength = Math.max(0, this.options.partitionLength || 0);
 
+        // Check for optimization across all 24 orientations
         for (const top_rot of Move.TOP_ROTATIONS) {
             for (const front_rot of Move.FRONT_ROTATIONS) {
                 const rotatedScramble = ScrambleOptimizer.copyScramble(preprocessedScramble);

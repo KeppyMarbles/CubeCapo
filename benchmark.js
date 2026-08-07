@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { ScrambleOptimizer } from './src/cube/scramble.js';
 import { defaultCostConfiguration, defaultFingertricks, defaultRunOptions } from './src/cube/defaults.js';
+/** @import {RunOptions} from './src/types.js' */
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,12 +24,15 @@ let totalCost = 0;
 let totalIterations = 0;
 let totalCandidates = 0;
 
+/** @type {RunOptions} */
 const options = {
     ...defaultRunOptions,
-    searchRotations: false, //speedup
-    maxRegripBranches: 1, //speedup
-    partitionLength: 10, //speedup
+    wideReplace: true,
+    searchRotations: true, //speedup
+    maxRegripBranches: 2, //speedup
+    partitionLength: 0, //speedup
     depth: 0, //speedup
+    searchRegrips: false,
 };
 console.log(options);
 
