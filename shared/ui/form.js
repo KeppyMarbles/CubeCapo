@@ -197,8 +197,9 @@ export async function setupForm(onSubmit, onFormatChange) {
         "memoize",
         "wideReplace",
         "searchRegrips",
+        "injectXRotations",
+        "injectZRotations",
         //"wideReplaceDouble",
-        //"allowMidScrambleRotations",
         "partitionLength",
         "cubeSize"
     ];
@@ -636,6 +637,8 @@ function collectRunOptionsValues() {
         pruneRotations: getElement("pruneRotations", HTMLInputElement).checked,
         memoize: getElement("memoize", HTMLInputElement).checked,
         wideReplace: getElement("wideReplace", HTMLInputElement).checked,
+        injectXRotations:  getElement("injectXRotations", HTMLInputElement).checked,
+        injectZRotations: getElement("injectZRotations", HTMLInputElement).checked,
         searchRegrips: getElement("searchRegrips", HTMLInputElement).checked,
         partitionLength: parseFloat(getElement("partitionLength", HTMLInputElement).value),
         cubeSize: Number(getElement("cubeSize", HTMLSelectElement).value),
@@ -663,7 +666,6 @@ export function collectFormatOptionsValues() {
  */
 function applyRunOptionsValues(runOpts) {
     const opts = { ...defaultRunOptions, ...runOpts };
-
     getElement("depth", HTMLInputElement).value = String(opts.depth);
     getElement("iterations", HTMLInputElement).value = String(opts.maxIterations);
     getElement("maxRegripBranches", HTMLInputElement).value = String(opts.maxRegripBranches ?? defaultRunOptions.maxRegripBranches);
@@ -671,6 +673,8 @@ function applyRunOptionsValues(runOpts) {
     getElement("pruneRotations", HTMLInputElement).checked = Boolean(opts.pruneRotations ?? defaultRunOptions.pruneRotations);
     getElement("memoize", HTMLInputElement).checked = Boolean(opts.memoize ?? defaultRunOptions.memoize);
     getElement("wideReplace", HTMLInputElement).checked = Boolean(opts.wideReplace ?? defaultRunOptions.wideReplace);
+    getElement("injectXRotations", HTMLInputElement).checked = Boolean(opts.injectXRotations ?? defaultRunOptions.injectXRotations);
+    getElement("injectZRotations", HTMLInputElement).checked = Boolean(opts.injectZRotations ?? defaultRunOptions.injectZRotations);
     getElement("searchRegrips", HTMLInputElement).checked = Boolean(opts.searchRegrips ?? defaultRunOptions.searchRegrips);
     getElement("partitionLength", HTMLInputElement).value = String(opts.partitionLength ?? defaultRunOptions.partitionLength);
     getElement("cubeSize", HTMLSelectElement).value = String(opts.cubeSize);

@@ -37,6 +37,22 @@ export class ScrambleOptimizer {
     });
 
     /**
+     * @param {RotationStr} rotKey 
+     * @returns {TransformDescriptor}
+     */
+    static makeRotationInjectDescriptor(rotKey) {
+        return Object.freeze({ logicalSkip: 1, physicalCount: 2, apply: (clone, index, newOrientation) => ScrambleOptimizer.injectRotation(clone, index, newOrientation, rotKey) });
+    }
+
+    static Z_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("z");
+    static Z_PRIME_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("z'");
+    static Z2_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("z2");
+
+    static X_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("x");
+    static X_PRIME_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("x'");
+    static X2_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("x2");
+
+    /**
      * Computes a unique signature string for deduplicating scramble candidates.
      * @param {ScrambleCandidate} candidate 
      * @returns {string}
@@ -132,6 +148,13 @@ export class ScrambleOptimizer {
                 if (nextGrip) cacheRow[key] = { next: nextGrip, type: "" };
             }
 
+            // Injected Z rotations when in F F grip (preserve F F grip with 0 fingertrick penalty)
+            if (grip === "F F") {
+                cacheRow["z"] = { next: "F F", type: "" };
+                cacheRow["z'"] = { next: "F F", type: "" };
+                cacheRow["z2"] = { next: "F F", type: "" };
+            }
+
             cache[grip] = cacheRow;
         }
         this.transitionCache = cache;
@@ -150,6 +173,20 @@ export class ScrambleOptimizer {
         for (let i = index + 1; i < moves.length; i++) {
             moves[i].transpose(rotKey);
         }
+    }
+
+    /**
+     * Inserts a rotation move at a given index and transposes subsequent moves + orientation
+     * @param {Move[]} moves 
+     * @param {number} index 
+     * @param {Orientation} orientation 
+     * @param {RotationStr} rotKey 
+     */
+    static injectRotation(moves, index, orientation, rotKey) {
+        if (!rotKey) return;
+        const rotMove = Move.fromString(rotKey);
+        moves.splice(index, 0, rotMove);
+        ScrambleOptimizer.applyRotation(moves, index, orientation, rotKey);
     }
 
     /**
@@ -230,7 +267,7 @@ export class ScrambleOptimizer {
 
     /**
      * @param {GripState} grip 
-     * @param {MoveKey} moveKey 
+     * @param {MoveKey | RotationStr} moveKey 
      * @returns {Transition | null}
      */
     getTransitionFor(grip, moveKey) {
@@ -349,6 +386,20 @@ export class ScrambleOptimizer {
 
         // Normal branch
         branchWith(ScrambleOptimizer.IDENTITY_DESCRIPTOR);
+
+        // Injected Z rotations (when in F F grip and injectZRotations or injectRotations option is enabled)
+        if (this.options.injectZRotations && currentGrip === "F F") {
+            branchWith(ScrambleOptimizer.Z_INJECT_DESCRIPTOR);
+            branchWith(ScrambleOptimizer.Z_PRIME_INJECT_DESCRIPTOR);
+            branchWith(ScrambleOptimizer.Z2_INJECT_DESCRIPTOR);
+        }
+
+        // Injected X rotations (when injectXRotations option is enabled)
+        if (this.options.injectXRotations) {
+            if (this.getTransitionFor(currentGrip, "x")) branchWith(ScrambleOptimizer.X_INJECT_DESCRIPTOR);
+            if (this.getTransitionFor(currentGrip, "x'")) branchWith(ScrambleOptimizer.X_PRIME_INJECT_DESCRIPTOR);
+            if (this.getTransitionFor(currentGrip, "x2")) branchWith(ScrambleOptimizer.X2_INJECT_DESCRIPTOR);
+        }
 
         const canWideReplace = this.canWideReplace(move);
 

@@ -32,7 +32,8 @@ export const defaultRunOptions = Object.freeze({
     memoize: true,
     wideReplace: true,
     //wideReplaceDouble: false,
-    //allowMidScrambleRotations: false,
+    injectXRotations: false,
+    injectZRotations: false,
     searchRegrips: false,
     partitionLength: 20,
     maxCapacity: 50,
@@ -51,7 +52,7 @@ export const defaultCostConfiguration = Object.freeze({
     "alpha": { 
         "F": 0, "B": 1, "R": 0, "L": 1, "U": 0, "D": 1,
         "f": 3, "b": 3, "r": 1, "l": 2, "u": 3, "d": 3,
-        //"x": 2, "y": 2, "z": 2
+        "x": 2, "y": 2, "z": 2
     },
     "grip": {
         "F F": 0, "F U": 0, "F D": 0, "F Bd": 2, "F Bu": 2, 

@@ -131,8 +131,9 @@
  * @property {boolean} memoize If search shouldn't continue if same index, orientation and grip is reached
  * @property {boolean} [wideReplace] If search should try replacing single moves with wide moves
  * @property {boolean} [searchRegrips] If regrip candidates should always be explored, even when a direct transition exists
+ * @property {boolean} [injectXRotations] If search should try injecting X rotations mid-scramble
+ * @property {boolean} [injectZRotations] If search should try injecting Z rotations mid-scramble when in F F grip
  * //@property {boolean} wideReplaceDouble If search should try replacing double moves with 1 wide and 1 normal move
- * //@property {boolean} allowMidScrambleRotations
  * @property {number} [partitionLength] Maximum length of scramble partitions (0 or undefined to disable)
  * @property {number} [maxCapacity] Maximum number of candidate scrambles to retain (default 50)
  */

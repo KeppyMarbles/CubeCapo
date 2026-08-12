@@ -32,7 +32,7 @@ const options = {
     maxRegripBranches: 1, //speedup
     partitionLength: 10, //speedup
     depth: 0, //speedup
-    searchRegrips: false,
+    searchRegrips: false, //speedup
 };
 console.log(options);
 
