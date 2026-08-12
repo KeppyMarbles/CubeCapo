@@ -157,6 +157,13 @@
  */
 
 /**
+ * @typedef {Object} TransformDescriptor
+ * @property {number} logicalSkip Number of original (logical) moves this transform consumes
+ * @property {number} physicalCount Number of physical moves this transform produces in the clone
+ * @property {(moves: Move[], index: number, orientation: Orientation) => void} apply Function to apply the transformation in-place
+ */
+
+/**
  * @typedef {Object} ScrambleCandidate
  * @property {Move[]} scramble Transposed candidate scramble moves
  * @property {number} cost Total cost of candidate
@@ -165,6 +172,8 @@
  * @property {GripState} startingGrip Starting thumb placement grip
  * @property {number[]} partitionBoundaries Indices where partition boundaries occur
  * @property {GripState} finalGrip Final thumb placement grip after candidate execution
+ * @property {number} [physicalOffset] Cumulative physical index offset due to length-changing transforms
+ * @property {number} [logicalIndex] Current logical progress index in the original scramble
  */
 
 /**
