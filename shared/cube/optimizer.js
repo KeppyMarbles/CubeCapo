@@ -15,9 +15,6 @@ import { getOrientationColors, getRestoringRotation, detectCubeSize } from "./ut
  */
 
 export class ScrambleOptimizer {
-    /** @type {readonly number[]} */
-    static supportedSizes = Object.freeze([2, 3, 4, 5, 6, 7]);
-
     /** @type {TransformDescriptor} */
     static IDENTITY_DESCRIPTOR = Object.freeze({ logicalSkip: 1, physicalCount: 1, apply: () => {} });
 
@@ -622,9 +619,6 @@ export class ScrambleOptimizer {
         }
 
         const cubeSize = options?.cubeSize || detectCubeSize(preprocessedScramble);
-        if(!ScrambleOptimizer.supportedSizes.includes(cubeSize)) {
-            throw new Error(`Unsupported cube size: ${cubeSize}x${cubeSize}`);
-        }
 
         this.options = { ...defaultRunOptions, ...options, cubeSize };
         this.candidates = [];
