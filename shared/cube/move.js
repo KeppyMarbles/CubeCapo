@@ -1,15 +1,16 @@
 import { ScrambleParser } from "./parser.js";
-/** @import { FaceStr, RotationStr, AxisStr, MoveStr, MiddleStr, MoveKey, ThumbPosition, GripState, Transition, Orientation, ModifierStr, TranspositionMap, ThumbTransitions, RegripDistanceCache, RegripDistanceCacheRow, NextGripCache, NextGripCacheRow } from "../types.js" */
-
-/**
- * Splits a GripState string into its two ThumbPosition components
- * (For type checks)
- * @param {GripState} grip
- * @returns {[ThumbPosition, ThumbPosition]}
- */
-function splitGrip(grip) { return /** @type {[ThumbPosition, ThumbPosition]} */ (grip.split(" ")); }
+/** @import { FaceStr, RotationStr, AxisStr, MoveStr, MiddleStr, MoveKey, ThumbPosition, GripState, Transition, Orientation, ModifierStr, TranspositionMap, ThumbTransitions, RegripDistanceCache, RegripDistanceCacheRow, NextGripCache, NextGripCacheRow, Fingertrick } from "../types.js" */
 
 export class Move {
+    /**
+     * Splits a GripState string into its two ThumbPosition components
+     * @param {GripState} grip
+     * @returns {[ThumbPosition, ThumbPosition]}
+     */
+    static splitGrip(grip) {
+        return /** @type {[ThumbPosition, ThumbPosition]} */ (grip.split(" "));
+    }
+
     /** @type {readonly FaceStr[]} */
     static MOVE_LIST = Object.freeze(["R", "L", "U", "D", "F", "B"]);
 
@@ -24,6 +25,70 @@ export class Move {
 
     /** @type {readonly (RotationStr | null)[]} */
     static FRONT_ROTATIONS = Object.freeze([null, "y", "y'", "y2"]);
+
+    /** @type {Record<MoveKey, MoveKey>} */
+    static MIRROR_MOVE_MAP = Object.freeze({
+        "R": "L'", "R'": "L", "R2": "L2'", "R2'": "L2",
+        "L": "R'", "L'": "R", "L2": "R2'", "L2'": "R2",
+        "U": "U'", "U'": "U", "U2": "U2'", "U2'": "U2",
+        "D": "D'", "D'": "D", "D2": "D2'", "D2'": "D2",
+        "F": "F'", "F'": "F", "F2": "F2'", "F2'": "F2",
+        "B": "B'", "B'": "B", "B2": "B2'", "B2'": "B2",
+        "M": "M",  "M'": "M'", "M2": "M2",  "M2'": "M2'",
+        "E": "E'", "E'": "E", "E2": "E2'", "E2'": "E2",
+        "S": "S'", "S'": "S", "S2": "S2'", "S2'": "S2",
+    });
+
+    /** @type {Record<Fingertrick, Fingertrick>} */
+    static MIRROR_FINGERTRICK_MAP = Object.freeze({
+        "right_index":        "left_index",
+        "right_index_push":   "left_index_push",
+        "right_index_front":  "left_index_front",
+        "right_index_middle": "left_index_middle",
+        "right_ring":         "left_ring",
+        "right_ring_middle":  "left_ring_middle",
+        "right_ring_push":    "left_ring_push",
+        "right_middle":       "left_middle",
+        "right_middle_push":  "left_middle_push",
+        "right_thumb":        "left_thumb",
+        "right_up":           "left_up",
+        "right_up_double":    "left_up_double",
+        "right_down":         "left_down",
+        "right_down_double":  "left_down_double",
+
+        "left_index":         "right_index",
+        "left_index_push":    "right_index_push",
+        "left_index_front":   "right_index_front",
+        "left_index_middle":  "right_index_middle",
+        "left_ring":          "right_ring",
+        "left_ring_middle":   "right_ring_middle",
+        "left_ring_push":     "right_ring_push",
+        "left_middle":        "right_middle",
+        "left_middle_push":   "right_middle_push",
+        "left_thumb":         "right_thumb",
+        "left_up":            "right_up",
+        "left_up_double":     "right_up_double",
+        "left_down":          "right_down",
+        "left_down_double":   "right_down_double",
+    });
+
+    /**
+     * Mirrors a move across the M-slice
+     * @param {MoveKey} moveKey
+     * @returns {MoveKey}
+     */
+    static mirrorMove(moveKey) {
+        return Move.MIRROR_MOVE_MAP[moveKey] ?? moveKey;
+    }
+
+    /**
+     * Mirrors a fingertrick across the M-slice
+     * @param {Fingertrick} ft
+     * @returns {Fingertrick}
+     */
+    static mirrorFingertrick(ft) {
+        return Move.MIRROR_FINGERTRICK_MAP[ft] ?? ft;
+    }
 
     /** @type {TranspositionMap} */
     static TRANSPOSITIONS = Object.freeze(/** @type {TranspositionMap} */ ({
@@ -141,11 +206,11 @@ export class Move {
         const cache = /** @type {RegripDistanceCache} */ ({});
         for (const g1 of Move.ALL_GRIPS) {
             cache[g1] = /** @type {RegripDistanceCacheRow} */ ({});
-            const [l1, r1] = splitGrip(g1);
+            const [l1, r1] = Move.splitGrip(g1);
             const pL1 = Move.THUMB_POSITIONS[l1] ?? 0;
             const pR1 = Move.THUMB_POSITIONS[r1] ?? 0;
             for (const g2 of Move.ALL_GRIPS) {
-                const [l2, r2] = splitGrip(g2);
+                const [l2, r2] = Move.splitGrip(g2);
                 const lDist = Math.abs(pL1 - (Move.THUMB_POSITIONS[l2] ?? 0));
                 const rDist = Math.abs(pR1 - (Move.THUMB_POSITIONS[r2] ?? 0));
                 cache[g1][g2] = lDist + rDist;
@@ -158,7 +223,7 @@ export class Move {
     static NEXT_GRIP_CACHE = Object.freeze((() => {
         const cache = /** @type {NextGripCache} */ ({});
         for (const grip of Move.ALL_GRIPS) {
-            const [l, r] = splitGrip(grip);
+            const [l, r] = Move.splitGrip(grip);
             /** @type {NextGripCacheRow} */
             const row = /** @type {NextGripCacheRow} */ ({});
 

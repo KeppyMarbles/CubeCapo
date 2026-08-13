@@ -1,8 +1,8 @@
-import { defaultFormatOptions, defaultRunOptions } from "./defaults.js";
+import { defaultFormatOptions, defaultRunOptions, defaultFingertricks } from "./defaults.js";
 import { Move } from "./move.js";
 import { ScrambleParser } from "./parser.js";
 import { getOrientationColors, getRestoringRotation, detectCubeSize } from "./util.js";
-/** @import { CostConfig, TransitionConfig, Orientation, GripState, MoveKey, Transition, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, CostDetails, RotationStr, ScrambleCandidate, Fingertrick, FaceStr, MoveStr, TransitionCache, TransitionCacheRow, TransitionCandidate, TransformDescriptor, ParseOptions, ParseResult, AxisStr } from "../types.js" */
+/** @import { CostConfig, TransitionConfig, Orientation, GripState, MoveKey, Transition, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, CostDetails, RotationStr, ScrambleCandidate, Fingertrick, FaceStr, MoveStr, TransitionCache, TransitionCacheRow, TransitionCandidate, TransformDescriptor, ParseOptions, ParseResult, AxisStr, ThumbPosition, SingleHandFingertricks } from "../types.js" */
 
 /**
  * @typedef {Object} SearchContext
@@ -122,21 +122,62 @@ export class ScrambleOptimizer {
         if (!this.transitions) return;
         /** @type {TransitionCache} */
         const cache = /** @type {TransitionCache} */ ({});
+        const handedness = this.config.general.handedness;
+        const ftCosts = this.config.fingertrick;
 
         for (const grip of this.allGripKeys) {
             /** @type {TransitionCacheRow} */
             const cacheRow = {};
-            const gripTrans = this.transitions[grip];
+            const [l, r] = Move.splitGrip(grip);
 
-            // Standard face transitions
-            if (gripTrans) {
-                for (const moveKey in gripTrans) {
+            const lMovesRaw = this.transitions[l];
+            const rMoves = this.transitions[r];
+
+            // Mirrored left-hand moves
+            /** @type {Partial<Record<MoveKey, Fingertrick | null>>} */
+            const lMoves = {};
+            if (lMovesRaw) {
+                for (const moveKey in lMovesRaw) {
                     const key = /** @type {MoveKey} */ (moveKey);
-                    const ftType = gripTrans[key];
-                    if (ftType === undefined || ftType === null) continue;
-                    const nextGrip = Move.computeNextGrip(grip, key);
-                    if (nextGrip) cacheRow[key] = { next: nextGrip, type: ftType };
+                    const ft = lMovesRaw[key];
+                    if (ft) {
+                        const mirroredMove = Move.mirrorMove(key);
+                        const mirroredFt = Move.mirrorFingertrick(ft);
+                        lMoves[mirroredMove] = mirroredFt;
+                    }
                 }
+            }
+
+            // Union of move keys from both hands
+            /** @type {Set<MoveKey>} */
+            const allMoveKeys = new Set(/** @type {MoveKey[]} */ ([
+                ...Object.keys(lMoves),
+                ...(rMoves ? Object.keys(rMoves) : [])
+            ]));
+
+            for (const key of allMoveKeys) {
+                const lFt = lMoves[key];
+                const rFt = rMoves ? rMoves[key] : null;
+
+                /** @type {Fingertrick | null | undefined} */
+                let selectedFt = null;
+                if (lFt && rFt) {
+                    const lCost = ftCosts[lFt] ?? 0;
+                    const rCost = ftCosts[rFt] ?? 0;
+                    if (lCost < rCost) {
+                        selectedFt = lFt;
+                    } else if (rCost < lCost) {
+                        selectedFt = rFt;
+                    } else {
+                        selectedFt = handedness === "left" ? lFt : rFt;
+                    }
+                } else {
+                    selectedFt = rFt || lFt;
+                }
+
+                if (!selectedFt) continue;
+                const nextGrip = Move.computeNextGrip(grip, key);
+                if (nextGrip) cacheRow[key] = { next: nextGrip, type: selectedFt };
             }
 
             // Full-cube X rotations (0 fingertrick penalty)

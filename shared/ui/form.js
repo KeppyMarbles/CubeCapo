@@ -1,10 +1,8 @@
-import { ScrambleOptimizer } from "../cube/optimizer.js";
 import { ScrambleParser } from "../cube/parser.js";
 import { costToColor } from "./stats.js";
 import { defaultCostConfiguration, defaultFormatOptions, defaultRunOptions } from "../cube/defaults.js";
 import { getElement, getOptionalElement, queryElementOptional, queryElements } from "./dom.js";
 /** @import { CostConfig, RunOptions, FormatOptions, ParseResult, NotationMode } from "../types.js" */
-/** @import { Move } from "../cube/move.js" */
 
 /**
  * @typedef {Object} GroupControl
@@ -83,7 +81,8 @@ export async function setupForm(onSubmit, onFormatChange) {
             "regripPerStep": "Regrip Per Step",
             //"double": "Double Move",
             "repeatPenalty": "Repeat Fingertrick",
-            "perSliceFingertrick": "Per-Slice Fingertrick Cost"
+            "perSliceFingertrick": "Per-Slice Fingertrick Cost",
+            "handedness": "Dominant Hand"
         };
 
         /** @type {Record<string, string>} */
@@ -91,12 +90,14 @@ export async function setupForm(onSubmit, onFormatChange) {
             "regripPerStep": "Cost added for each step moved along the thumb chain (Bd <-> D <-> F <-> U <-> Bu)",
             "double": "Only effective if Wide Replace Double is active",
             "repeatPenalty": "The cost of doing the same fingertrick twice in a row",
-            "perSliceFingertrick": "If the fingertrick cost should be applied per effective slice"
+            "perSliceFingertrick": "If the fingertrick cost should be applied per effective slice",
+            "handedness": "Hand preference used to tiebreak equal-cost fingertricks"
         };
 
         /** @type {Record<string, string>} */
         const formTypes = {
-            "perSliceFingertrick": "checkbox"
+            "perSliceFingertrick": "checkbox",
+            "handedness": "select"
         };
       
         /** @type {Record<string, (key: string) => number>} */
@@ -139,17 +140,33 @@ export async function setupForm(onSubmit, onFormatChange) {
                 const label = document.createElement("label");
                 label.textContent = formAlias[key] || key;
                 label.title = formTitles[key] || "";
-                const input = document.createElement("input");
-                input.type = formTypes[key] || "number";
-                input.name = `${groupName}.${key}`;
-                if (input.type === "checkbox") {
-                    input.checked = Boolean(val);
+
+                if (formTypes[key] === "select") {
+                    const select = document.createElement("select");
+                    select.name = `${groupName}.${key}`;
+                    const optRight = document.createElement("option");
+                    optRight.value = "right";
+                    optRight.textContent = "Right";
+                    const optLeft = document.createElement("option");
+                    optLeft.value = "left";
+                    optLeft.textContent = "Left";
+                    select.appendChild(optRight);
+                    select.appendChild(optLeft);
+                    select.value = String(val || "right");
+                    label.appendChild(select);
                 } else {
-                    input.step = "0.5";
-                    input.value = String(val);
-                    input.dataset.valueType = "additive";
+                    const input = document.createElement("input");
+                    input.type = formTypes[key] || "number";
+                    input.name = `${groupName}.${key}`;
+                    if (input.type === "checkbox") {
+                        input.checked = Boolean(val);
+                    } else {
+                        input.step = "0.5";
+                        input.value = String(val);
+                        input.dataset.valueType = "additive";
+                    }
+                    label.appendChild(input);
                 }
-                label.appendChild(input);
                 colDiv.appendChild(label);
             }
 
@@ -613,9 +630,16 @@ async function loadOptions(key, defaults) {
 function collectCostConfig(form, initialConfig) {
     const newConfig = /** @type {any} */ (structuredClone(initialConfig));
 
-    for (const input of queryElements(form, "input[name]", HTMLInputElement)) {
-        const fullKey = input.name;
-        const val = input.type === "checkbox" ? input.checked : parseFloat(input.value);
+    for (const el of queryElements(form, "input[name], select[name]", HTMLElement)) {
+        const fullKey = /** @type {HTMLInputElement | HTMLSelectElement} */ (el).name;
+        let val;
+        if (el instanceof HTMLInputElement && el.type === "checkbox") {
+            val = el.checked;
+        } else if (el instanceof HTMLSelectElement) {
+            val = el.value;
+        } else if (el instanceof HTMLInputElement) {
+            val = parseFloat(el.value);
+        }
         if (fullKey.includes(".")) {
             const [group, subkey] = fullKey.split(".");
             if (newConfig[group]) newConfig[group][subkey] = val;
@@ -707,17 +731,17 @@ function applyConfig(form, config) {
     for (const [groupName, groupValue] of Object.entries(config)) {
         if (typeof groupValue === "object" && groupValue !== null) {
             for (const [key, val] of Object.entries(groupValue)) {
-                const input = queryElementOptional(form, `[name="${groupName}.${key}"]`, HTMLInputElement);
-                if (!input) continue;
-                if (input.type === "checkbox") input.checked = Boolean(val);
-                else input.value = String(val);
+                const el = queryElementOptional(form, `[name="${groupName}.${key}"]`, HTMLElement);
+                if (!el) continue;
+                if (el instanceof HTMLInputElement && el.type === "checkbox") el.checked = Boolean(val);
+                else if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) el.value = String(val);
             }
         } 
         else {
-            const input = queryElementOptional(form, `[name="${groupName}"]`, HTMLInputElement);
-            if (!input) continue;
-            if (input.type === "checkbox") input.checked = Boolean(groupValue);
-            else input.value = String(groupValue);
+            const el = queryElementOptional(form, `[name="${groupName}"]`, HTMLElement);
+            if (!el) continue;
+            if (el instanceof HTMLInputElement && el.type === "checkbox") el.checked = Boolean(groupValue);
+            else if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) el.value = String(groupValue);
         }
     }
     updateCostInputColors(form);

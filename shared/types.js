@@ -70,6 +70,7 @@
  * //@property {number} double Cost of a double move
  * @property {number} repeatPenalty Cost of the same fingertrick occuring twice in a row
  * @property {boolean} perSliceFingertrick If fingertrick cost should be applied for each effective slice
+ * @property {'right' | 'left'} handedness Dominant hand preference for tiebreaking move fingertricks
  */
 
 /**
@@ -98,8 +99,8 @@
  * @property {number} [addedCost] Marginal cost contributed by this move alone
  */
 
-/** @typedef {Record<MoveKey, Fingertrick | null>} GripTransitions */
-/** @typedef {Record<GripState, GripTransitions>} TransitionConfig */
+/** @typedef {Record<MoveKey, Fingertrick | null>} SingleHandFingertricks */
+/** @typedef {Record<ThumbPosition, SingleHandFingertricks>} TransitionConfig */
 /** @typedef {Record<RotationStr, Record<FaceStr | AxisStr, FaceStr | AxisStr>>} TranspositionMap */
 /** @typedef {Partial<Record<MoveKey, Record<ThumbPosition, ThumbPosition | null>>>} ThumbTransitions */
 /** @typedef {Record<GripState, number>} RegripDistanceCacheRow */

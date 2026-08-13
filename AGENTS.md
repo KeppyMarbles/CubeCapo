@@ -24,7 +24,7 @@ scramblemanip-js/
 ├── shared/
 │   ├── types.js             # JSDoc type definitions (@typedef for Move, CostConfig, Transition, Options, etc.)
 │   ├── cube/
-│   │   ├── defaults.js      # `defaultColorScheme`, `defaultFormatOptions`, `defaultRunOptions`, `defaultCostConfiguration`, `defaultFingertricks`. Mostly `defaultFingertricks`; only inspect the first 100 lines to start with.
+│   │   ├── defaults.js      # `defaultColorScheme`, `defaultFormatOptions`, `defaultRunOptions`, `defaultCostConfiguration`, `defaultFingertricks` (5 single-thumb states).
 │   │   ├── move.js          # Move class: copy/clone/invert methods, transposition matrix, linear chain state transitions, rotation helpers
 │   │   ├── optimizer.js     # ScrambleOptimizer class: branch-and-bound optimization, pre-computed transitionCache, fast top-K regrip candidate search (findCandidateRegrips), static addCandidate and getCandidateSignature helpers
 │   │   ├── parser.js        # ScrambleParser class: tokenization, recursive descent parsing for commutators/conjugates/groups, notation detection & normalization
