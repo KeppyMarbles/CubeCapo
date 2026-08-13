@@ -367,6 +367,15 @@ summary {
   gap: 10px;
 }
 
+.scramble-meta {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-top: 0px;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
 .scramble-pagination {
   display: flex;
   align-items: center;

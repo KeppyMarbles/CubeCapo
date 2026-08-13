@@ -91,6 +91,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     await setupOptionsBinding("runOptions", {
         cubeSize: { id: "cubeSizeSelect", type: "number" }
     }, tab);
+
+    await setupOptionsBinding("parseOptions", {
+        notation: { id: "notationModeSelect", type: "string" }
+    }, tab);
 });
 
 /**
@@ -120,10 +124,10 @@ async function setupOptionsBinding(storageKey, bindings, activeTab) {
 
             if (el instanceof HTMLInputElement && el.type === "checkbox") {
                 updatedOpts[optKey] = el.checked;
-            } else if ((el instanceof HTMLInputElement || el instanceof HTMLSelectElement) && (config.type === "number" || el.tagName === "SELECT")) {
-                updatedOpts[optKey] = Number(el.value);
+            } else if ((el instanceof HTMLInputElement || el instanceof HTMLSelectElement) && config.type === "number") {
+                updatedOpts[optKey] = el.value ? Number(el.value) : null;
             } else if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {
-                updatedOpts[optKey] = el.value;
+                updatedOpts[optKey] = el.value ? el.value : null;
             }
 
             await extAPI.storage.local.set({ [storageKey]: updatedOpts });

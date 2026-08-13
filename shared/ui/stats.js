@@ -1,14 +1,17 @@
 import { getOptionalElement, queryElementOptional } from "./dom.js";
-/** @import { ScrambleBreakdownEntry, OrientationResultInfo, FormatOptions } from "../types.js" */
-/** @import { ScrambleOptimizer } from "../cube/scramble.js" */
+/** @import { ScrambleBreakdownEntry, OrientationResultInfo, FormatOptions, ParseResult } from "../types.js" */
+/** @import { ScrambleOptimizer } from "../cube/optimizer.js" */
 
 /**
  * Show all the results of the scramble optimizer
  * @param {ScrambleOptimizer | null} optimizer 
  * @param {FormatOptions} [formatOptions]
  * @param {number} [candidateIndex]
+ * @param {ParseResult | null} [parseResult]
  */
-export async function drawOptimizerStats(optimizer, formatOptions, candidateIndex = 0) {
+export async function drawOptimizerStats(optimizer, formatOptions, candidateIndex = 0, parseResult = null) {
+    const metaContainer = getOptionalElement("scrambleMeta", HTMLDivElement);
+    const metaText = getOptionalElement("scrambleMetaText", HTMLElement);
     const paginationContainer = getOptionalElement("scramblePagination", HTMLDivElement);
     const indicator = getOptionalElement("scramblePageIndicator", HTMLElement);
     const prevBtn = getOptionalElement("prevScrambleBtn", HTMLButtonElement);
@@ -27,12 +30,22 @@ export async function drawOptimizerStats(optimizer, formatOptions, candidateInde
         }
         drawCostTable(optimizer.analyzeCandidate(candidate, formatOptions));
 
+        const size = optimizer.options?.cubeSize;
+        const sizeStr = `${size}x${size}`;
+        const inputNot = !parseResult?.resolvedNotation ? "Unknown" : (parseResult.resolvedNotation === "sign" ? "SiGN" : "WCA");
+        const notStr = `${inputNot}→WCA`;
+
+        if (metaContainer) {
+            metaContainer.style.display = "block";
+            if (metaText) {
+                metaText.textContent = `Size: ${sizeStr}  •  Notation: ${notStr}`;
+            }
+        }
+
         if (paginationContainer) {
             paginationContainer.style.display = "flex";
             if (indicator) {
-                const size = optimizer.options?.cubeSize || 0;
-                const sizeStr = `${size}x${size}`;
-                indicator.textContent = `Scramble ${validIndex + 1} of ${total} (Size: ${sizeStr})`;
+                indicator.textContent = `Scramble ${validIndex + 1} of ${total}`;
             }
             if (prevBtn) {
                 prevBtn.disabled = validIndex <= 0;
@@ -52,6 +65,9 @@ export async function drawOptimizerStats(optimizer, formatOptions, candidateInde
         const searchTimeEl = getOptionalElement("searchTime", HTMLElement);
         if (searchTimeEl) searchTimeEl.textContent = "";
 
+        if (metaContainer) {
+            metaContainer.style.display = "none";
+        }
         if (paginationContainer) {
             paginationContainer.style.display = "none";
         }

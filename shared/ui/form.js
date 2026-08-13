@@ -1,8 +1,9 @@
-import { ScrambleOptimizer } from "../cube/scramble.js";
+import { ScrambleOptimizer } from "../cube/optimizer.js";
+import { ScrambleParser } from "../cube/parser.js";
 import { costToColor } from "./stats.js";
 import { defaultCostConfiguration, defaultFormatOptions, defaultRunOptions } from "../cube/defaults.js";
 import { getElement, getOptionalElement, queryElementOptional, queryElements } from "./dom.js";
-/** @import { CostConfig, RunOptions, FormatOptions } from "../types.js" */
+/** @import { CostConfig, RunOptions, FormatOptions, ParseResult, NotationMode } from "../types.js" */
 /** @import { Move } from "../cube/move.js" */
 
 /**
@@ -13,7 +14,7 @@ import { getElement, getOptionalElement, queryElementOptional, queryElements } f
 
 /**
  * Set up everything needed for the user to configure the optimizer
- * @param {(config: CostConfig, scramble: Move[], options: RunOptions) => Promise<void> | void} onSubmit
+ * @param {(config: CostConfig, scramble: ParseResult, options: RunOptions) => Promise<void> | void} onSubmit
  * @param {() => void} [onFormatChange] Called whenever a format option changes
  */
 export async function setupForm(onSubmit, onFormatChange) {
@@ -270,9 +271,12 @@ export async function setupForm(onSubmit, onFormatChange) {
             if (!rawText) {
                 throw new Error("Please enter a scramble to analyze.");
             }
-            const scramble = ScrambleOptimizer.parseScramble(rawText);
+            const notationSelect = getOptionalElement("notationMode", HTMLSelectElement);
+            const notationVal = notationSelect?.value;
+            const notation = /** @type {NotationMode} */ (notationVal ? notationVal : null);
+            const parseResult = ScrambleParser.parse(rawText, { notation });
             const options = collectRunOptionsValues();
-            await onSubmit(config, scramble, options);
+            await onSubmit(config, parseResult, options);
         } 
         catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -641,7 +645,7 @@ function collectRunOptionsValues() {
         injectZRotations: getElement("injectZRotations", HTMLInputElement).checked,
         searchRegrips: getElement("searchRegrips", HTMLInputElement).checked,
         partitionLength: parseFloat(getElement("partitionLength", HTMLInputElement).value),
-        cubeSize: Number(getElement("cubeSize", HTMLSelectElement).value),
+        cubeSize: getElement("cubeSize", HTMLSelectElement).value ? Number(getElement("cubeSize", HTMLSelectElement).value) : null,
     };
 }
 

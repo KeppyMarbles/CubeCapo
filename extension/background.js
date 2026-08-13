@@ -1,5 +1,5 @@
-import { ScrambleOptimizer } from "../shared/cube/scramble.js";
-import { defaultCostConfiguration, defaultFormatOptions, defaultFingertricks, defaultRunOptions } from "../shared/cube/defaults.js";
+import { ScrambleOptimizer } from "../shared/cube/optimizer.js";
+import { defaultCostConfiguration, defaultFormatOptions, defaultFingertricks, defaultRunOptions, defaultParseOptions } from "../shared/cube/defaults.js";
 /** @import { SendOptimizationResponse } from "../shared/types.js" */
 
 const extAPI = /** @type {any} */ (globalThis).browser || chrome;
@@ -48,11 +48,14 @@ extAPI.runtime.onMessage.addListener(
                     return;
                 }
 
+                const store = await extAPI.storage.local.get(["costConfig", "runOptions", "formatOptions", "parseOptions"]);
+                const parseOptions = { ...defaultParseOptions, ...store.parseOptions };
+
                 // Validate scramble move syntax
-                let scramble;
+                let parseResult;
                 try {
-                    scramble = ScrambleOptimizer.parseScramble(rawText);
-                    if (!scramble || scramble.length === 0) {
+                    parseResult = ScrambleOptimizer.parseScramble(rawText, parseOptions);
+                    if (!parseResult || !parseResult.moves || parseResult.moves.length === 0) {
                         sendResponse({ success: false, error: "Invalid scramble text" });
                         return;
                     }
@@ -62,10 +65,9 @@ extAPI.runtime.onMessage.addListener(
                     return;
                 }
 
-                const store = await extAPI.storage.local.get(["costConfig", "runOptions", "formatOptions"]);
                 const config = store.costConfig || defaultCostConfiguration;
 
-                const cubeSize = Number(store.runOptions?.cubeSize ?? 0);
+                const cubeSize = store.runOptions?.cubeSize ? Number(store.runOptions.cubeSize) : null;
 
                 const runOptions = { ...defaultRunOptions, ...store.runOptions, cubeSize };
                 const formatOptions = { ...defaultFormatOptions, ...store.formatOptions };
@@ -73,7 +75,7 @@ extAPI.runtime.onMessage.addListener(
                 const optimizer = new ScrambleOptimizer(config, defaultFingertricks, null);
 
                 const start = performance.now();
-                await optimizer.optimize(scramble, runOptions);
+                await optimizer.optimize(parseResult, runOptions);
                 const end = performance.now();
 
                 const topCandidate = optimizer.candidates[0];
@@ -87,7 +89,8 @@ extAPI.runtime.onMessage.addListener(
                     breakdown,
                     bestCost,
                     searchTime: end - start,
-                    cubeSize: optimizer.options.cubeSize // TODO?
+                    cubeSize: optimizer.options.cubeSize,
+                    resolvedNotation: parseResult.resolvedNotation
                 });
             } catch (error) {
                 console.error("Optimization background task error:", error);

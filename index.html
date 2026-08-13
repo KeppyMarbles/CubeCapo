@@ -20,13 +20,21 @@
 
             <label title="Target cube size (2x2 to 7x7). Set to Detect to automatically detect size from scramble moves.">Cube Size
               <select id="cubeSize">
-                <option value="0">Detect</option>
+                <option value="">Detect</option>
                 <option value="2">2x2</option>
                 <option value="3">3x3</option>
                 <option value="4">4x4</option>
                 <option value="5">5x5</option>
                 <option value="6">6x6</option>
                 <option value="7">7x7</option>
+              </select>
+            </label>
+
+            <label title="Scramble notation format (Detect, WCA, or SiGN).">Notation
+              <select id="notationMode">
+                <option value="" selected>Detect</option>
+                <option value="wca">WCA</option>
+                <option value="sign">SiGN</option>
               </select>
             </label>
 
@@ -57,6 +65,9 @@
 
           <button id="submitButton">Submit</button>
           <p id="errorMessage"></p>
+          <div id="scrambleMeta" class="scramble-meta" style="display: none;">
+            <span id="scrambleMetaText"></span>
+          </div>
           <div class="scramble-container">
             <div id="scramblePagination" class="scramble-pagination" style="display: none;">
               <button type="button" id="prevScrambleBtn" class="pagination-btn" aria-label="Previous scramble" title="Previous scramble">◀</button>

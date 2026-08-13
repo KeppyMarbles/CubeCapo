@@ -1,5 +1,19 @@
 /** @import { Move } from "./cube/move.js" */
 
+/** @typedef {'wca' | 'sign' | null} NotationMode */
+
+/**
+ * @typedef {Object} ParseOptions
+ * @property {NotationMode} notation Notation mode convention to use (null for auto-detect)
+ * @property {number} maxNestingDepth Maximum allowed nesting depth for commutators/conjugates/groups
+ */
+
+/**
+ * @typedef {Object} ParseResult
+ * @property {Move[]} moves Fully expanded, flat Move array
+ * @property {NotationMode} resolvedNotation The resolved notation mode that was used ('wca' | 'sign')
+ */
+
 /** @typedef {'F' | 'U' | 'D' | 'Bu' | 'Bd'} ThumbPosition */
 /** @typedef {"" | "'" | "2" | "2'"} ModifierStr */
 /** @typedef {"M" | "E" | "S"} MiddleStr */
@@ -122,7 +136,7 @@
 
 /**
  * @typedef {Object} RunOptions
- * @property {number} cubeSize Size of the cube (e.g. 3 for 3x3, 7 for 7x7), detected automatically if 0
+ * @property {number | null} cubeSize Target cube size (e.g. 3 for 3x3, 7 for 7x7), detected automatically if null
  * @property {number} depth The branch pruning threshold
  * @property {number} maxIterations Number of iterations to try before bailing out
  * @property {number} [maxRegripBranches] Maximum number of candidate regrips to explore when a regrip is required
@@ -133,7 +147,6 @@
  * @property {boolean} [searchRegrips] If regrip candidates should always be explored, even when a direct transition exists
  * @property {boolean} [injectXRotations] If search should try injecting X rotations mid-scramble
  * @property {boolean} [injectZRotations] If search should try injecting Z rotations mid-scramble when in F F grip
- * //@property {boolean} wideReplaceDouble If search should try replacing double moves with 1 wide and 1 normal move
  * @property {number} [partitionLength] Maximum length of scramble partitions (0 or undefined to disable)
  * @property {number} [maxCapacity] Maximum number of candidate scrambles to retain (default 50)
  */
@@ -193,7 +206,8 @@
  * @property {ScrambleBreakdownEntry[]} [breakdown] Move-by-move breakdown entries
  * @property {number} [bestCost] Total cost of the optimized scramble
  * @property {number} [searchTime] Search runtime in milliseconds
- * @property {number} [cubeSize] Detected cube dimension (e.g. 3 for 3x3)
+ * @property {number | null} [cubeSize] Detected cube dimension (e.g. 3 for 3x3)
+ * @property {NotationMode} [resolvedNotation] Resolved notation mode ('wca' | 'sign')
  * @property {string} [error] Error message if optimization failed
  */
 

@@ -244,10 +244,12 @@ function showOptimizedState(scrambleElement, data) {
 
     bar.replaceChildren();
 
-    const cubeSize = data.cubeSize;
+    const cubeSize = data.cubeSize || 3;
     const sizeStr = `${cubeSize}x${cubeSize}`;
+    const inputNot = !data.resolvedNotation ? "Unknown" : (data.resolvedNotation === "sign" ? "SiGN" : "WCA");
+    const notStr = `${inputNot}→WCA`;
     const bestCost = data.bestCost ?? 0;
-    const transposedBadgeText = `(Transposed | Cost: ${bestCost.toFixed(1)} | Size: ${sizeStr})`;
+    const transposedBadgeText = `(Transposed | Cost: ${bestCost.toFixed(1)} | Size: ${sizeStr} | Notation: ${notStr})`;
     const originalBadgeText = "(Original)";
 
     const badge = document.createElement("span");

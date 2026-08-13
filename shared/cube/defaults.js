@@ -1,4 +1,4 @@
-/** @import { FormatOptions, RunOptions, CostConfig, TransitionConfig, ColorSchemeConfig } from "../types.js" */
+/** @import { FormatOptions, RunOptions, CostConfig, TransitionConfig, ColorSchemeConfig, ParseOptions } from "../types.js" */
 
 /**
  * Default Western color scheme (WCA standard)
@@ -22,6 +22,12 @@ export const defaultFormatOptions = Object.freeze({
     reorient: false
 });
 
+/** @type {ParseOptions} */
+export const defaultParseOptions = Object.freeze({
+    notation: null,
+    maxNestingDepth: 3
+});
+
 /** @type {RunOptions} */
 export const defaultRunOptions = Object.freeze({
     depth: 1,
@@ -37,7 +43,7 @@ export const defaultRunOptions = Object.freeze({
     searchRegrips: false,
     partitionLength: 20,
     maxCapacity: 50,
-    cubeSize: 0,
+    cubeSize: null,
 });
 
 /** @type {CostConfig} */

@@ -1,7 +1,8 @@
 import { defaultFormatOptions, defaultRunOptions } from "./defaults.js";
 import { Move } from "./move.js";
+import { ScrambleParser } from "./parser.js";
 import { getOrientationColors, getRestoringRotation, detectCubeSize } from "./util.js";
-/** @import { CostConfig, TransitionConfig, Orientation, GripState, MoveKey, Transition, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, CostDetails, RotationStr, ScrambleCandidate, Fingertrick, FaceStr, MoveStr, TransitionCache, TransitionCacheRow, TransitionCandidate, TransformDescriptor } from "../types.js" */
+/** @import { CostConfig, TransitionConfig, Orientation, GripState, MoveKey, Transition, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, CostDetails, RotationStr, ScrambleCandidate, Fingertrick, FaceStr, MoveStr, TransitionCache, TransitionCacheRow, TransitionCandidate, TransformDescriptor, ParseOptions, ParseResult, AxisStr } from "../types.js" */
 
 /**
  * @typedef {Object} SearchContext
@@ -184,7 +185,7 @@ export class ScrambleOptimizer {
      */
     static injectRotation(moves, index, orientation, rotKey) {
         if (!rotKey) return;
-        const rotMove = Move.fromString(rotKey);
+        const rotMove = new Move(/** @type {AxisStr} */ (rotKey[0]), rotKey.includes("'"), rotKey.includes("2"), true);
         moves.splice(index, 0, rotMove);
         ScrambleOptimizer.applyRotation(moves, index, orientation, rotKey);
     }
@@ -241,10 +242,11 @@ export class ScrambleOptimizer {
 
     /**
      * @param {string} string 
-     * @returns {Move[]}
+     * @param {Partial<ParseOptions>} [options]
+     * @returns {ParseResult}
      */
-    static parseScramble(string) {
-        return string.split(" ").map(str => Move.fromString(/** @type {any} */ (str)));
+    static parseScramble(string, options = {}) {
+        return ScrambleParser.parse(string, options);
     }
 
     /**
@@ -479,7 +481,7 @@ export class ScrambleOptimizer {
      * @returns {boolean}
      */
     canWideReplace(move) {
-        return (this.options.wideReplace !== false) && move && (this.options.cubeSize !== 2 * (move.sliceNum || 1)) && !move.isWide && !move.isMiddle && !move.isRotation;
+        return (this.options.wideReplace !== false) && move && (this.options.cubeSize !== 2 * (move.sliceNum || 1)) && !move.isInvertedSlice && !move.isMiddle && !move.isRotation;
     }
 
     /**
@@ -579,13 +581,17 @@ export class ScrambleOptimizer {
 
     /**
      * Calls bruteforceOptimize for all orientations of the cube to find the best one
-     * @param {Move[]} scramble The input scramble moves
+     * @param {ParseResult} parseResult The input parse result
      * @param {Partial<RunOptions>} [options] Options for execution
      */
-    async optimize(scramble, options = {}) {
+    async optimize(parseResult, options = {}) {
+        if (!parseResult || !Array.isArray(parseResult.moves)) {
+            throw new Error("ScrambleOptimizer.optimize requires a valid ParseResult object");
+        }
+
         /** @type {Orientation} */
         const orientation = {up: "U", front: "F"};
-        const rawScramble = scramble || [];
+        const rawScramble = parseResult.moves;
         const preprocessedScramble = [];
 
         this.originalFinalOrientation = ScrambleOptimizer.getFinalOrientation(rawScramble);
@@ -717,7 +723,7 @@ export class ScrambleOptimizer {
         const totalFtCost = this.config.general.perSliceFingertrick ? move.getPhysicalSlices(this.options.cubeSize) * ftCost : ftCost;
         added += totalFtCost;
 
-        const alphaKey = /** @type {FaceStr} */ (move.isWide ? move.alpha.toLowerCase() : move.alpha);
+        const alphaKey = /** @type {FaceStr} */ (move.isInvertedSlice ? move.alpha.toLowerCase() : move.alpha);
         const alphaCost = this.config.alpha[alphaKey] ?? 0;
         added += alphaCost;
 

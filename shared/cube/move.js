@@ -1,3 +1,4 @@
+import { ScrambleParser } from "./parser.js";
 /** @import { FaceStr, RotationStr, AxisStr, MoveStr, MiddleStr, MoveKey, ThumbPosition, GripState, Transition, Orientation, ModifierStr, TranspositionMap, ThumbTransitions, RegripDistanceCache, RegripDistanceCacheRow, NextGripCache, NextGripCacheRow } from "../types.js" */
 
 /**
@@ -236,11 +237,11 @@ export class Move {
      * @param {boolean} [isPrime=false]
      * @param {boolean} [isDouble=false]
      * @param {boolean} [isRotation=false]
-     * @param {boolean} [isWide=false]
+     * @param {boolean} [isInvertedSlice=false]
      * @param {boolean} [isMiddle=false]
-     * @param {number} [sliceNum=1]
+     * @param {number} [sliceNum=0]
      */
-    constructor(alpha = "R", isPrime = false, isDouble = false, isRotation = false, isWide = false, isMiddle = false, sliceNum = 0) {
+    constructor(alpha = "R", isPrime = false, isDouble = false, isRotation = false, isInvertedSlice = false, isMiddle = false, sliceNum = 0) {
         /** @type {FaceStr | AxisStr | MiddleStr} */
         this.alpha = alpha; 
         /** @type {boolean} */ 
@@ -248,7 +249,7 @@ export class Move {
         /** @type {boolean} */ 
         this.isDouble = isDouble;
         /** @type {boolean} */ 
-        this.isWide = isWide;
+        this.isInvertedSlice = isInvertedSlice;
         /** @type {boolean} */ 
         this.isRotation = isRotation;
         /** @type {boolean} */ 
@@ -260,101 +261,18 @@ export class Move {
     }
 
     /**
-     * @param {MoveStr | RotationStr} moveStr 
-     * @returns {Move}
-     */
-    static fromString(moveStr) {
-        const move = new Move();
-        let index = 0;
-        const length = moveStr.length;
-
-        if (length === 0) 
-            throw new SyntaxError("Empty move string");
-
-        let char = moveStr[index];
-
-        // Optional numeric prefix (e.g. "3Rw")
-        if (/\d/.test(char)) {
-            move.sliceNum = parseInt(char);
-            index++;
-            if (index === length) {
-                throw new SyntaxError(`Char '${char}' at index ${index}: expected a letter`);
-            }
-            char = moveStr[index];
-        }
-
-        // Face or rotation
-        if (Move.MOVE_LIST.includes(/** @type {any} */ (char.toUpperCase()))) {
-            move.alpha = /** @type {FaceStr} */ (char.toUpperCase());
-            move.isWide = char === char.toLowerCase(); // lowercase = wide move
-        } 
-        else if (Move.MIDDLE_MOVE_LIST.includes(/** @type {any} */ (char))) {
-            move.alpha = /** @type {MiddleStr} */ (char);
-            move.isMiddle = true;
-        }
-        else if (Move.ROTATION_LIST.includes(/** @type {any} */ (char))) {
-            move.alpha = /** @type {AxisStr} */ (char);
-            move.isRotation = true;
-        }
-        else {
-            throw new SyntaxError(`Char '${char}' at index ${index}: unknown move type`);
-        }
-
-        index++;
-        if (index === length) 
-            return move;
-
-        char = moveStr[index];
-
-        // Optional 'w' modifier (e.g. "Rw", "3Rw")
-        if (char === "w") {
-            if (!move.sliceNum) 
-                move.sliceNum = 2; // standard wide move means 2 slices
-            index++;
-            if (index === length) 
-                return move;
-            char = moveStr[index];
-        }
-        else {
-            move.sliceNum = 1;
-        }
-
-        // Optional '2' (double turn)
-        if (char === "2") {
-            move.isDouble = true;
-            index++;
-            if (index === length) 
-                return move;
-            char = moveStr[index];
-        }
-
-        // Optional "'" (prime)
-        if (char === "'") {
-            move.isPrime = true;
-            index++;
-            if (index < length) {
-                throw new SyntaxError(`Extra characters after prime: '${moveStr.slice(index)}'`);
-            }
-        } 
-        else if (index < length) {
-            throw new SyntaxError(`Char '${char}' at index ${index}: unknown modifier`);
-        }
-
-        return move;
-    }
-
-    /**
      * @param {boolean} [wedgeNotation]
-     * @param {number} [cubeSize]
+     * @param {number | null} [cubeSize]
      * @returns {string}
      */
-    toString(wedgeNotation = false, cubeSize = 3) {
+    toString(wedgeNotation = false, cubeSize = null) {
         let s = "";
+        const resolvedSize = cubeSize ?? 3;
 
         if (this.isRotation) {
             s += this.alpha.toLowerCase();
         } else {
-            const physicalSlices = this.getPhysicalSlices(cubeSize);
+            const physicalSlices = this.getPhysicalSlices(resolvedSize);
 
             let prefix = "";
             let face = this.alpha.toUpperCase();
@@ -366,9 +284,9 @@ export class Move {
                     suffix = "w";
                 }
             } else {
-                if (physicalSlices * 2 > cubeSize && physicalSlices < cubeSize) {
+                if (physicalSlices * 2 > resolvedSize && physicalSlices < resolvedSize) {
                     face = face.toLowerCase();
-                    const invertedSlices = cubeSize - physicalSlices;
+                    const invertedSlices = resolvedSize - physicalSlices;
                     
                     if (invertedSlices === 1) {
                         suffix = "";
@@ -422,12 +340,13 @@ export class Move {
 
     /**
      * Calculates the actual physical number of slices being turned.
-     * @param {number} [cubeSize=3] - The dimensions of the cube (e.g., 3 for 3x3x3)
+     * @param {number | null} [cubeSize] - The dimensions of the cube (e.g., 3 for 3x3x3, or null for 3x3 default)
      * @returns {number} The number of slices affected by the move
      */
-    getPhysicalSlices(cubeSize = 3) {        
+    getPhysicalSlices(cubeSize = null) {        
+        const resolvedSize = cubeSize ?? 3;
         const parsedSliceNum = this.sliceNum || 1;
-        return this.isWide ? (cubeSize - parsedSliceNum) : parsedSliceNum;
+        return this.isInvertedSlice ? (resolvedSize - parsedSliceNum) : parsedSliceNum;
     }
 
     /**
@@ -438,7 +357,7 @@ export class Move {
         this.alpha = target.alpha;
         this.isPrime = target.isPrime;
         this.isDouble = target.isDouble;
-        this.isWide = target.isWide;
+        this.isInvertedSlice = target.isInvertedSlice;
         this.isRotation = target.isRotation;
         this.isMiddle = target.isMiddle;
         this.sliceNum = target.sliceNum;
@@ -483,13 +402,13 @@ export class Move {
             const keys = Move.DECOMPOSED_FACE_MOVES[this.toKey()];
             if (keys) {
                 for (let i = 0; i < keys.length; i++) {
-                    target.faceMoves.push(Move.fromString(keys[i]));
+                    target.faceMoves.push(ScrambleParser.parse(keys[i]).moves[0]);
                 }
                 return target;
             }            
         }
 
-        if (this.isWide) {
+        if (this.isInvertedSlice) {
             const oppFace = Move.WIDE_EQUIVALENTS[/** @type {FaceStr} */ (this.alpha)];
             if(oppFace) {
                 target.faceMoves.push(new Move(oppFace, this.isPrime, this.isDouble, false, false, false, this.sliceNum));
@@ -506,7 +425,7 @@ export class Move {
      */
     toWide() {
         this.alpha = Move.WIDE_EQUIVALENTS[/** @type {FaceStr} */ (this.alpha)] || this.alpha;
-        this.isWide = true;
+        this.isInvertedSlice = true;
         return this;
     }
 
@@ -516,7 +435,7 @@ export class Move {
      */
     getAssociatedRotation() {
         if (this.isRotation) return /** @type {RotationStr} */ (this.toKey());
-        if (this.isWide) return Move.WIDE_ROTATIONS[this.toKey()] || null;
+        if (this.isInvertedSlice) return Move.WIDE_ROTATIONS[this.toKey()] || null;
         if (this.isMiddle) return Move.MIDDLE_ROTATIONS[this.toKey()] || null;
         return null;
     }
