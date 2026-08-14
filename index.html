@@ -121,9 +121,10 @@
             <div class="config-tabs">
               <!-- Level 1 Main Tabs -->
               <div class="main-tab-buttons">
-                <button type="button" class="main-tab-btn active" data-main-tab="strategy">Search Strategy</button>
-                <button type="button" class="main-tab-btn" data-main-tab="penalties">Cost Penalties</button>
-                <button type="button" class="main-tab-btn" data-main-tab="execution">Move Execution</button>
+                <button type="button" class="main-tab-btn active" data-main-tab="strategy">Search</button>
+                <button type="button" class="main-tab-btn" data-main-tab="penalties">Costs</button>
+                <button type="button" class="main-tab-btn" data-main-tab="execution">Execution</button>
+                <button type="button" class="main-tab-btn" data-main-tab="colors">Color Scheme</button>
                 <button type="button" class="main-tab-btn" data-main-tab="profile">Profile</button>
               </div>
 
@@ -209,6 +210,35 @@
               <!-- Level 1 Tab: Move Execution -->
               <div class="main-tab-content" id="mainTabExecution">
                 <div id="transitions" data-group="transitions"></div>
+              </div>
+
+              <!-- Level 1 Tab: Color Scheme -->
+              <div class="main-tab-content" id="mainTabColors">
+                <div class="strategy-container">
+                  <div class="strategy-group">
+                    <h3>Face Colors</h3>
+                    <div class="strategy-fields">
+                      <label>Up
+                        <input type="text" id="colorSchemeU" data-face="U" value="White" placeholder="e.g. White"/>
+                      </label>
+                      <label>Down
+                        <input type="text" id="colorSchemeD" data-face="D" value="Yellow" placeholder="e.g. Yellow"/>
+                      </label>
+                      <label>Front
+                        <input type="text" id="colorSchemeF" data-face="F" value="Green" placeholder="e.g. Green"/>
+                      </label>
+                      <label>Back
+                        <input type="text" id="colorSchemeB" data-face="B" value="Blue" placeholder="e.g. Blue"/>
+                      </label>
+                      <label>Right
+                        <input type="text" id="colorSchemeR" data-face="R" value="Red" placeholder="e.g. Red"/>
+                      </label>
+                      <label>Left
+                        <input type="text" id="colorSchemeL" data-face="L" value="Orange" placeholder="e.g. Orange"/>
+                      </label>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <!-- Level 1 Tab: Profile & Storage -->

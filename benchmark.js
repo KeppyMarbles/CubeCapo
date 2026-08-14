@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { ScrambleOptimizer } from './shared/cube/optimizer.js';
 import { defaultCostConfiguration, defaultFingertricks, defaultRunOptions, strategyPresets } from './shared/cube/defaults.js';
+import { ScrambleParser } from './shared/cube/parser.js';
 /** @import {RunOptions} from './shared/types.js' */
 
 const __filename = fileURLToPath(import.meta.url);
@@ -34,7 +35,7 @@ console.log(options);
 
 for (let i = 0; i < scrambleLines.length; i++) {
     const line = scrambleLines[i];
-    const parseResult = ScrambleOptimizer.parseScramble(line);
+    const parseResult = ScrambleParser.parse(line);
     const optimizer = new ScrambleOptimizer(defaultCostConfiguration, defaultFingertricks);
     await optimizer.optimize(parseResult, options);
     const topCandidate = optimizer.candidates[0];

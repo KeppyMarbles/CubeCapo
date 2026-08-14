@@ -397,6 +397,13 @@ summary {
   margin-bottom: 0;
 }
 
+.strategy-fields input[type="text"] {
+  width: 140px;
+  margin-top: 0;
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
 .cost-tab-content {
   display: none;
   overflow-y: auto;

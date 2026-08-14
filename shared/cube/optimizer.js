@@ -283,15 +283,6 @@ export class ScrambleOptimizer {
     }
 
     /**
-     * @param {string} string 
-     * @param {Partial<ParseOptions>} [options]
-     * @returns {ParseResult}
-     */
-    static parseScramble(string, options = {}) {
-        return ScrambleParser.parse(string, options);
-    }
-
-    /**
      * @param {Move[]} scramble 
      * @returns {string}
      */
@@ -826,7 +817,7 @@ export class ScrambleOptimizer {
 
         const formatGrip = (/** @type {GripState} */ g) => `[${g.replace(" ", "/")}]`;
 
-        const { topColor, frontColor } = getOrientationColors(candidate.rotation);
+        const { topColor, frontColor } = getOrientationColors(candidate.rotation, options.colorScheme);
         const orientationColorStr = topColor && frontColor ? `${topColor} U ${frontColor} F` : "";
         const rotations = options.showOrientationColors 
             ? (orientationColorStr ? [`[${orientationColorStr}]`] : [])

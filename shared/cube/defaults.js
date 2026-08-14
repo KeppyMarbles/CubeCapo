@@ -18,8 +18,9 @@ export const defaultFormatOptions = Object.freeze({
     showGrips: true,
     showBoundaries: false,
     wedgeNotation: true,
-    showOrientationColors: false,
-    reorient: false
+    showOrientationColors: true,
+    reorient: false,
+    colorScheme: defaultColorScheme
 });
 
 /** @type {ParseOptions} */

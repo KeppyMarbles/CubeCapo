@@ -1,10 +1,10 @@
 import { ScrambleParser } from "../cube/parser.js";
 import { costToColor } from "./stats.js";
-import { defaultCostConfiguration, defaultFormatOptions, defaultRunOptions, defaultFingertricks, strategyPresets } from "../cube/defaults.js";
+import { defaultCostConfiguration, defaultFormatOptions, defaultRunOptions, defaultFingertricks, defaultColorScheme, strategyPresets } from "../cube/defaults.js";
 import { Move } from "../cube/move.js";
 import { getElement, queryElementOptional, queryElements } from "./dom.js";
 import { getStorageItem, setStorageItem, removeStorageItem } from "../storage.js";
-/** @import { CostConfig, RunOptions, FormatOptions, ParseResult, NotationMode, TransitionConfig, ThumbPosition, MoveKey, RightFingertrick, LeftFingertrick, Fingertrick, FingerAction } from "../types.js" */
+/** @import { CostConfig, RunOptions, FormatOptions, ParseResult, NotationMode, TransitionConfig, ThumbPosition, MoveKey, RightFingertrick, LeftFingertrick, Fingertrick, FingerAction, ColorSchemeConfig } from "../types.js" */
 
 /**
  * @typedef {Object} GroupControl
@@ -95,9 +95,9 @@ export async function setupForm(onSubmit, onFormatChange) {
             "regrip": "Cost of a full hand regrip (e.g. going from front thumb to back thumb)",
             "regripPerStep": "Multiplier on top of base regrip proportional to the distance moved (e.g. front thumb to up thumb is 1 step, but front thumb to back thumb is 2 steps)",
             //"double": "Cost of double move relative to a single move",
-            "repeatPenalty": "Cost penalty for consecutive moves executed by the same finger or hand",
-            "perSliceFingertrick": "Allow fingertricks specifically on slice moves without whole hand shifts",
-            "handedness": "Choose dominant hand for move prioritization",
+            "repeatPenalty": "Cost penalty for doing the same fingertrick twice in a row",
+            "perSliceFingertrick": "If fingertrick cost should be applied for each effective slice",
+            "handedness": "Choose dominant hand for fingertrick tiebreaks. Currently has minimal effect due to lack of slice moves. Change fingertrick costs to see more or less of a certain hand.",
             
             "x": "Cost to perform an X rotation",
             "y": "Cost to perform a Y rotation",
@@ -197,6 +197,10 @@ export async function setupForm(onSubmit, onFormatChange) {
     const formatOpts = /** @type {FormatOptions} */ (await loadOptions("formatOptions", defaultFormatOptions));
     applyFormatOptionsValues(formatOpts);
 
+    const colorScheme = /** @type {ColorSchemeConfig} */ (await loadOptions("colorScheme", defaultColorScheme));
+    let savedColorScheme = structuredClone(colorScheme);
+    applyColorSchemeValues(colorScheme);
+
     const transitionsTabEl = getElement("transitions", HTMLElement);
     renderTransitionsTab(transitionsTabEl, currentTransitions, () => checkUnsavedChanges());
 
@@ -204,13 +208,15 @@ export async function setupForm(onSubmit, onFormatChange) {
     const checkUnsavedChanges = () => {
         const currentConfig = collectCostConfig(form, savedConfig);
         const currentRunOpts = collectRunOptionsValues();
+        const currentColorScheme = collectColorSchemeValues();
 
         const configDiff = JSON.stringify(currentConfig) !== JSON.stringify(savedConfig);
         const optsDiff = JSON.stringify(currentRunOpts) !== JSON.stringify(savedRunOpts);
         const transDiff = JSON.stringify(currentTransitions) !== JSON.stringify(savedTransitions);
+        const colorsDiff = JSON.stringify(currentColorScheme) !== JSON.stringify(savedColorScheme);
 
         const bar = getElement("unsavedChangesBar", HTMLElement);
-        if (configDiff || optsDiff || transDiff) {
+        if (configDiff || optsDiff || transDiff || colorsDiff) {
             bar.classList.remove("hidden");
         } else {
             bar.classList.add("hidden");
@@ -250,6 +256,27 @@ export async function setupForm(onSubmit, onFormatChange) {
     getElement("presetBalanced", HTMLButtonElement).addEventListener("click", () => applyPreset(strategyPresets.balanced));
     getElement("presetExhaustive", HTMLButtonElement).addEventListener("click", () => applyPreset(strategyPresets.exhaustive));
 
+    // Attach change detection to color scheme settings
+    const colorInputIds = [
+        "colorSchemeU",
+        "colorSchemeD",
+        "colorSchemeF",
+        "colorSchemeB",
+        "colorSchemeR",
+        "colorSchemeL"
+    ];
+    colorInputIds.forEach(id => {
+        const el = getElement(id, HTMLInputElement);
+        el.addEventListener("input", () => {
+            checkUnsavedChanges();
+            onFormatChange?.();
+        });
+        el.addEventListener("change", () => {
+            checkUnsavedChanges();
+            onFormatChange?.();
+        });
+    });
+
     // Format options: auto-save on change and trigger live update (no unsaved bar)
     const formatInputIds = [ 
         "showGrips", 
@@ -276,9 +303,13 @@ export async function setupForm(onSubmit, onFormatChange) {
 
         await saveOptions("transitionConfig", currentTransitions);
 
+        const colorSchemeVals = collectColorSchemeValues();
+        await saveOptions("colorScheme", colorSchemeVals);
+
         savedConfig = structuredClone(config);
         savedRunOpts = structuredClone(runOptions);
         savedTransitions = structuredClone(currentTransitions);
+        savedColorScheme = structuredClone(colorSchemeVals);
 
         // Notify options page / content scripts of settings change
         if (typeof chrome !== "undefined" && chrome.tabs) {
@@ -299,11 +330,13 @@ export async function setupForm(onSubmit, onFormatChange) {
     getElement("revertChangesButton", HTMLButtonElement).addEventListener("click", () => {
         applyConfig(form, savedConfig);
         applyRunOptionsValues(savedRunOpts);
+        applyColorSchemeValues(savedColorScheme);
         currentTransitions = structuredClone(savedTransitions);
         renderTransitionsTab(transitionsTabEl, currentTransitions, () => checkUnsavedChanges());
 
         updateCostInputColors(form);
         checkUnsavedChanges();
+        onFormatChange?.();
     });
 
     // Submit handler
@@ -334,17 +367,20 @@ export async function setupForm(onSubmit, onFormatChange) {
     getElement("resetDefaultButton", HTMLButtonElement).addEventListener("click", () => {
         applyConfig(form, defaultCostConfiguration);
         applyRunOptionsValues(defaultRunOptions);
+        applyColorSchemeValues(defaultColorScheme);
         currentTransitions = structuredClone(defaultFingertricks);
         renderTransitionsTab(transitionsTabEl, currentTransitions, () => checkUnsavedChanges());
         form.dispatchEvent(new Event("input", { bubbles: true }));
         checkUnsavedChanges();
+        onFormatChange?.();
     });
 
-    // Level 1 Main Tabs (Move Execution vs Cost Penalties vs Search Strategy vs Profile)
+    // Level 1 Main Tabs (Move Execution vs Cost Penalties vs Search Strategy vs Color Scheme vs Profile)
     const MAIN_TAB_MAP = /** @type {const} */ ({
         execution: "mainTabExecution",
         penalties: "mainTabPenalties",
         strategy: "mainTabStrategy",
+        colors: "mainTabColors",
         profile: "mainTabProfile",
     });
 
@@ -417,9 +453,11 @@ export async function setupForm(onSubmit, onFormatChange) {
     getElement("exportButton", HTMLButtonElement).addEventListener("click", () => {
         try {
             const config = collectCostConfig(form, initialConfig);
+            const colorSchemeVals = collectColorSchemeValues();
             const unifiedProfile = {
                 costConfig: config,
-                transitionConfig: currentTransitions
+                transitionConfig: currentTransitions,
+                colorScheme: colorSchemeVals,
             };
             const json = JSON.stringify(unifiedProfile, null, 2);
             const blob = new Blob([json], { type: "application/json" });
@@ -458,9 +496,11 @@ export async function setupForm(onSubmit, onFormatChange) {
             const costForm = getElement("costForm", HTMLFormElement);
             applyConfig(costForm, parsed.costConfig);
             currentTransitions = structuredClone(parsed.transitionConfig);
+            applyColorSchemeValues(parsed.colorScheme);
             renderTransitionsTab(transitionsTabEl, currentTransitions, () => checkUnsavedChanges());
             form.dispatchEvent(new Event("input", { bubbles: true }));
             checkUnsavedChanges();
+            onFormatChange?.();
         } 
         catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -697,6 +737,35 @@ function collectRunOptionsValues() {
 }
 
 /**
+ * Gather the current color scheme values from the DOM
+ * @returns {ColorSchemeConfig}
+ */
+export function collectColorSchemeValues() {
+    return {
+        U: getElement("colorSchemeU", HTMLInputElement).value.trim(),
+        D: getElement("colorSchemeD", HTMLInputElement).value.trim(),
+        F: getElement("colorSchemeF", HTMLInputElement).value.trim(),
+        B: getElement("colorSchemeB", HTMLInputElement).value.trim(),
+        R: getElement("colorSchemeR", HTMLInputElement).value.trim(),
+        L: getElement("colorSchemeL", HTMLInputElement).value.trim(),
+    };
+}
+
+/**
+ * Populate the color scheme DOM elements with the provided values
+ * @param {Partial<ColorSchemeConfig>} [colorScheme]
+ */
+function applyColorSchemeValues(colorScheme) {
+    const scheme = { ...defaultColorScheme, ...(colorScheme || {}) };
+    if (scheme.U !== undefined) getElement("colorSchemeU", HTMLInputElement).value = String(scheme.U);
+    if (scheme.D !== undefined) getElement("colorSchemeD", HTMLInputElement).value = String(scheme.D);
+    if (scheme.F !== undefined) getElement("colorSchemeF", HTMLInputElement).value = String(scheme.F);
+    if (scheme.B !== undefined) getElement("colorSchemeB", HTMLInputElement).value = String(scheme.B);
+    if (scheme.R !== undefined) getElement("colorSchemeR", HTMLInputElement).value = String(scheme.R);
+    if (scheme.L !== undefined) getElement("colorSchemeL", HTMLInputElement).value = String(scheme.L);
+}
+
+/**
  * Gather the current format option values from the DOM
  * @returns {FormatOptions}
  */
@@ -708,6 +777,7 @@ export function collectFormatOptionsValues() {
         wedgeNotation: getElement("wedgeNotation", HTMLInputElement).checked,
         showOrientationColors: getElement("showOrientationColors", HTMLInputElement).checked,
         reorient: getElement("reorient", HTMLInputElement).checked,
+        colorScheme: collectColorSchemeValues(),
     };
 }
 

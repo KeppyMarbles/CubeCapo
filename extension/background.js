@@ -1,5 +1,6 @@
 import { ScrambleOptimizer } from "../shared/cube/optimizer.js";
 import { defaultCostConfiguration, defaultFormatOptions, defaultFingertricks, defaultRunOptions, defaultParseOptions } from "../shared/cube/defaults.js";
+import { ScrambleParser } from "../shared/cube/parser.js";
 /** @import { SendOptimizationResponse } from "../shared/types.js" */
 
 const extAPI = /** @type {any} */ (globalThis).browser || chrome;
@@ -48,13 +49,13 @@ extAPI.runtime.onMessage.addListener(
                     return;
                 }
 
-                const store = await extAPI.storage.local.get(["costConfig", "runOptions", "formatOptions", "parseOptions", "transitionConfig"]);
+                const store = await extAPI.storage.local.get(["costConfig", "runOptions", "formatOptions", "parseOptions", "transitionConfig", "colorScheme"]);
                 const parseOptions = { ...defaultParseOptions, ...store.parseOptions };
 
                 // Validate scramble move syntax
                 let parseResult;
                 try {
-                    parseResult = ScrambleOptimizer.parseScramble(rawText, parseOptions);
+                    parseResult = ScrambleParser.parse(rawText, parseOptions);
                     if (!parseResult || !parseResult.moves || parseResult.moves.length === 0) {
                         sendResponse({ success: false, error: "Invalid scramble text" });
                         return;
@@ -71,7 +72,7 @@ extAPI.runtime.onMessage.addListener(
                 const cubeSize = store.runOptions?.cubeSize ? Number(store.runOptions.cubeSize) : null;
 
                 const runOptions = { ...defaultRunOptions, ...store.runOptions, cubeSize };
-                const formatOptions = { ...defaultFormatOptions, ...store.formatOptions };
+                const formatOptions = { ...defaultFormatOptions, ...store.formatOptions, colorScheme: store.colorScheme || store.formatOptions?.colorScheme || defaultFormatOptions.colorScheme };
 
                 const optimizer = new ScrambleOptimizer(config, transitions, null);
 
