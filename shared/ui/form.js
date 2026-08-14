@@ -3,6 +3,7 @@ import { costToColor } from "./stats.js";
 import { defaultCostConfiguration, defaultFormatOptions, defaultRunOptions, defaultFingertricks, strategyPresets } from "../cube/defaults.js";
 import { Move } from "../cube/move.js";
 import { getElement, queryElementOptional, queryElements } from "./dom.js";
+import { getStorageItem, setStorageItem, removeStorageItem } from "../storage.js";
 /** @import { CostConfig, RunOptions, FormatOptions, ParseResult, NotationMode, TransitionConfig, ThumbPosition, MoveKey, RightFingertrick, LeftFingertrick, Fingertrick, FingerAction } from "../types.js" */
 
 /**
@@ -41,9 +42,7 @@ export async function setupForm(onSubmit, onFormatChange) {
         input.value = text || "";
 
         if (text) {
-            if (typeof chrome !== "undefined" && chrome.storage?.local) {
-                chrome.storage.local.remove(["pendingScramble"]);
-            }
+            removeStorageItem("pendingScramble");
             setTimeout(() => {
                 getElement("submitButton", HTMLButtonElement).click();
             }, 50);
@@ -54,12 +53,9 @@ export async function setupForm(onSubmit, onFormatChange) {
     const urlScramble = new URLSearchParams(window.location.search).get("scramble");
     if (urlScramble) {
         applyScrambleAndSubmit(urlScramble);
-    } else if (typeof chrome !== "undefined" && chrome.storage?.local) {
-        chrome.storage.local.get(["pendingScramble"], (store) => {
-            applyScrambleAndSubmit(String(store?.pendingScramble || ""));
-        });
     } else {
-        applyScrambleAndSubmit("");
+        const pending = await getStorageItem("pendingScramble", "");
+        applyScrambleAndSubmit(String(pending || ""));
     }
 
     // Real-time updates for already-open settings tabs
@@ -617,12 +613,7 @@ function updateCostInputColors(form) {
  * @param {CostConfig} config 
  */
 async function saveCostConfig(config) {
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-        await new Promise((resolve) => {
-            chrome.storage.local.set({ costConfig: config }, () => resolve(undefined));
-        });
-    }
-    localStorage.setItem("costConfig", JSON.stringify(config));
+    await setStorageItem("costConfig", config);
 }
 
 /**
@@ -630,20 +621,7 @@ async function saveCostConfig(config) {
  * @returns {Promise<CostConfig | null>}
  */
 async function loadCostConfig() {
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-        return new Promise((resolve) => {
-            chrome.storage.local.get(["costConfig"], (result) => {
-                resolve(/** @type {CostConfig | null} */ (result?.costConfig || null));
-            });
-        });
-    }
-    try {
-        const stored = localStorage.getItem("costConfig");
-        return stored ? JSON.parse(stored) : null;
-    } 
-    catch {
-        return null;
-    }
+    return getStorageItem("costConfig", null);
 }
 
 /**
@@ -652,12 +630,7 @@ async function loadCostConfig() {
  * @param {Object} options
  */
 async function saveOptions(key, options) {
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-        await new Promise((resolve) => {
-            chrome.storage.local.set({ [key]: options }, () => resolve(undefined));
-        });
-    }
-    localStorage.setItem(key, JSON.stringify(options));
+    await setStorageItem(key, options);
 }
 
 /**
@@ -668,21 +641,7 @@ async function saveOptions(key, options) {
  * @returns {Promise<T>}
  */
 async function loadOptions(key, defaults) {
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-        return new Promise((resolve) => {
-            chrome.storage.local.get([key], (result) => {
-                const storedVal = result ? result[key] : null;
-                resolve({ ...defaults, ...(storedVal || {}) });
-            });
-        });
-    }
-    try {
-        const stored = localStorage.getItem(key);
-        return stored ? { ...defaults, ...JSON.parse(stored) } : { ...defaults };
-    }
-    catch {
-        return { ...defaults };
-    }
+    return getStorageItem(key, defaults);
 }
 
 /**
@@ -1046,18 +1005,5 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange)
  * @returns {Promise<TransitionConfig | null>}
  */
 async function loadTransitionConfig() {
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-        return new Promise((resolve) => {
-            chrome.storage.local.get(["transitionConfig"], (result) => {
-                resolve(/** @type {TransitionConfig | null} */ (result?.transitionConfig || null));
-            });
-        });
-    }
-    try {
-        const stored = localStorage.getItem("transitionConfig");
-        return stored ? JSON.parse(stored) : null;
-    } 
-    catch {
-        return null;
-    }
+    return getStorageItem("transitionConfig", null);
 }

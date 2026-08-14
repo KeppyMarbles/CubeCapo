@@ -47,6 +47,7 @@
         "shared/cube/move.js",
         "shared/cube/util.js",
         "shared/types.js",
+        "shared/storage.js",
         "extension/content.css"
       ],
       "matches": ["<all_urls>"]

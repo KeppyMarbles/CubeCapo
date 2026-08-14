@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ScrambleOptimizer } from './shared/cube/optimizer.js';
-import { defaultCostConfiguration, defaultFingertricks, defaultRunOptions } from './shared/cube/defaults.js';
+import { defaultCostConfiguration, defaultFingertricks, defaultRunOptions, strategyPresets } from './shared/cube/defaults.js';
 /** @import {RunOptions} from './shared/types.js' */
 
 const __filename = fileURLToPath(import.meta.url);
@@ -27,12 +27,8 @@ let totalCandidates = 0;
 /** @type {RunOptions} */
 const options = {
     ...defaultRunOptions,
-    wideReplace: true,
-    searchRotations: false, //speedup
-    maxRegripBranches: 1, //speedup
-    partitionLength: 10, //speedup
-    depth: 0, //speedup
-    searchRegrips: false, //speedup
+    ...strategyPresets.fast,
+    searchRotations: false,
 };
 console.log(options);
 

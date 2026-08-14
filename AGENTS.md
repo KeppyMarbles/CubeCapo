@@ -24,6 +24,7 @@ scramblemanip-js/
 ├── scratch/                 # Test script folder for agents. Excluded from git.
 ├── shared/
 │   ├── types.js             # JSDoc type definitions (@typedef for Move, CostConfig, Transition, Options, etc.)
+│   ├── storage.js           # Cross-environment storage helper (chrome.storage.local with localStorage fallback)
 │   ├── cube/
 │   │   ├── defaults.js      # `defaultColorScheme`, `defaultFormatOptions`, `defaultRunOptions`, `defaultCostConfiguration`, `defaultFingertricks` (`{ right, left? }` 5-state thumb model).
 │   │   ├── move.js          # Move class: copy/clone/invert methods, transposition matrix, linear chain state transitions, rotation helpers
