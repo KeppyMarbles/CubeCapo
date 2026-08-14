@@ -1,4 +1,4 @@
-import { getOptionalElement, queryElementOptional } from "./dom.js";
+import { getElement, queryElementOptional } from "./dom.js";
 /** @import { ScrambleBreakdownEntry, OrientationResultInfo, FormatOptions, ParseResult } from "../types.js" */
 /** @import { ScrambleOptimizer } from "../cube/optimizer.js" */
 
@@ -10,13 +10,13 @@ import { getOptionalElement, queryElementOptional } from "./dom.js";
  * @param {ParseResult | null} [parseResult]
  */
 export async function drawOptimizerStats(optimizer, formatOptions, candidateIndex = 0, parseResult = null) {
-    const metaContainer = getOptionalElement("scrambleMeta", HTMLDivElement);
-    const metaText = getOptionalElement("scrambleMetaText", HTMLElement);
-    const paginationContainer = getOptionalElement("scramblePagination", HTMLDivElement);
-    const indicator = getOptionalElement("scramblePageIndicator", HTMLElement);
-    const prevBtn = getOptionalElement("prevScrambleBtn", HTMLButtonElement);
-    const nextBtn = getOptionalElement("nextScrambleBtn", HTMLButtonElement);
-    const outputEl = getOptionalElement("output", HTMLElement);
+    const metaContainer = getElement("scrambleMeta", HTMLDivElement);
+    const metaText = getElement("scrambleMetaText", HTMLElement);
+    const paginationContainer = getElement("scramblePagination", HTMLDivElement);
+    const indicator = getElement("scramblePageIndicator", HTMLElement);
+    const prevBtn = getElement("prevScrambleBtn", HTMLButtonElement);
+    const nextBtn = getElement("nextScrambleBtn", HTMLButtonElement);
+    const outputEl = getElement("output", HTMLElement);
 
     if (optimizer && optimizer.candidates && optimizer.candidates.length > 0) {
         const total = optimizer.candidates.length;
@@ -25,9 +25,7 @@ export async function drawOptimizerStats(optimizer, formatOptions, candidateInde
 
         drawDistributionChart(optimizer.distribution || new Map());
         drawRotationInfoTable(optimizer.rotationInfo || []);
-        if (outputEl) {
-            outputEl.textContent = optimizer.formatCandidate(candidate, formatOptions);
-        }
+        outputEl.textContent = optimizer.formatCandidate(candidate, formatOptions);
         drawCostTable(optimizer.analyzeCandidate(candidate, formatOptions));
 
         const size = optimizer.options?.cubeSize;
@@ -35,42 +33,23 @@ export async function drawOptimizerStats(optimizer, formatOptions, candidateInde
         const inputNot = !parseResult?.resolvedNotation ? "Unknown" : (parseResult.resolvedNotation === "sign" ? "SiGN" : "WCA");
         const notStr = `${inputNot}→WCA`;
 
-        if (metaContainer) {
-            metaContainer.style.display = "block";
-            if (metaText) {
-                metaText.textContent = `Size: ${sizeStr}  •  Notation: ${notStr}`;
-            }
-        }
+        metaContainer.style.display = "block";
+        metaText.textContent = `Size: ${sizeStr}  •  Notation: ${notStr}`;
 
-        if (paginationContainer) {
-            paginationContainer.style.display = "flex";
-            if (indicator) {
-                indicator.textContent = `Scramble ${validIndex + 1} of ${total}`;
-            }
-            if (prevBtn) {
-                prevBtn.disabled = validIndex <= 0;
-            }
-            if (nextBtn) {
-                nextBtn.disabled = validIndex >= total - 1;
-            }
-        }
+        paginationContainer.style.display = "flex";
+        indicator.textContent = `Scramble ${validIndex + 1} of ${total}`;
+        prevBtn.disabled = validIndex <= 0;
+        nextBtn.disabled = validIndex >= total - 1;
     }
     else {
         drawDistributionChart(new Map());
         drawRotationInfoTable([]);
         drawCostTable([]);
-        if (outputEl) {
-            outputEl.textContent = "";
-        }
-        const searchTimeEl = getOptionalElement("searchTime", HTMLElement);
-        if (searchTimeEl) searchTimeEl.textContent = "";
+        outputEl.textContent = "";
+        getElement("searchTime", HTMLElement).textContent = "";
 
-        if (metaContainer) {
-            metaContainer.style.display = "none";
-        }
-        if (paginationContainer) {
-            paginationContainer.style.display = "none";
-        }
+        metaContainer.style.display = "none";
+        paginationContainer.style.display = "none";
     }
     await new Promise(requestAnimationFrame);
 }
@@ -80,8 +59,7 @@ export async function drawOptimizerStats(optimizer, formatOptions, candidateInde
  * @param {Map<number, number>} distribution 
  */
 function drawDistributionChart(distribution) {
-    const chartContainer = getOptionalElement("myChart", HTMLElement);
-    if (!chartContainer) return;
+    const chartContainer = getElement("myChart", HTMLElement);
     chartContainer.replaceChildren();
 
     const isMap = distribution instanceof Map;
@@ -90,16 +68,11 @@ function drawDistributionChart(distribution) {
         emptyDiv.className = "chart-empty";
         emptyDiv.textContent = "No stats available";
         chartContainer.appendChild(emptyDiv);
-        const samplesEl = getOptionalElement("samples", HTMLElement);
-        if (samplesEl) samplesEl.textContent = "-";
-        const avgEl = getOptionalElement("averageCost", HTMLElement);
-        if (avgEl) avgEl.textContent = "-";
-        const stdEl = getOptionalElement("standardDeviation", HTMLElement);
-        if (stdEl) stdEl.textContent = "-";
-        const skewEl = getOptionalElement("skewness", HTMLElement);
-        if (skewEl) skewEl.textContent = "-";
-        const minZEl = getOptionalElement("minZ", HTMLElement);
-        if (minZEl) minZEl.textContent = "-";
+        getElement("samples", HTMLElement).textContent = "-";
+        getElement("averageCost", HTMLElement).textContent = "-";
+        getElement("standardDeviation", HTMLElement).textContent = "-";
+        getElement("skewness", HTMLElement).textContent = "-";
+        getElement("minZ", HTMLElement).textContent = "-";
         return;
     }
 
@@ -112,16 +85,11 @@ function drawDistributionChart(distribution) {
     const minCost = Math.min(...distribution.keys());
     const zScore = stdDev > 0 ? (minCost - mean) / stdDev : 0;
 
-    const samplesEl = getOptionalElement("samples", HTMLElement);
-    if (samplesEl) samplesEl.textContent = String(samples);
-    const avgEl = getOptionalElement("averageCost", HTMLElement);
-    if (avgEl) avgEl.textContent = mean.toFixed(3);
-    const stdEl = getOptionalElement("standardDeviation", HTMLElement);
-    if (stdEl) stdEl.textContent = stdDev.toFixed(3);
-    const skewEl = getOptionalElement("skewness", HTMLElement);
-    if (skewEl) skewEl.textContent = skewness.toFixed(3);
-    const minZEl = getOptionalElement("minZ", HTMLElement);
-    if (minZEl) minZEl.textContent = zScore.toFixed(3);
+    getElement("samples", HTMLElement).textContent = String(samples);
+    getElement("averageCost", HTMLElement).textContent = mean.toFixed(3);
+    getElement("standardDeviation", HTMLElement).textContent = stdDev.toFixed(3);
+    getElement("skewness", HTMLElement).textContent = skewness.toFixed(3);
+    getElement("minZ", HTMLElement).textContent = zScore.toFixed(3);
 
     // Aggregate into integer bins for UI chart display
     const intMap = new Map();

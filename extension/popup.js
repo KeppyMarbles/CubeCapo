@@ -1,4 +1,4 @@
-import { getElement, getOptionalElement } from "../shared/ui/dom.js";
+import { getElement } from "../shared/ui/dom.js";
 
 const extAPI = /** @type {any} */ (globalThis).browser || globalThis.chrome;
 
@@ -108,8 +108,7 @@ async function setupOptionsBinding(storageKey, bindings, activeTab) {
     const currentOptions = store[storageKey] || {};
 
     for (const [optKey, config] of Object.entries(bindings)) {
-        const el = getOptionalElement(config.id, HTMLElement);
-        if (!el) continue;
+        const el = getElement(config.id, HTMLElement);
 
         const val = currentOptions[optKey];
         if (el instanceof HTMLInputElement && el.type === "checkbox") {

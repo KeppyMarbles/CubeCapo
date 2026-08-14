@@ -1,4 +1,4 @@
-import { getElement, getOptionalElement, queryElementOptional } from "../shared/ui/dom.js";
+import { getOptionalElement, queryElementOptional } from "../shared/ui/dom.js";
 import { renderBreakdownTable } from "../shared/ui/stats.js";
 /** @import { OptimizationResult } from "../shared/types.js" */
 
@@ -220,7 +220,7 @@ function showOptimizedState(scrambleElement, data) {
     // 1. Hide original text nodes immediately
     hideOriginalText(scrambleElement);
     
-    let visualSpan = queryElementOptional(scrambleElement, ".cubecapo-visual-overlay", HTMLElement);
+    let visualSpan = scrambleElement.querySelector(".cubecapo-visual-overlay");
     if (!visualSpan) {
         visualSpan = document.createElement("span");
         visualSpan.className = "cubecapo-visual-overlay";
@@ -288,12 +288,12 @@ function showOptimizedState(scrambleElement, data) {
     bar.appendChild(openSettingsBtn);
 
     // 3. Setup details table card (as a floating popup appended to body to prevent clipping)
-    let details = getOptionalElement("cubecapo-details-card", HTMLDivElement);
-    if (details) {
-        details.remove();
+    const existingDetails = getOptionalElement("cubecapo-details-card", HTMLDivElement);
+    if (existingDetails) {
+        existingDetails.remove();
     }
 
-    details = document.createElement("div");
+    const details = document.createElement("div");
     details.id = "cubecapo-details-card";
     details.className = "cubecapo-details-card";
 
@@ -333,77 +333,71 @@ function showOptimizedState(scrambleElement, data) {
     document.body.appendChild(details);
 
     // Bind original vs optimized toggle button
-    const toggleTextBtn = getOptionalElement("cubecapo-toggle-original", HTMLButtonElement);
-    if (toggleTextBtn) {
-        toggleTextBtn.addEventListener("click", (/** @type {Event} */ e) => {
-            e.stopPropagation();
-            isShowingOptimized = !isShowingOptimized;
-            if (isShowingOptimized && visualSpan) {
-                visualSpan.textContent = data.bestScrambleStr || "";
-                toggleTextBtn.textContent = "Show Original";
-                badge.textContent = transposedBadgeText;
-            } else if (visualSpan) {
-                visualSpan.textContent = lastOriginalText;
-                toggleTextBtn.textContent = "Show Transposed";
-                badge.textContent = originalBadgeText;
-            }
-        });
-    }
+    toggleOriginalBtn.addEventListener("click", (/** @type {Event} */ e) => {
+        e.stopPropagation();
+        isShowingOptimized = !isShowingOptimized;
+        if (isShowingOptimized && visualSpan) {
+            visualSpan.textContent = data.bestScrambleStr || "";
+            toggleOriginalBtn.textContent = "Show Original";
+            badge.textContent = transposedBadgeText;
+        } else if (visualSpan) {
+            visualSpan.textContent = lastOriginalText;
+            toggleOriginalBtn.textContent = "Show Transposed";
+            badge.textContent = originalBadgeText;
+        }
+    });
 
     // Bind details toggle button click event
-    const toggleBtn = getOptionalElement("cubecapo-toggle-details", HTMLButtonElement);
-    if (toggleBtn) {
-        toggleBtn.addEventListener("click", (/** @type {Event} */ e) => {
-            e.stopPropagation();
-            const isActive = details.classList.toggle("active");
-            toggleBtn.textContent = isActive ? "Close" : "Details";
+    toggleDetailsBtn.addEventListener("click", (/** @type {Event} */ e) => {
+        e.stopPropagation();
+        const isActive = details.classList.toggle("active");
+        toggleDetailsBtn.textContent = isActive ? "Close" : "Details";
 
-            if (isActive) {
-                // Dynamically position the details popup card relative to the details button and viewport boundaries
-                const rect = toggleBtn.getBoundingClientRect();
-                details.style.position = "fixed";
+        if (isActive) {
+            // Dynamically position the details popup card relative to the details button and viewport boundaries
+            const rect = toggleDetailsBtn.getBoundingClientRect();
+            details.style.position = "fixed";
 
-                const spaceBelow = window.innerHeight - rect.bottom - 16;
-                const spaceAbove = rect.top - 16;
+            const spaceBelow = window.innerHeight - rect.bottom - 16;
+            const spaceAbove = rect.top - 16;
 
-                if (spaceBelow < 200 && spaceAbove > spaceBelow) {
-                    // Position above button if bottom viewport space is constrained
-                    details.style.top = "auto";
-                    details.style.bottom = `${window.innerHeight - rect.top + 8}px`;
-                    details.style.maxHeight = `${Math.min(spaceAbove, window.innerHeight - 32)}px`;
-                } else {
-                    // Position below button
-                    details.style.top = `${rect.bottom + 8}px`;
-                    details.style.bottom = "auto";
-                    details.style.maxHeight = `${Math.max(120, spaceBelow)}px`;
-                }
-
-                // Handle horizontal boundary alignments so it does not overflow the right margin of the browser window
-                const cardWidth = 380;
-                if (rect.left + cardWidth > window.innerWidth) {
-                    details.style.left = "auto";
-                    details.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
-                } else {
-                    details.style.left = `${Math.max(8, rect.left)}px`;
-                    details.style.right = "auto";
-                }
-
-                // Add close on click outside event handler
-                const clickOutside = (/** @type {MouseEvent} */ event) => {
-                    // Do not close if clicking inside the details popup itself or clicking the details button again
-                    if (event.target instanceof Node && !details.contains(event.target) && event.target !== toggleBtn) {
-                        details.classList.remove("active");
-                        toggleBtn.textContent = "Details";
-                        document.removeEventListener("click", clickOutside, true);
-                    }
-                };
-                // Defer attaching so this click trigger itself doesn't close it instantly
-                setTimeout(() => {
-                    document.addEventListener("click", clickOutside, true);
-                }, 10);
+            if (spaceBelow < 200 && spaceAbove > spaceBelow) {
+                // Position above button if bottom viewport space is constrained
+                details.style.top = "auto";
+                details.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+                details.style.maxHeight = `${Math.min(spaceAbove, window.innerHeight - 32)}px`;
+            } else {
+                // Position below button
+                details.style.top = `${rect.bottom + 8}px`;
+                details.style.bottom = "auto";
+                details.style.maxHeight = `${Math.max(120, spaceBelow)}px`;
             }
-        });
-    }
+
+            // Handle horizontal boundary alignments so it does not overflow the right margin of the browser window
+            const cardWidth = 380;
+            if (rect.left + cardWidth > window.innerWidth) {
+                details.style.left = "auto";
+                details.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+            } else {
+                details.style.left = `${Math.max(8, rect.left)}px`;
+                details.style.right = "auto";
+            }
+
+            // Add close on click outside event handler
+            const clickOutside = (/** @type {MouseEvent} */ event) => {
+                // Do not close if clicking inside the details popup itself or clicking the details button again
+                if (event.target instanceof Node && !details.contains(event.target) && event.target !== toggleDetailsBtn) {
+                    details.classList.remove("active");
+                    toggleDetailsBtn.textContent = "Details";
+                    document.removeEventListener("click", clickOutside, true);
+                }
+            };
+            // Defer attaching so this click trigger itself doesn't close it instantly
+            setTimeout(() => {
+                document.addEventListener("click", clickOutside, true);
+            }, 10);
+        }
+    });
 }
 
 /**

@@ -1,5 +1,5 @@
 import { ScrambleParser } from "./parser.js";
-/** @import { FaceStr, RotationStr, AxisStr, MoveStr, MiddleStr, MoveKey, ThumbPosition, GripState, Transition, Orientation, ModifierStr, TranspositionMap, ThumbTransitions, RegripDistanceCache, RegripDistanceCacheRow, NextGripCache, NextGripCacheRow, Fingertrick } from "../types.js" */
+/** @import { FaceStr, RotationStr, AxisStr, MoveStr, MiddleStr, MoveKey, ThumbPosition, GripState, Transition, Orientation, ModifierStr, TranspositionMap, ThumbTransitions, RegripDistanceCache, RegripDistanceCacheRow, NextGripCache, NextGripCacheRow, Fingertrick, FingerAction, RightFingertrick, LeftFingertrick } from "../types.js" */
 
 export class Move {
     /**
@@ -20,6 +20,24 @@ export class Move {
     /** @type {readonly AxisStr[]} */
     static ROTATION_LIST = Object.freeze(["x", "y", "z"]);
 
+    /** @type {readonly FingerAction[]} */
+    static FINGER_ACTIONS = Object.freeze([
+        "index",
+        "index_push",
+        "index_front",
+        "index_middle",
+        "middle",
+        "middle_push",
+        "ring",
+        "ring_middle",
+        "ring_push",
+        "thumb",
+        "up",
+        "up_double",
+        "down",
+        "down_double"
+    ]);
+
     /** @type {readonly (RotationStr | null)[]} */
     static TOP_ROTATIONS = Object.freeze([null, "x", "x'", "x2", "z", "z'"]);
 
@@ -39,8 +57,8 @@ export class Move {
         "S": "S'", "S'": "S", "S2": "S2'", "S2'": "S2",
     });
 
-    /** @type {Record<Fingertrick, Fingertrick>} */
-    static MIRROR_FINGERTRICK_MAP = Object.freeze({
+    /** @type {Record<RightFingertrick, LeftFingertrick>} */
+    static RIGHT_TO_LEFT_FINGERTRICK = Object.freeze({
         "right_index":        "left_index",
         "right_index_push":   "left_index_push",
         "right_index_front":  "left_index_front",
@@ -55,7 +73,10 @@ export class Move {
         "right_up_double":    "left_up_double",
         "right_down":         "left_down",
         "right_down_double":  "left_down_double",
+    });
 
+    /** @type {Record<LeftFingertrick, RightFingertrick>} */
+    static LEFT_TO_RIGHT_FINGERTRICK = Object.freeze({
         "left_index":         "right_index",
         "left_index_push":    "right_index_push",
         "left_index_front":   "right_index_front",
@@ -82,12 +103,21 @@ export class Move {
     }
 
     /**
-     * Mirrors a fingertrick across the M-slice
-     * @param {Fingertrick} ft
-     * @returns {Fingertrick}
+     * Mirrors a right-hand fingertrick to the left hand across the M-slice
+     * @param {RightFingertrick} ft
+     * @returns {LeftFingertrick}
      */
-    static mirrorFingertrick(ft) {
-        return Move.MIRROR_FINGERTRICK_MAP[ft] ?? ft;
+    static mirrorRightFingertrick(ft) {
+        return Move.RIGHT_TO_LEFT_FINGERTRICK[ft];
+    }
+
+    /**
+     * Mirrors a left-hand fingertrick to the right hand across the M-slice
+     * @param {LeftFingertrick} ft
+     * @returns {RightFingertrick}
+     */
+    static mirrorLeftFingertrick(ft) {
+        return Move.LEFT_TO_RIGHT_FINGERTRICK[ft];
     }
 
     /** @type {TranspositionMap} */
@@ -163,28 +193,12 @@ export class Move {
         "Bu": 4
     });
 
-    /** @type {ThumbTransitions} */
-    static R_TRANSITIONS = Object.freeze({
-        "R":   { "Bd": "D",  "D": "F",  "F": "U",  "U": "Bu", "Bu": null },
-        "R'":  { "Bu": "U",  "U": "F",  "F": "D",  "D": "Bd", "Bd": null },
-        "R2":  { "Bd": "F",  "D": "U",  "F": "Bu", "U": null, "Bu": null },
-        "R2'": { "Bu": "F",  "U": "D",  "F": "Bd", "D": null, "Bd": null },
-    });
-
-    /** @type {ThumbTransitions} */
-    static L_TRANSITIONS = Object.freeze({
-        "L":   { "Bu": "U",  "U": "F",  "F": "D",  "D": "Bd", "Bd": null },
-        "L'":  { "Bd": "D",  "D": "F",  "F": "U",  "U": "Bu", "Bu": null },
-        "L2":  { "Bu": "F",  "U": "D",  "F": "Bd", "D": null, "Bd": null },
-        "L2'": { "Bd": "F",  "D": "U",  "F": "Bu", "U": null, "Bu": null },
-    });
-
-    /** @type {Partial<Record<RotationStr, MoveKey>>} */
-    static X_ROTATION_MAP = Object.freeze({
-        "x": "R",
-        "x'": "R'",
-        "x2": "R2",
-        "x2'": "R2'"
+    /** @type {Partial<Record<FingerAction, Record<ThumbPosition, ThumbPosition | null>>>} */
+    static WRIST_TRANSITIONS = Object.freeze({
+        "up":          { "Bd": "D",  "D": "F",  "F": "U",  "U": "Bu", "Bu": null },
+        "down":        { "Bu": "U",  "U": "F",  "F": "D",  "D": "Bd", "Bd": null },
+        "up_double":   { "Bd": "F",  "D": "U",  "F": "Bu", "U": null, "Bu": null },
+        "down_double": { "Bu": "F",  "U": "D",  "F": "Bd", "D": null, "Bd": null },
     });
 
     /** @type {readonly ModifierStr[]} */
@@ -195,11 +209,6 @@ export class Move {
 
     /** @type {readonly GripState[]} Flat list of all 25 explicit grip combinations */
     static ALL_GRIPS = Object.freeze(/** @type {readonly GripState[]} */ (Move.THUMB_KEYS.flatMap(l => Move.THUMB_KEYS.map(r => /** @type {GripState} */ (`${l} ${r}`)))));
-
-    /** @type {readonly MoveKey[]} Face and slice moves that do not change thumb positions */
-    static FINGERTRICK_MOVES = Object.freeze(/** @type {readonly MoveKey[]} */ (["U", "D", "F", "B", "M", "E", "S"].flatMap(m =>
-        Move.MODIFIERS.map(mod => /** @type {MoveKey} */ (`${m}${mod}`))
-    )));
 
     /** @type {RegripDistanceCache} */
     static REGRIP_DIST_CACHE = Object.freeze((() => {
@@ -219,47 +228,6 @@ export class Move {
         return cache;
     })());
 
-    /** @type {NextGripCache} */
-    static NEXT_GRIP_CACHE = Object.freeze((() => {
-        const cache = /** @type {NextGripCache} */ ({});
-        for (const grip of Move.ALL_GRIPS) {
-            const [l, r] = Move.splitGrip(grip);
-            /** @type {NextGripCacheRow} */
-            const row = /** @type {NextGripCacheRow} */ ({});
-
-            // R moves the right thumb
-            for (const moveKey in Move.R_TRANSITIONS) {
-                const key = /** @type {MoveKey} */ (moveKey);
-                const transitions = Move.R_TRANSITIONS[key];
-                const nextRight = transitions ? transitions[r] : null;
-                row[key] = nextRight ? `${l} ${nextRight}` : null;
-            }
-            // L moves the left thumb
-            for (const moveKey in Move.L_TRANSITIONS) {
-                const key = /** @type {MoveKey} */ (moveKey);
-                const transitions = Move.L_TRANSITIONS[key];
-                const nextLeft = transitions ? transitions[l] : null;
-                row[key] = nextLeft ? `${nextLeft} ${r}` : null;
-            }
-            // x moves both thumbs
-            for (const moveKey in Move.X_ROTATION_MAP) {
-                const rotKey = /** @type {RotationStr} */ (moveKey);
-                const rMap = Move.X_ROTATION_MAP[rotKey];
-                const transitions = rMap ? Move.R_TRANSITIONS[rMap] : null;
-                const nextLeft = transitions ? transitions[l] : null;
-                const nextRight = transitions ? transitions[r] : null;
-                row[rotKey] = (nextLeft && nextRight) ? `${nextLeft} ${nextRight}` : null;
-            }
-            // Fingertrick moves keep the grip
-            for (const moveKey of Move.FINGERTRICK_MOVES) {
-                row[moveKey] = grip;
-            }
-
-            cache[grip] = row;
-        }
-        return cache;
-    })());
-
     /**
      * Calculates the chain step distance between two grip states along Bd <-> D <-> F <-> U <-> Bu
      * @param {GripState} fromGrip 
@@ -271,16 +239,58 @@ export class Move {
         return Move.REGRIP_DIST_CACHE[fromGrip]?.[toGrip] ?? Infinity;
     }
 
+    /** @type {Partial<Record<RotationStr, FingerAction>>} */
+    static X_ROTATION_ACTIONS = Object.freeze({
+        "x": "up",
+        "x'": "down",
+        "x2": "up_double",
+        "x2'": "down_double"
+    });
+
     /**
-     * Calculates the resulting grip state after performing a move from currentGrip.
+     * Calculates the resulting grip state after performing a transition with a given fingertrick or rotation.
      * @param {GripState} currentGrip 
-     * @param {MoveKey | RotationStr} moveKey 
+     * @param {Fingertrick | RotationStr | ""} [transitionType=""]
      * @returns {GripState | null}
      */
-    static computeNextGrip(currentGrip, moveKey) {
+    static computeNextGrip(currentGrip, transitionType = "") {
         if (!currentGrip) return null;
-        const row = Move.NEXT_GRIP_CACHE[currentGrip];
-        return row?.[moveKey] ?? null;
+        if (!transitionType) return currentGrip;
+
+        // Full-cube X rotations
+        if (transitionType.startsWith("x")) {
+            const rotKey = /** @type {RotationStr} */ (transitionType);
+            const action = Move.X_ROTATION_ACTIONS[rotKey];
+            const trans = action ? Move.WRIST_TRANSITIONS[action] : null;
+            if (!trans) return currentGrip;
+            const [l, r] = Move.splitGrip(currentGrip);
+            const nextL = trans[l];
+            const nextR = trans[r];
+            return (nextL && nextR) ? /** @type {GripState} */ (`${nextL} ${nextR}`) : null;
+        }
+
+        // Full-cube Z rotations (preserve F F grip)
+        if (transitionType.startsWith("z")) {
+            return currentGrip === "F F" ? "F F" : null;
+        }
+
+        if (transitionType.startsWith("right_")) {
+            const action = /** @type {FingerAction} */ (transitionType.slice(6));
+            const trans = Move.WRIST_TRANSITIONS[action];
+            if (!trans) return currentGrip;
+            const [l, r] = Move.splitGrip(currentGrip);
+            const nextR = trans[r];
+            return nextR ? /** @type {GripState} */ (`${l} ${nextR}`) : null;
+        } else if (transitionType.startsWith("left_")) {
+            const action = /** @type {FingerAction} */ (transitionType.slice(5));
+            const trans = Move.WRIST_TRANSITIONS[action];
+            if (!trans) return currentGrip;
+            const [l, r] = Move.splitGrip(currentGrip);
+            const nextL = trans[l];
+            return nextL ? /** @type {GripState} */ (`${nextL} ${r}`) : null;
+        }
+
+        return currentGrip;
     }
 
     /**

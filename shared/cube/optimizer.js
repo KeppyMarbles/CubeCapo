@@ -2,7 +2,7 @@ import { defaultFormatOptions, defaultRunOptions, defaultFingertricks } from "./
 import { Move } from "./move.js";
 import { ScrambleParser } from "./parser.js";
 import { getOrientationColors, getRestoringRotation, detectCubeSize } from "./util.js";
-/** @import { CostConfig, TransitionConfig, Orientation, GripState, MoveKey, Transition, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, CostDetails, RotationStr, ScrambleCandidate, Fingertrick, FaceStr, MoveStr, TransitionCache, TransitionCacheRow, TransitionCandidate, TransformDescriptor, ParseOptions, ParseResult, AxisStr, ThumbPosition, SingleHandFingertricks } from "../types.js" */
+/** @import { CostConfig, TransitionConfig, Orientation, GripState, MoveKey, Transition, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, CostDetails, RotationStr, ScrambleCandidate, Fingertrick, FaceStr, MoveStr, TransitionCache, TransitionCacheRow, TransitionCandidate, TransformDescriptor, ParseOptions, ParseResult, AxisStr, ThumbPosition } from "../types.js" */
 
 /**
  * @typedef {Object} SearchContext
@@ -122,6 +122,8 @@ export class ScrambleOptimizer {
         if (!this.transitions) return;
         /** @type {TransitionCache} */
         const cache = /** @type {TransitionCache} */ ({});
+        const rightConfig = this.transitions.right;
+        const leftConfig = this.transitions.left;
         const handedness = this.config.general.handedness;
         const ftCosts = this.config.fingertrick;
 
@@ -130,20 +132,22 @@ export class ScrambleOptimizer {
             const cacheRow = {};
             const [l, r] = Move.splitGrip(grip);
 
-            const lMovesRaw = this.transitions[l];
-            const rMoves = this.transitions[r];
+            const rMoves = rightConfig ? rightConfig[r] : null;
+            const lMovesRaw = rightConfig ? rightConfig[l] : null;
+            const lCustomMoves = leftConfig ? leftConfig[l] : null;
 
-            // Mirrored left-hand moves
+            // Resolve left-hand moves: if leftConfig has an override, use it; otherwise mirror from lMovesRaw
             /** @type {Partial<Record<MoveKey, Fingertrick | null>>} */
             const lMoves = {};
             if (lMovesRaw) {
                 for (const moveKey in lMovesRaw) {
                     const key = /** @type {MoveKey} */ (moveKey);
-                    const ft = lMovesRaw[key];
-                    if (ft) {
-                        const mirroredMove = Move.mirrorMove(key);
-                        const mirroredFt = Move.mirrorFingertrick(ft);
-                        lMoves[mirroredMove] = mirroredFt;
+                    const mirroredMove = Move.mirrorMove(key);
+                    if (lCustomMoves && lCustomMoves[mirroredMove] !== undefined) {
+                        lMoves[mirroredMove] = lCustomMoves[mirroredMove];
+                    } else {
+                        const ft = lMovesRaw[key];
+                        lMoves[mirroredMove] = ft ? Move.mirrorRightFingertrick(ft) : null;
                     }
                 }
             }
@@ -176,12 +180,12 @@ export class ScrambleOptimizer {
                 }
 
                 if (!selectedFt) continue;
-                const nextGrip = Move.computeNextGrip(grip, key);
+                const nextGrip = Move.computeNextGrip(grip, selectedFt);
                 if (nextGrip) cacheRow[key] = { next: nextGrip, type: selectedFt };
             }
 
             // Full-cube X rotations (0 fingertrick penalty)
-            for (const rotKey in Move.X_ROTATION_MAP) {
+            for (const rotKey of ["x", "x'", "x2", "x2'"]) {
                 const key = /** @type {RotationStr} */ (rotKey);
                 const nextGrip = Move.computeNextGrip(grip, key);
                 if (nextGrip) cacheRow[key] = { next: nextGrip, type: "" };

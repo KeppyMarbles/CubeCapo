@@ -1,8 +1,9 @@
 import { ScrambleParser } from "../cube/parser.js";
 import { costToColor } from "./stats.js";
-import { defaultCostConfiguration, defaultFormatOptions, defaultRunOptions } from "../cube/defaults.js";
-import { getElement, getOptionalElement, queryElementOptional, queryElements } from "./dom.js";
-/** @import { CostConfig, RunOptions, FormatOptions, ParseResult, NotationMode } from "../types.js" */
+import { defaultCostConfiguration, defaultFormatOptions, defaultRunOptions, defaultFingertricks, strategyPresets } from "../cube/defaults.js";
+import { Move } from "../cube/move.js";
+import { getElement, queryElementOptional, queryElements } from "./dom.js";
+/** @import { CostConfig, RunOptions, FormatOptions, ParseResult, NotationMode, TransitionConfig, ThumbPosition, MoveKey, RightFingertrick, LeftFingertrick, Fingertrick, FingerAction } from "../types.js" */
 
 /**
  * @typedef {Object} GroupControl
@@ -12,7 +13,7 @@ import { getElement, getOptionalElement, queryElementOptional, queryElements } f
 
 /**
  * Set up everything needed for the user to configure the optimizer
- * @param {(config: CostConfig, scramble: ParseResult, options: RunOptions) => Promise<void> | void} onSubmit
+ * @param {(config: CostConfig, scramble: ParseResult, options: RunOptions, transitions: TransitionConfig) => Promise<void> | void} onSubmit
  * @param {() => void} [onFormatChange] Called whenever a format option changes
  */
 export async function setupForm(onSubmit, onFormatChange) {
@@ -24,14 +25,19 @@ export async function setupForm(onSubmit, onFormatChange) {
 
     let savedConfig = structuredClone(initialConfig);
 
+    let initialTransitions = await loadTransitionConfig();
+    if (!initialTransitions || !initialTransitions.right) {
+        initialTransitions = defaultFingertricks;
+    }
+    let currentTransitions = structuredClone(initialTransitions);
+    let savedTransitions = structuredClone(initialTransitions);
+
     /**
      * Set scramble input value, clean up pending storage, and trigger auto-submit
      * @param {string} text 
      */
     const applyScrambleAndSubmit = (text) => {
-        const input = getOptionalElement("scramble", HTMLInputElement);
-        if (!input) return;
-
+        const input = getElement("scramble", HTMLInputElement);
         input.value = text || "";
 
         if (text) {
@@ -39,7 +45,7 @@ export async function setupForm(onSubmit, onFormatChange) {
                 chrome.storage.local.remove(["pendingScramble"]);
             }
             setTimeout(() => {
-                getOptionalElement("submitButton", HTMLButtonElement)?.click();
+                getElement("submitButton", HTMLButtonElement).click();
             }, 50);
         }
     };
@@ -71,8 +77,7 @@ export async function setupForm(onSubmit, onFormatChange) {
         });
     }
 
-    const form = getOptionalElement("costForm", HTMLFormElement);
-    if (!form) return;
+    const form = getElement("costForm", HTMLFormElement);
 
     {
         /** @type {Record<string, string>} */
@@ -80,18 +85,27 @@ export async function setupForm(onSubmit, onFormatChange) {
             "regrip": "Base Regrip",
             "regripPerStep": "Regrip Per Step",
             //"double": "Double Move",
-            "repeatPenalty": "Repeat Fingertrick",
-            "perSliceFingertrick": "Per-Slice Fingertrick Cost",
-            "handedness": "Dominant Hand"
+            "repeatPenalty": "Repeat Penalty",
+            "perSliceFingertrick": "Slice Fingertrick",
+            "handedness": "Dominant Hand",
+
+            "x": "X Rotation",
+            "y": "Y Rotation",
+            "z": "Z Rotation",
         };
 
         /** @type {Record<string, string>} */
         const formTitles = {
-            "regripPerStep": "Cost added for each step moved along the thumb chain (Bd <-> D <-> F <-> U <-> Bu)",
-            "double": "Only effective if Wide Replace Double is active",
-            "repeatPenalty": "The cost of doing the same fingertrick twice in a row",
-            "perSliceFingertrick": "If the fingertrick cost should be applied per effective slice",
-            "handedness": "Hand preference used to tiebreak equal-cost fingertricks"
+            "regrip": "Cost of a full hand regrip (e.g. going from front thumb to back thumb)",
+            "regripPerStep": "Multiplier on top of base regrip proportional to the distance moved (e.g. front thumb to up thumb is 1 step, but front thumb to back thumb is 2 steps)",
+            //"double": "Cost of double move relative to a single move",
+            "repeatPenalty": "Cost penalty for consecutive moves executed by the same finger or hand",
+            "perSliceFingertrick": "Allow fingertricks specifically on slice moves without whole hand shifts",
+            "handedness": "Choose dominant hand for move prioritization",
+            
+            "x": "Cost to perform an X rotation",
+            "y": "Cost to perform a Y rotation",
+            "z": "Cost to perform a Z rotation",
         };
 
         /** @type {Record<string, string>} */
@@ -187,6 +201,9 @@ export async function setupForm(onSubmit, onFormatChange) {
     const formatOpts = /** @type {FormatOptions} */ (await loadOptions("formatOptions", defaultFormatOptions));
     applyFormatOptionsValues(formatOpts);
 
+    const transitionsTabEl = getElement("transitions", HTMLElement);
+    renderTransitionsTab(transitionsTabEl, currentTransitions, () => checkUnsavedChanges());
+
     // Live update check for unsaved bar
     const checkUnsavedChanges = () => {
         const currentConfig = collectCostConfig(form, savedConfig);
@@ -194,14 +211,13 @@ export async function setupForm(onSubmit, onFormatChange) {
 
         const configDiff = JSON.stringify(currentConfig) !== JSON.stringify(savedConfig);
         const optsDiff = JSON.stringify(currentRunOpts) !== JSON.stringify(savedRunOpts);
+        const transDiff = JSON.stringify(currentTransitions) !== JSON.stringify(savedTransitions);
 
-        const bar = getOptionalElement("unsavedChangesBar", HTMLElement);
-        if (bar) {
-            if (configDiff || optsDiff) {
-                bar.classList.remove("hidden");
-            } else {
-                bar.classList.add("hidden");
-            }
+        const bar = getElement("unsavedChangesBar", HTMLElement);
+        if (configDiff || optsDiff || transDiff) {
+            bar.classList.remove("hidden");
+        } else {
+            bar.classList.add("hidden");
         }
     };
 
@@ -219,38 +235,54 @@ export async function setupForm(onSubmit, onFormatChange) {
         "injectZRotations",
         //"wideReplaceDouble",
         "partitionLength",
-        "cubeSize"
+        //"cubeSize"
     ];
     computeInputIds.forEach(id => {
-        const el = getOptionalElement(id, HTMLElement);
-        if (el) {
-            el.addEventListener("input", checkUnsavedChanges);
-            el.addEventListener("change", checkUnsavedChanges);
-        }
+        const el = getElement(id, HTMLElement);
+        el.addEventListener("input", checkUnsavedChanges);
+        el.addEventListener("change", checkUnsavedChanges);
     });
 
+    // Strategy Preset quick buttons
+    const applyPreset = (/** @type {Partial<RunOptions>} */ preset) => {
+        applyRunOptionsValues(preset);
+        form.dispatchEvent(new Event("input", { bubbles: true }));
+        checkUnsavedChanges();
+    };
+
+    getElement("presetFast", HTMLButtonElement).addEventListener("click", () => applyPreset(strategyPresets.fast));
+    getElement("presetBalanced", HTMLButtonElement).addEventListener("click", () => applyPreset(strategyPresets.balanced));
+    getElement("presetExhaustive", HTMLButtonElement).addEventListener("click", () => applyPreset(strategyPresets.exhaustive));
+
     // Format options: auto-save on change and trigger live update (no unsaved bar)
-    const formatInputIds = ["showGrips", "showBoundaries", "wedgeNotation", "showOrientationColors", "reorient"];
+    const formatInputIds = [ 
+        "showGrips", 
+        //"showBoundaries", 
+        "wedgeNotation", 
+        "showOrientationColors", 
+        "reorient"
+    ];
     formatInputIds.forEach(id => {
-        const el = getOptionalElement(id, HTMLElement);
-        if (el) {
-            el.addEventListener("change", async () => {
-                await saveOptions("formatOptions", collectFormatOptionsValues());
-                onFormatChange?.();
-            });
-        }
+        const el = getElement(id, HTMLElement);
+        el.addEventListener("change", async () => {
+            await saveOptions("formatOptions", collectFormatOptionsValues());
+            onFormatChange?.();
+        });
     });
 
     // Unsaved Changes Bar click listeners
-    getOptionalElement("saveChangesButton", HTMLButtonElement)?.addEventListener("click", async () => {
+    getElement("saveChangesButton", HTMLButtonElement).addEventListener("click", async () => {
         const config = collectCostConfig(form, savedConfig);
         await saveCostConfig(config);
 
         const runOptions = collectRunOptionsValues();
         await saveOptions("runOptions", runOptions);
 
+        await saveOptions("transitionConfig", currentTransitions);
+
         savedConfig = structuredClone(config);
         savedRunOpts = structuredClone(runOptions);
+        savedTransitions = structuredClone(currentTransitions);
 
         // Notify options page / content scripts of settings change
         if (typeof chrome !== "undefined" && chrome.tabs) {
@@ -268,52 +300,79 @@ export async function setupForm(onSubmit, onFormatChange) {
         checkUnsavedChanges();
     });
 
-    getOptionalElement("revertChangesButton", HTMLButtonElement)?.addEventListener("click", () => {
+    getElement("revertChangesButton", HTMLButtonElement).addEventListener("click", () => {
         applyConfig(form, savedConfig);
         applyRunOptionsValues(savedRunOpts);
+        currentTransitions = structuredClone(savedTransitions);
+        renderTransitionsTab(transitionsTabEl, currentTransitions, () => checkUnsavedChanges());
 
         updateCostInputColors(form);
-        checkUnsavedChanges(); //TODO not always working?
+        checkUnsavedChanges();
     });
 
     // Submit handler
-    getOptionalElement("submitButton", HTMLButtonElement)?.addEventListener("click", async (e) => {
+    getElement("submitButton", HTMLButtonElement).addEventListener("click", async (e) => {
         e.preventDefault();
-        const errEl = getOptionalElement("errorMessage", HTMLElement);
-        if (errEl) errEl.textContent = "";
+        const errEl = getElement("errorMessage", HTMLElement);
+        errEl.textContent = "";
         try {
             const config = collectCostConfig(form, savedConfig);
-            const scrambleInput = getOptionalElement("scramble", HTMLInputElement);
-            const rawText = scrambleInput ? scrambleInput.value.trim() : "";
+            const scrambleInput = getElement("scramble", HTMLInputElement);
+            const rawText = scrambleInput.value.trim();
             if (!rawText) {
                 throw new Error("Please enter a scramble to analyze.");
             }
-            const notationSelect = getOptionalElement("notationMode", HTMLSelectElement);
-            const notationVal = notationSelect?.value;
+            const notationSelect = getElement("notationMode", HTMLSelectElement);
+            const notationVal = notationSelect.value;
             const notation = /** @type {NotationMode} */ (notationVal ? notationVal : null);
             const parseResult = ScrambleParser.parse(rawText, { notation });
             const options = collectRunOptionsValues();
-            await onSubmit(config, parseResult, options);
+            await onSubmit(config, parseResult, options, currentTransitions);
         } 
         catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            if (errEl) errEl.textContent = "Error: " + msg;
+            errEl.textContent = "Error: " + msg;
         }
     });
 
-    getOptionalElement("resetDefaultButton", HTMLButtonElement)?.addEventListener("click", () => {
+    getElement("resetDefaultButton", HTMLButtonElement).addEventListener("click", () => {
         applyConfig(form, defaultCostConfiguration);
+        applyRunOptionsValues(defaultRunOptions);
+        currentTransitions = structuredClone(defaultFingertricks);
+        renderTransitionsTab(transitionsTabEl, currentTransitions, () => checkUnsavedChanges());
         form.dispatchEvent(new Event("input", { bubbles: true }));
+        checkUnsavedChanges();
     });
 
-    queryElements(document, '.tab-buttons button', HTMLButtonElement).forEach(btn => {
+    // Level 1 Main Tabs (Move Execution vs Cost Penalties vs Search Strategy vs Profile)
+    const MAIN_TAB_MAP = /** @type {const} */ ({
+        execution: "mainTabExecution",
+        penalties: "mainTabPenalties",
+        strategy: "mainTabStrategy",
+        profile: "mainTabProfile",
+    });
+
+    queryElements(document, '.main-tab-btn', HTMLButtonElement).forEach(btn => {
         btn.addEventListener('click', () => {
-            queryElements(document, '.tab-buttons button', HTMLButtonElement).forEach(b => b.classList.remove('active'));
-            queryElements(document, '.tab-content', HTMLElement).forEach(c => c.classList.remove('active'));
+            queryElements(document, '.main-tab-btn', HTMLButtonElement).forEach(b => b.classList.remove('active'));
+            queryElements(document, '.main-tab-content', HTMLElement).forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
-            const targetTab = btn.dataset.tab;
+            const target = btn.dataset.mainTab;
+            if (target && target in MAIN_TAB_MAP) {
+                getElement(MAIN_TAB_MAP[/** @type {keyof typeof MAIN_TAB_MAP} */ (target)], HTMLElement).classList.add('active');
+            }
+        });
+    });
+
+    // Level 2 Cost Penalties Subtabs
+    queryElements(document, '.subtab-btn[data-cost-tab]', HTMLButtonElement).forEach(btn => {
+        btn.addEventListener('click', () => {
+            queryElements(document, '.subtab-btn[data-cost-tab]', HTMLButtonElement).forEach(b => b.classList.remove('active'));
+            queryElements(document, '.cost-tab-content', HTMLElement).forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            const targetTab = btn.dataset.costTab;
             if (targetTab) {
-                getOptionalElement(targetTab, HTMLElement)?.classList.add('active');
+                getElement(targetTab, HTMLElement).classList.add('active');
             }
         });
     });
@@ -359,16 +418,20 @@ export async function setupForm(onSubmit, onFormatChange) {
         //{ label: "Rotation", targets: ["x", "y", "z"]},
     ]);
 
-    getOptionalElement("exportButton", HTMLButtonElement)?.addEventListener("click", () => {
+    getElement("exportButton", HTMLButtonElement).addEventListener("click", () => {
         try {
             const config = collectCostConfig(form, initialConfig);
-            const json = JSON.stringify(config, null, 2);
+            const unifiedProfile = {
+                costConfig: config,
+                transitionConfig: currentTransitions
+            };
+            const json = JSON.stringify(unifiedProfile, null, 2);
             const blob = new Blob([json], { type: "application/json" });
             const url = URL.createObjectURL(blob);
 
             const a = document.createElement("a");
             a.href = url;
-            a.download = "scramble-config.json";
+            a.download = "cube-capo-config.json";
             a.click();
             URL.revokeObjectURL(url);
         } 
@@ -378,38 +441,39 @@ export async function setupForm(onSubmit, onFormatChange) {
         }
     });
     
-    const importFile = getOptionalElement("importFile", HTMLInputElement);
+    const importFile = getElement("importFile", HTMLInputElement);
 
-    getOptionalElement("importButton", HTMLButtonElement)?.addEventListener("click", () => {
-        if (importFile) {
-            importFile.click();
-        }
+    getElement("importButton", HTMLButtonElement).addEventListener("click", () => {
+        importFile.click();
     });
 
-    if (importFile) {
-        importFile.addEventListener("change", async (e) => {
-            const target = e.target;
-            if (!(target instanceof HTMLInputElement)) return;
-            const file = target.files?.[0];
-            if (!file) return;
+    importFile.addEventListener("change", async (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLInputElement)) return;
+        const file = target.files?.[0];
+        if (!file) return;
 
-            try {
-                const text = await file.text();
-                const config = JSON.parse(text);
-                const costForm = getOptionalElement("costForm", HTMLFormElement);
-                if (costForm) {
-                    applyConfig(costForm, config);
-                    form.dispatchEvent(new Event("input", { bubbles: true }));
-                }
-            } 
-            catch (err) {
-                const msg = err instanceof Error ? err.message : String(err);
-                alert("Error importing configuration: " + msg);
+        try {
+            const text = await file.text();
+            const parsed = JSON.parse(text);
+            if (!parsed || typeof parsed !== "object" || !parsed.costConfig || !parsed.transitionConfig) {
+                throw new Error("Invalid configuration format. The file must contain both 'costConfig' and 'transitionConfig'.");
             }
-
+            const costForm = getElement("costForm", HTMLFormElement);
+            applyConfig(costForm, parsed.costConfig);
+            currentTransitions = structuredClone(parsed.transitionConfig);
+            renderTransitionsTab(transitionsTabEl, currentTransitions, () => checkUnsavedChanges());
+            form.dispatchEvent(new Event("input", { bubbles: true }));
+            checkUnsavedChanges();
+        } 
+        catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            alert("Error importing configuration: " + msg);
+        }
+        finally {
             importFile.value = "";
-        });
-    }
+        }
+    });
 
     form.addEventListener("input", (e) => {
         const target = e.target;
@@ -681,7 +745,7 @@ export function collectFormatOptionsValues() {
     return {
         ...defaultFormatOptions,
         showGrips: getElement("showGrips", HTMLInputElement).checked,
-        showBoundaries: getElement("showBoundaries", HTMLInputElement).checked,
+        //showBoundaries: getElement("showBoundaries", HTMLInputElement).checked,
         wedgeNotation: getElement("wedgeNotation", HTMLInputElement).checked,
         showOrientationColors: getElement("showOrientationColors", HTMLInputElement).checked,
         reorient: getElement("reorient", HTMLInputElement).checked,
@@ -690,22 +754,21 @@ export function collectFormatOptionsValues() {
 
 /**
  * Populate the compute option DOM elements with the provided values
- * @param {RunOptions} runOpts
+ * @param {Partial<RunOptions>} runOpts
  */
 function applyRunOptionsValues(runOpts) {
-    const opts = { ...defaultRunOptions, ...runOpts };
-    getElement("depth", HTMLInputElement).value = String(opts.depth);
-    getElement("iterations", HTMLInputElement).value = String(opts.maxIterations);
-    getElement("maxRegripBranches", HTMLInputElement).value = String(opts.maxRegripBranches ?? defaultRunOptions.maxRegripBranches);
-    getElement("searchRotations", HTMLInputElement).checked = Boolean(opts.searchRotations ?? defaultRunOptions.searchRotations);
-    getElement("pruneRotations", HTMLInputElement).checked = Boolean(opts.pruneRotations ?? defaultRunOptions.pruneRotations);
-    getElement("memoize", HTMLInputElement).checked = Boolean(opts.memoize ?? defaultRunOptions.memoize);
-    getElement("wideReplace", HTMLInputElement).checked = Boolean(opts.wideReplace ?? defaultRunOptions.wideReplace);
-    getElement("injectXRotations", HTMLInputElement).checked = Boolean(opts.injectXRotations ?? defaultRunOptions.injectXRotations);
-    getElement("injectZRotations", HTMLInputElement).checked = Boolean(opts.injectZRotations ?? defaultRunOptions.injectZRotations);
-    getElement("searchRegrips", HTMLInputElement).checked = Boolean(opts.searchRegrips ?? defaultRunOptions.searchRegrips);
-    getElement("partitionLength", HTMLInputElement).value = String(opts.partitionLength ?? defaultRunOptions.partitionLength);
-    getElement("cubeSize", HTMLSelectElement).value = String(opts.cubeSize);
+    if (runOpts.depth !== undefined) getElement("depth", HTMLInputElement).value = String(runOpts.depth);
+    if (runOpts.maxIterations !== undefined) getElement("iterations", HTMLInputElement).value = String(runOpts.maxIterations);
+    if (runOpts.maxRegripBranches !== undefined) getElement("maxRegripBranches", HTMLInputElement).value = String(runOpts.maxRegripBranches);
+    if (runOpts.searchRotations !== undefined) getElement("searchRotations", HTMLInputElement).checked = Boolean(runOpts.searchRotations);
+    if (runOpts.pruneRotations !== undefined) getElement("pruneRotations", HTMLInputElement).checked = Boolean(runOpts.pruneRotations);
+    if (runOpts.memoize !== undefined) getElement("memoize", HTMLInputElement).checked = Boolean(runOpts.memoize);
+    if (runOpts.wideReplace !== undefined) getElement("wideReplace", HTMLInputElement).checked = Boolean(runOpts.wideReplace);
+    if (runOpts.injectXRotations !== undefined) getElement("injectXRotations", HTMLInputElement).checked = Boolean(runOpts.injectXRotations);
+    if (runOpts.injectZRotations !== undefined) getElement("injectZRotations", HTMLInputElement).checked = Boolean(runOpts.injectZRotations);
+    if (runOpts.searchRegrips !== undefined) getElement("searchRegrips", HTMLInputElement).checked = Boolean(runOpts.searchRegrips);
+    if (runOpts.partitionLength !== undefined) getElement("partitionLength", HTMLInputElement).value = String(runOpts.partitionLength);
+    if (runOpts.cubeSize !== undefined) getElement("cubeSize", HTMLSelectElement).value = String(runOpts.cubeSize);
 }
 
 /**
@@ -716,7 +779,7 @@ function applyFormatOptionsValues(formatOpts) {
     const opts = { ...defaultFormatOptions, ...formatOpts };
 
     getElement("showGrips", HTMLInputElement).checked = Boolean(opts.showGrips ?? defaultFormatOptions.showGrips);
-    getElement("showBoundaries", HTMLInputElement).checked = Boolean(opts.showBoundaries ?? defaultFormatOptions.showBoundaries);
+    //getElement("showBoundaries", HTMLInputElement).checked = Boolean(opts.showBoundaries ?? defaultFormatOptions.showBoundaries);
     getElement("wedgeNotation", HTMLInputElement).checked = Boolean(opts.wedgeNotation ?? defaultFormatOptions.wedgeNotation);
     getElement("showOrientationColors", HTMLInputElement).checked = Boolean(opts.showOrientationColors ?? defaultFormatOptions.showOrientationColors);
     getElement("reorient", HTMLInputElement).checked = Boolean(opts.reorient ?? defaultFormatOptions.reorient);
@@ -752,8 +815,249 @@ function applyConfig(form, config) {
  * @param {number} time 
  */
 export function drawSearchTime(time) {
-    const el = getOptionalElement("searchTime", HTMLElement);
-    if (el) {
-        el.textContent = new Date(time).toISOString().slice(11, -1);
+    const el = getElement("searchTime", HTMLElement);
+    el.textContent = new Date(time).toISOString().slice(11, -1);
+}
+
+/**
+ * Canonical Symmetrical Move Pairs for Right and Left hands (all 36 moves)
+ * @type {readonly { r: MoveKey, l: MoveKey }[]}
+ */
+const CANONICAL_MOVE_PAIRS = Object.freeze(
+    ["R", "L", "U", "D", "F", "B"].flatMap(face =>
+        Move.MODIFIERS.map(mod => {
+            const r = /** @type {MoveKey} */ (`${face}${mod}`);
+            const l = Move.mirrorMove(r);
+            return { r, l };
+        })
+    )
+);
+/**
+ * Renders the Transitions tab in the configuration form
+ * @param {HTMLElement} container
+ * @param {TransitionConfig} currentTransitions
+ * @param {() => void} onTransitionChange
+ */
+function renderTransitionsTab(container, currentTransitions, onTransitionChange) {
+    container.replaceChildren();
+
+    const THUMB_POSITIONS = /** @type {ThumbPosition[]} */ (["F", "U", "D", "Bu", "Bd"]);
+    let activePosition = /** @type {ThumbPosition} */ ("F");
+
+    const subtabBar = document.createElement("div");
+    subtabBar.className = "subtab-buttons";
+
+    const contentContainer = document.createElement("div");
+    contentContainer.className = "transition-container";
+
+    const renderCurrentGrid = () => {
+        contentContainer.replaceChildren();
+
+        const headerRow = document.createElement("div");
+        headerRow.className = "transition-header-row";
+        for (const title of ["Move", "🤚 Left Hand", "Link", "✋ Right Hand", "Move"]) {
+            const span = document.createElement("span");
+            span.textContent = title;
+            headerRow.appendChild(span);
+        }
+        contentContainer.appendChild(headerRow);
+
+        const grid = document.createElement("div");
+        grid.className = "transition-grid";
+
+        for (const { r: rMove, l: lMove } of CANONICAL_MOVE_PAIRS) {
+            const rFt = currentTransitions.right[activePosition] ? currentTransitions.right[activePosition][rMove] : null;
+            const leftSub = currentTransitions.left ? currentTransitions.left[activePosition] : undefined;
+            const isLinked = !leftSub || leftSub[lMove] === undefined;
+
+            const resolvedLFt = isLinked 
+                ? (rFt ? Move.mirrorRightFingertrick(rFt) : null)
+                : (leftSub ? leftSub[lMove] : null);
+
+            const row = document.createElement("div");
+            row.className = "transition-row";
+
+            // Left Move Label
+            const lLabel = document.createElement("span");
+            lLabel.className = "transition-move-label";
+            lLabel.textContent = lMove;
+
+            // Left Hand Select
+            const lSelect = document.createElement("select");
+            if (isLinked) lSelect.classList.add("select-mirrored");
+            const lNoneOpt = document.createElement("option");
+            lNoneOpt.value = "";
+            lNoneOpt.textContent = "None";
+            lSelect.appendChild(lNoneOpt);
+
+            for (const action of Move.FINGER_ACTIONS) {
+                const opt = document.createElement("option");
+                opt.value = `left_${action}`;
+                opt.textContent = `left_${action}`;
+                lSelect.appendChild(opt);
+            }
+            lSelect.value = resolvedLFt || "";
+
+            // Link Toggle Button
+            const linkBtn = document.createElement("button");
+            linkBtn.type = "button";
+            linkBtn.className = `btn-link-toggle ${isLinked ? "linked" : "unlinked"}`;
+            linkBtn.title = isLinked ? "Linked to Right Hand (Mirrored). Click to unlink." : "Custom Left Hand Override. Click to relink.";
+
+            const iconSpan = document.createElement("span");
+            iconSpan.className = `icon-svg ${isLinked ? "icon-link" : "icon-unlink"}`;
+            linkBtn.appendChild(iconSpan);
+
+            // Right Hand Select
+            const rSelect = document.createElement("select");
+            const rNoneOpt = document.createElement("option");
+            rNoneOpt.value = "";
+            rNoneOpt.textContent = "None";
+            rSelect.appendChild(rNoneOpt);
+
+            for (const action of Move.FINGER_ACTIONS) {
+                const opt = document.createElement("option");
+                opt.value = `right_${action}`;
+                opt.textContent = `right_${action}`;
+                rSelect.appendChild(opt);
+            }
+            rSelect.value = rFt || "";
+
+            // Right Move Label
+            const rLabel = document.createElement("span");
+            rLabel.className = "transition-move-label";
+            rLabel.textContent = rMove;
+
+            // Event Listeners
+            rSelect.addEventListener("change", () => {
+                const newRFt = /** @type {RightFingertrick | null} */ (rSelect.value || null);
+                if (!currentTransitions.right[activePosition]) {
+                    currentTransitions.right[activePosition] = /** @type {any} */ ({});
+                }
+                currentTransitions.right[activePosition][rMove] = newRFt;
+
+                // If linked, also update Left select
+                const leftSub = currentTransitions.left ? currentTransitions.left[activePosition] : undefined;
+                const isCurrentlyLinked = !leftSub || leftSub[lMove] === undefined;
+                if (isCurrentlyLinked) {
+                    const mirrored = newRFt ? Move.mirrorRightFingertrick(newRFt) : null;
+                    lSelect.value = mirrored || "";
+                }
+
+                onTransitionChange();
+            });
+
+            lSelect.addEventListener("change", () => {
+                const newLFt = /** @type {LeftFingertrick | null} */ (lSelect.value || null);
+                const leftSub = currentTransitions.left ? currentTransitions.left[activePosition] : undefined;
+                const isCurrentlyLinked = !leftSub || leftSub[lMove] === undefined;
+
+                if (isCurrentlyLinked) {
+                    // Symmetrical link active: update right hand with mirrored value
+                    const newRFt = newLFt ? Move.mirrorLeftFingertrick(newLFt) : null;
+                    if (!currentTransitions.right[activePosition]) {
+                        currentTransitions.right[activePosition] = /** @type {any} */ ({});
+                    }
+                    currentTransitions.right[activePosition][rMove] = newRFt;
+                    rSelect.value = newRFt || "";
+                } else {
+                    // Unlinked: update custom left override
+                    if (!currentTransitions.left) currentTransitions.left = {};
+                    let targetSub = currentTransitions.left[activePosition];
+                    if (!targetSub) {
+                        targetSub = {};
+                        currentTransitions.left[activePosition] = targetSub;
+                    }
+                    targetSub[lMove] = newLFt;
+                }
+
+                onTransitionChange();
+            });
+
+            linkBtn.addEventListener("click", () => {
+                const leftSub = currentTransitions.left ? currentTransitions.left[activePosition] : undefined;
+                const isCurrentlyLinked = !leftSub || leftSub[lMove] === undefined;
+                if (isCurrentlyLinked) {
+                    // Unlink: store current value explicitly
+                    if (!currentTransitions.left) currentTransitions.left = {};
+                    let targetSub = currentTransitions.left[activePosition];
+                    if (!targetSub) {
+                        targetSub = {};
+                        currentTransitions.left[activePosition] = targetSub;
+                    }
+                    targetSub[lMove] = /** @type {LeftFingertrick | null} */ (lSelect.value || null);
+
+                    iconSpan.className = "icon-svg icon-unlink";
+                    linkBtn.className = "btn-link-toggle unlinked";
+                    linkBtn.title = "Custom Left Hand Override. Click to relink.";
+                    lSelect.classList.remove("select-mirrored");
+                } else {
+                    // Relink: delete override
+                    const leftSub = currentTransitions.left ? currentTransitions.left[activePosition] : undefined;
+                    if (leftSub) {
+                        delete leftSub[lMove];
+                    }
+                    const rightSub = currentTransitions.right[activePosition];
+                    const currentRightVal = rightSub ? rightSub[rMove] : null;
+                    const mirrored = currentRightVal ? Move.mirrorRightFingertrick(currentRightVal) : null;
+                    lSelect.value = mirrored || "";
+
+                    iconSpan.className = "icon-svg icon-link";
+                    linkBtn.className = "btn-link-toggle linked";
+                    linkBtn.title = "Linked to Right Hand (Mirrored). Click to unlink.";
+                    lSelect.classList.add("select-mirrored");
+                }
+                onTransitionChange();
+            });
+
+            row.appendChild(lLabel);
+            row.appendChild(lSelect);
+            row.appendChild(linkBtn);
+            row.appendChild(rSelect);
+            row.appendChild(rLabel);
+
+            grid.appendChild(row);
+        }
+
+        contentContainer.appendChild(grid);
+    };
+
+    THUMB_POSITIONS.forEach(pos => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `subtab-btn ${pos === activePosition ? "active" : ""}`;
+        btn.textContent = pos;
+        btn.addEventListener("click", () => {
+            activePosition = pos;
+            queryElements(subtabBar, ".subtab-btn", HTMLButtonElement).forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            renderCurrentGrid();
+        });
+        subtabBar.appendChild(btn);
+    });
+
+    container.appendChild(subtabBar);
+    container.appendChild(contentContainer);
+    renderCurrentGrid();
+}
+
+/**
+ * Get the transition configuration saved in storage
+ * @returns {Promise<TransitionConfig | null>}
+ */
+async function loadTransitionConfig() {
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        return new Promise((resolve) => {
+            chrome.storage.local.get(["transitionConfig"], (result) => {
+                resolve(/** @type {TransitionConfig | null} */ (result?.transitionConfig || null));
+            });
+        });
+    }
+    try {
+        const stored = localStorage.getItem("transitionConfig");
+        return stored ? JSON.parse(stored) : null;
+    } 
+    catch {
+        return null;
     }
 }

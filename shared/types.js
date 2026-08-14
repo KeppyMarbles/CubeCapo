@@ -23,36 +23,26 @@
 
 /**
  * @typedef {(
- *   | "right_index"
- *   | "right_index_push"
- *   | "right_index_front"
- *   | "right_index_middle"
- *   | "right_ring"
- *   | "right_ring_middle"
- *   | "right_ring_push"
- *   | "right_middle"
- *   | "right_middle_push"
- *   | "right_thumb"
- *   | "right_up"
- *   | "right_up_double"
- *   | "right_down"
- *   | "right_down_double"
- *   | "left_index"
- *   | "left_index_push"
- *   | "left_index_front"
- *   | "left_index_middle"
- *   | "left_ring"
- *   | "left_ring_middle"
- *   | "left_ring_push"
- *   | "left_middle"
- *   | "left_middle_push"
- *   | "left_thumb"
- *   | "left_up"
- *   | "left_up_double"
- *   | "left_down"
- *   | "left_down_double"
- * )} Fingertrick
+ *   | "index"
+ *   | "index_push"
+ *   | "index_front"
+ *   | "index_middle"
+ *   | "ring"
+ *   | "ring_middle"
+ *   | "ring_push"
+ *   | "middle"
+ *   | "middle_push"
+ *   | "thumb"
+ *   | "up"
+ *   | "up_double"
+ *   | "down"
+ *   | "down_double"
+ * )} FingerAction
  */
+
+/** @typedef {`right_${FingerAction}`} RightFingertrick */
+/** @typedef {`left_${FingerAction}`} LeftFingertrick */
+/** @typedef {RightFingertrick | LeftFingertrick} Fingertrick */
 
 /** @typedef {`${ThumbPosition} ${ThumbPosition}`} GripState */
 /** @typedef {`${FaceStr | MiddleStr}${ModifierStr}`} MoveKey */
@@ -99,8 +89,16 @@
  * @property {number} [addedCost] Marginal cost contributed by this move alone
  */
 
-/** @typedef {Record<MoveKey, Fingertrick | null>} SingleHandFingertricks */
-/** @typedef {Record<ThumbPosition, SingleHandFingertricks>} TransitionConfig */
+/** @typedef {Record<MoveKey, RightFingertrick | null>} RightHandFingertricks */
+/** @typedef {Partial<Record<MoveKey, LeftFingertrick | null>>} LeftHandFingertricks */
+/** @typedef {Record<ThumbPosition, RightHandFingertricks>} RightHandConfig */
+/** @typedef {Partial<Record<ThumbPosition, LeftHandFingertricks>>} LeftHandConfig */
+
+/**
+ * @typedef {Object} TransitionConfig
+ * @property {RightHandConfig} right
+ * @property {LeftHandConfig} [left]
+ */
 /** @typedef {Record<RotationStr, Record<FaceStr | AxisStr, FaceStr | AxisStr>>} TranspositionMap */
 /** @typedef {Partial<Record<MoveKey, Record<ThumbPosition, ThumbPosition | null>>>} ThumbTransitions */
 /** @typedef {Record<GripState, number>} RegripDistanceCacheRow */

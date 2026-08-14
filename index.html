@@ -37,33 +37,10 @@
                 <option value="sign">SiGN</option>
               </select>
             </label>
-
-            <label title="If single moves can be replaced with wide moves (e.g. R -> r)">Wide Replace
-              <input type="checkbox" id="wideReplace" checked/>
-            </label>
-
-            <label title="Always explore regrip candidates even when a direct transition exists">Search Regrips
-              <input type="checkbox" id="searchRegrips"/>
-            </label>
-
-            <!-- <label title="If double moves can be replaced with a wide move + normal face move. Increases search time">Wide Replace Double
-              <input type="checkbox" id="wideReplaceDouble"/>
-            </label> -->
-
-            <label title="If a the search should be tried on every orientation">Search Starting Rotations
-              <input type="checkbox" id="searchRotations"/>
-            </label>
-
-            <label title="Try injecting X rotations mid-scramble">Inject X Rotations
-              <input type="checkbox" id="injectXRotations"/>
-            </label>
-
-            <label title="Try injecting Z rotations mid-scramble when starting grip is F F">Inject Z Rotations
-              <input type="checkbox" id="injectZRotations"/>
-            </label>
           </div>
 
           <button id="submitButton">Submit</button>
+
           <p id="errorMessage"></p>
           <div id="scrambleMeta" class="scramble-meta" style="display: none;">
             <span id="scrambleMetaText"></span>
@@ -85,16 +62,16 @@
                   <input type="checkbox" id="showGrips"/>
                 </label>
 
-                <label title="Show where the scramble was split during computation.">Show Partition Boundaries
-                  <input type="checkbox" id="showBoundaries"/>
+                <label title="Display starting cube orientation as colors (e.g. White top, Green front)">Show Orientation Colors
+                  <input type="checkbox" id="showOrientationColors"/>
                 </label>
+
+                <!-- <label title="Show where the scramble was split during computation.">Show Partition Boundaries
+                  <input type="checkbox" id="showBoundaries"/>
+                </label> -->
 
                 <label title="Convert wide moves to wedge count notation (e.g. Rw instead of r)">Wedge Notation
                   <input type="checkbox" id="wedgeNotation"/>
-                </label>
-
-                <label title="Display starting cube orientation as colors (e.g. White top, Green front)">Show Orientation Colors
-                  <input type="checkbox" id="showOrientationColors"/>
                 </label>
 
                 <label title="Append rotations at the end of the scramble to restore original cube orientation">Reorient
@@ -102,36 +79,6 @@
                 </label>
               </div>
             </details>
-
-            <details>
-              <summary>Computation Settings</summary>
-              <div id="advancedContent">
-                <label title="Number of iterations to try on each orientation before bailing out">Max Iterations
-                  <input type="number" id="iterations"/>
-                </label>
-
-                <label title="The most the current cost can be above the best cost before pruning the branch. Increase this if you have negative cost values">Pruning Threshold
-                  <input type="number" id="depth"/>
-                </label>
-
-                <label title="If a rotation search should stop if worse than the best rotation. Disable if you want more data">Prune Starting Rotations
-                  <input type="checkbox" id="pruneRotations"/>
-                </label>
-
-                <label title="Maximum move count per sub-scramble partition to optimize long scrambles (0 to disable)">Partition Length
-                  <input type="number" id="partitionLength" min="0" value="0"/>
-                </label>
-
-                <label title="Maximum number of candidate regrips to explore when a regrip is required">Max Regrip Branches
-                  <input type="number" id="maxRegripBranches" min="1" max="25" value="2"/>
-                </label>
-
-                <label title="If reaching an already visited state [current grip & scramble index & cube orientation] should prune the current branch. Disable if you want to ensure minimization">Memoize
-                  <input type="checkbox" id="memoize"/>
-                </label>
-              </div>
-            </details>
-
           </div>
 
           <h3>Cost Distribution</h3>
@@ -170,35 +117,128 @@
       </div>
       <div class="cost-section">   
           <form id="costForm" class="cost-form">
-            <h2>Cost Configuration</h2>
-            <div class="tabs">
-              <div class="tab-buttons">
-                <button type="button" class="active" data-tab="general">General</button>
-                <button type="button" data-tab="face">Move</button>
-                <button type="button" data-tab="grip">Thumb Placement</button>
-                <button type="button" data-tab="fingertricks">Fingertricks</button>
+            <h2>Configuration</h2>
+            <div class="config-tabs">
+              <!-- Level 1 Main Tabs -->
+              <div class="main-tab-buttons">
+                <button type="button" class="main-tab-btn active" data-main-tab="strategy">Search Strategy</button>
+                <button type="button" class="main-tab-btn" data-main-tab="penalties">Cost Penalties</button>
+                <button type="button" class="main-tab-btn" data-main-tab="execution">Move Execution</button>
+                <button type="button" class="main-tab-btn" data-main-tab="profile">Profile</button>
               </div>
-                <div class="tab-content active" id="general" data-group="general"></div>
-                <div class="tab-content" id="face" data-group="alpha"></div>
-                <div class="tab-content" id="grip" data-group="grip"></div>
-                <div class="tab-content" id="fingertricks" data-group="fingertrick"></div>
+
+              <!-- Level 1 Tab: Search Strategy -->
+              <div class="main-tab-content active" id="mainTabStrategy">
+                <div class="strategy-container">
+                  <div class="strategy-group">
+                    <h3>Presets</h3>
+                    <div class="profile-actions">
+                      <button type="button" class="btn-profile" id="presetFast" title="Low computation time but higher cost. Good for potato PCs">Low</button>
+                      <button type="button" class="btn-profile" id="presetBalanced" title="Balanced computation time and scramble cost.">Medium</button>
+                      <button type="button" class="btn-profile" id="presetExhaustive" title="Lower cost but high computation time.">High</button>
+                    </div>
+                  </div>
+
+                  <div class="strategy-group">
+                    <h3>Move Transformations</h3>
+                    <div class="strategy-fields">
+                      <label title="If single moves can be replaced with wide moves (e.g. R -> r)">Wide Replace
+                        <input type="checkbox" id="wideReplace" checked/>
+                      </label>
+                      <label title="Try injecting X rotations mid-scramble">Inject X Rotations
+                        <input type="checkbox" id="injectXRotations"/>
+                      </label>
+                      <label title="Try injecting Z rotations mid-scramble when starting grip is F F">Inject Z Rotations
+                        <input type="checkbox" id="injectZRotations"/>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="strategy-group">
+                    <h3>Search Exploration</h3>
+                    <div class="strategy-fields">
+                      <label title="If the search should explore all starting cube orientations">Search Starting Rotations
+                        <input type="checkbox" id="searchRotations"/>
+                      </label>
+                      <label title="If a rotation search should stop early if worse than the best rotation">Prune Starting Rotations
+                        <input type="checkbox" id="pruneRotations"/>
+                      </label>
+                      <label title="Always explore regrip candidates even when a direct transition exists">Search Regrips
+                        <input type="checkbox" id="searchRegrips"/>
+                      </label>
+                      <label title="Maximum number of candidate regrips to explore when a regrip is required">Max Regrip Branches
+                        <input type="number" id="maxRegripBranches" min="1" max="25" value="2"/>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="strategy-group">
+                    <h3>Engine & Limits</h3>
+                    <div class="strategy-fields">
+                      <label title="Number of iterations to try on each orientation before bailing out">Max Iterations
+                        <input type="number" id="iterations"/>
+                      </label>
+                      <label title="The most the current cost can be above the best cost before pruning the branch. Increase this if you have negative cost values">Pruning Threshold
+                        <input type="number" id="depth"/>
+                      </label>
+                      <label title="Maximum move count per sub-scramble partition to optimize long scrambles (0 to disable)">Partition Length
+                        <input type="number" id="partitionLength" min="0" value="0"/>
+                      </label>
+                      <label title="If reaching an already visited state [current grip & scramble index & cube orientation] should prune the current branch">Memoize
+                        <input type="checkbox" id="memoize"/>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Level 1 Tab: Cost Penalties -->
+              <div class="main-tab-content" id="mainTabPenalties">
+                <div class="subtab-buttons cost-subtab-buttons">
+                  <button type="button" class="subtab-btn active" data-cost-tab="general">General</button>
+                  <button type="button" class="subtab-btn" data-cost-tab="face">Move</button>
+                  <button type="button" class="subtab-btn" data-cost-tab="grip">Thumb Placement</button>
+                  <button type="button" class="subtab-btn" data-cost-tab="fingertricks">Fingertricks</button>
+                </div>
+                <div class="cost-tab-content active" id="general" data-group="general"></div>
+                <div class="cost-tab-content" id="face" data-group="alpha"></div>
+                <div class="cost-tab-content" id="grip" data-group="grip"></div>
+                <div class="cost-tab-content" id="fingertricks" data-group="fingertrick"></div>
+              </div>
+
+              <!-- Level 1 Tab: Move Execution -->
+              <div class="main-tab-content" id="mainTabExecution">
+                <div id="transitions" data-group="transitions"></div>
+              </div>
+
+              <!-- Level 1 Tab: Profile & Storage -->
+              <div class="main-tab-content" id="mainTabProfile">
+                <div class="strategy-container">
+                  <div class="strategy-group">
+                    <h3>Import & Export</h3>
+                    <p class="profile-desc">Save move executions and cost penalties to a JSON file or load an existing profile.</p>
+                    <div class="profile-actions">
+                      <button type="button" id="exportButton" class="btn-profile">Export</button>
+                      <button type="button" id="importButton" class="btn-profile">Import</button>
+                      <input id="importFile" type="file" accept=".json" class="hidden">
+                    </div>
+                  </div>
+
+                  <div class="strategy-group">
+                    <h3>Reset Defaults</h3>
+                    <p class="profile-desc">Restore all move execution mappings, cost penalties, and search strategy options to default.</p>
+                    <div class="profile-actions">
+                      <button type="button" id="resetDefaultButton" class="btn-profile btn-danger">Reset To Defaults</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </form>
-          <details class="config-details">
-            <summary class="config-summary">Config Options</summary>
-            <div id="configOptions">
-              <button type="button" id="resetDefaultButton">Reset To Defaults</button>
-              <button type="button" id="exportButton">Export</button>
-              <button type="button" id="importButton">Import</button>
-              <input id="importFile" type="file" accept=".json" class="hidden">
-            </div>
-          </details>
       </div>
     <footer class="footer-fixed">
-      <a href="https://github.com/KeppyMarbles/CubeCapo"
-         target="_blank" rel="noopener noreferrer">
-        <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/github.svg"
-             alt="GitHub">Source
+      <a href="https://github.com/KeppyMarbles/CubeCapo" target="_blank" rel="noopener noreferrer">
+        <span class="icon-svg icon-github"></span>&nbsp;Source
       </a>
     </footer>
   </div>
@@ -211,7 +251,6 @@
     </div>
   </div>
 
-  <script src="shared/ui/breakdownTable.js"></script>
   <script type="module" src="main.js"></script>
 </body>
 </html>

@@ -48,7 +48,7 @@ extAPI.runtime.onMessage.addListener(
                     return;
                 }
 
-                const store = await extAPI.storage.local.get(["costConfig", "runOptions", "formatOptions", "parseOptions"]);
+                const store = await extAPI.storage.local.get(["costConfig", "runOptions", "formatOptions", "parseOptions", "transitionConfig"]);
                 const parseOptions = { ...defaultParseOptions, ...store.parseOptions };
 
                 // Validate scramble move syntax
@@ -66,13 +66,14 @@ extAPI.runtime.onMessage.addListener(
                 }
 
                 const config = store.costConfig || defaultCostConfiguration;
+                const transitions = store.transitionConfig || defaultFingertricks;
 
                 const cubeSize = store.runOptions?.cubeSize ? Number(store.runOptions.cubeSize) : null;
 
                 const runOptions = { ...defaultRunOptions, ...store.runOptions, cubeSize };
                 const formatOptions = { ...defaultFormatOptions, ...store.formatOptions };
 
-                const optimizer = new ScrambleOptimizer(config, defaultFingertricks, null);
+                const optimizer = new ScrambleOptimizer(config, transitions, null);
 
                 const start = performance.now();
                 await optimizer.optimize(parseResult, runOptions);

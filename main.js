@@ -1,10 +1,9 @@
 import { setupForm, drawSearchTime, collectFormatOptionsValues } from "./shared/ui/form.js";
-import { getOptionalElement } from "./shared/ui/dom.js";
+import { getElement } from "./shared/ui/dom.js";
 import { ScrambleOptimizer } from "./shared/cube/optimizer.js";
 import { drawOptimizerStats } from "./shared/ui/stats.js";
 import { defaultFingertricks } from "./shared/cube/defaults.js";
-/** @import { CostConfig, RunOptions, ParseResult } from "./shared/types.js" */
-/** @import { Move } from "./shared/cube/move.js" */
+/** @import { CostConfig, RunOptions, ParseResult, TransitionConfig } from "./shared/types.js" */
 
 /** @type {ScrambleOptimizer | null} */
 let currentOptimizer = null;
@@ -17,13 +16,14 @@ let currentParseResult = null;
  * @param {CostConfig} config
  * @param {ParseResult} scramble
  * @param {RunOptions} options 
+ * @param {TransitionConfig} [transitions]
  */
-async function onSubmit(config, scramble, options) {
+async function onSubmit(config, scramble, options, transitions) {
     currentCandidateIndex = 0;
     currentParseResult = scramble;
     await drawOptimizerStats(null);
 
-    currentOptimizer = new ScrambleOptimizer(config, defaultFingertricks, async () => {
+    currentOptimizer = new ScrambleOptimizer(config, transitions || defaultFingertricks, async () => {
         await drawOptimizerStats(currentOptimizer, collectFormatOptionsValues(), currentCandidateIndex, currentParseResult);
     });
 
@@ -43,26 +43,22 @@ async function onSubmit(config, scramble, options) {
     };
 
     const setupPaginationControls = () => {
-        const prevBtn = getOptionalElement("prevScrambleBtn", HTMLButtonElement);
-        const nextBtn = getOptionalElement("nextScrambleBtn", HTMLButtonElement);
+        const prevBtn = getElement("prevScrambleBtn", HTMLButtonElement);
+        const nextBtn = getElement("nextScrambleBtn", HTMLButtonElement);
 
-        if (prevBtn) {
-            prevBtn.addEventListener("click", () => {
-                if (currentOptimizer && currentCandidateIndex > 0) {
-                    currentCandidateIndex--;
-                    drawOptimizerStats(currentOptimizer, collectFormatOptionsValues(), currentCandidateIndex, currentParseResult);
-                }
-            });
-        }
+        prevBtn.addEventListener("click", () => {
+            if (currentOptimizer && currentCandidateIndex > 0) {
+                currentCandidateIndex--;
+                drawOptimizerStats(currentOptimizer, collectFormatOptionsValues(), currentCandidateIndex, currentParseResult);
+            }
+        });
 
-        if (nextBtn) {
-            nextBtn.addEventListener("click", () => {
-                if (currentOptimizer && currentOptimizer.candidates && currentCandidateIndex < currentOptimizer.candidates.length - 1) {
-                    currentCandidateIndex++;
-                    drawOptimizerStats(currentOptimizer, collectFormatOptionsValues(), currentCandidateIndex, currentParseResult);
-                }
-            });
-        }
+        nextBtn.addEventListener("click", () => {
+            if (currentOptimizer && currentOptimizer.candidates && currentCandidateIndex < currentOptimizer.candidates.length - 1) {
+                currentCandidateIndex++;
+                drawOptimizerStats(currentOptimizer, collectFormatOptionsValues(), currentCandidateIndex, currentParseResult);
+            }
+        });
     };
 
     setupPaginationControls();
