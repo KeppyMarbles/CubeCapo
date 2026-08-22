@@ -375,12 +375,12 @@ export async function setupForm(onSubmit, onFormatChange) {
         onFormatChange?.();
     });
 
-    // Level 1 Main Tabs (Move Execution vs Cost Penalties vs Search Strategy vs Color Scheme vs Profile)
+    // Level 1 Main Tabs (Move Execution vs Cost Penalties vs Search Strategy vs Format vs Profile)
     const MAIN_TAB_MAP = /** @type {const} */ ({
         execution: "mainTabExecution",
         penalties: "mainTabPenalties",
         strategy: "mainTabStrategy",
-        colors: "mainTabColors",
+        format: "mainTabFormat",
         profile: "mainTabProfile",
     });
 
