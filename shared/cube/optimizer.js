@@ -1,8 +1,8 @@
-import { defaultFormatOptions, defaultRunOptions, defaultFingertricks } from "./defaults.js";
+import { defaultFormatOptions, defaultRunOptions } from "./defaults.js";
 import { Move } from "./move.js";
-import { ScrambleParser } from "./parser.js";
 import { getOrientationColors, getRestoringRotation, detectCubeSize } from "./util.js";
-/** @import { CostConfig, TransitionConfig, Orientation, GripState, MoveKey, Transition, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, CostDetails, RotationStr, ScrambleCandidate, Fingertrick, FaceStr, MoveStr, TransitionCache, TransitionCacheRow, TransitionCandidate, TransformDescriptor, ParseOptions, ParseResult, AxisStr, ThumbPosition } from "../types.js" */
+/** @import { ExecutionEvaluator } from "./execution.js" */
+/** @import { Orientation, GripState, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, RotationStr, ScrambleCandidate, FaceStr, MoveStr, ExecutionStep, TransformDescriptor, ParseResult, AxisStr } from "../types.js" */
 
 /**
  * @typedef {Object} SearchContext
@@ -84,16 +84,12 @@ export class ScrambleOptimizer {
     }
 
     /**
-     * 
-     * @param {CostConfig} config 
-     * @param {TransitionConfig} transitions
-     * @param {(() => Promise<void> | void) | null} [callback]
+     * @param {ExecutionEvaluator} execution Evaluator for grip transitions and execution costs
+     * @param {(() => Promise<void> | void) | null} [callback] Function to call when a rotation optimization finishes
      */
-    constructor(config, transitions, callback = null) {
-        /** @type {CostConfig} Cost config */
-        this.config = config;
-        /** @type {TransitionConfig} Transition config */
-        this.transitions = transitions;
+    constructor(execution, callback = null) {
+        /** @type {ExecutionEvaluator} Evaluator for grip transitions and execution costs */
+        this.execution = execution;
         /** @type {((() => Promise<void> | void)) | null} Function to call when a rotation optimization finishes */
         this.callback = callback || null;
         /** @type {RunOptions} Active run options for scramble search */
@@ -108,99 +104,6 @@ export class ScrambleOptimizer {
         this.rotationInfo = null;
         /** @type {Map<string, number>} Memoization for all orientations */
         this.memo = new Map();
-        /** @type {GripState[]} Invariant list of grip keys */
-        this.allGripKeys = /** @type {GripState[]} */ (Object.keys(this.config.grip));
-        /** @type {TransitionCache | null} Cache for transitions */
-        this.transitionCache = null;
-        this.initTransitionCache();
-    }
-
-    /**
-     * Pre-computes transition objects for fast O(1) lookups during optimization.
-     */
-    initTransitionCache() {
-        if (!this.transitions) return;
-        /** @type {TransitionCache} */
-        const cache = /** @type {TransitionCache} */ ({});
-        const rightConfig = this.transitions.right;
-        const leftConfig = this.transitions.left;
-        const handedness = this.config.general.handedness;
-        const ftCosts = this.config.fingertrick;
-
-        for (const grip of this.allGripKeys) {
-            /** @type {TransitionCacheRow} */
-            const cacheRow = {};
-            const [l, r] = Move.splitGrip(grip);
-
-            const rMoves = rightConfig ? rightConfig[r] : null;
-            const lMovesRaw = rightConfig ? rightConfig[l] : null;
-            const lCustomMoves = leftConfig ? leftConfig[l] : null;
-
-            // Resolve left-hand moves: if leftConfig has an override, use it; otherwise mirror from lMovesRaw
-            /** @type {Partial<Record<MoveKey, Fingertrick | null>>} */
-            const lMoves = {};
-            if (lMovesRaw) {
-                for (const moveKey in lMovesRaw) {
-                    const key = /** @type {MoveKey} */ (moveKey);
-                    const mirroredMove = Move.mirrorMove(key);
-                    if (lCustomMoves && lCustomMoves[mirroredMove] !== undefined) {
-                        lMoves[mirroredMove] = lCustomMoves[mirroredMove];
-                    } else {
-                        const ft = lMovesRaw[key];
-                        lMoves[mirroredMove] = ft ? Move.mirrorRightFingertrick(ft) : null;
-                    }
-                }
-            }
-
-            // Union of move keys from both hands
-            /** @type {Set<MoveKey>} */
-            const allMoveKeys = new Set(/** @type {MoveKey[]} */ ([
-                ...Object.keys(lMoves),
-                ...(rMoves ? Object.keys(rMoves) : [])
-            ]));
-
-            for (const key of allMoveKeys) {
-                const lFt = lMoves[key];
-                const rFt = rMoves ? rMoves[key] : null;
-
-                /** @type {Fingertrick | null | undefined} */
-                let selectedFt = null;
-                if (lFt && rFt) {
-                    const lCost = ftCosts[lFt] ?? 0;
-                    const rCost = ftCosts[rFt] ?? 0;
-                    if (lCost < rCost) {
-                        selectedFt = lFt;
-                    } else if (rCost < lCost) {
-                        selectedFt = rFt;
-                    } else {
-                        selectedFt = handedness === "left" ? lFt : rFt;
-                    }
-                } else {
-                    selectedFt = rFt || lFt;
-                }
-
-                if (!selectedFt) continue;
-                const nextGrip = Move.computeNextGrip(grip, selectedFt);
-                if (nextGrip) cacheRow[key] = { next: nextGrip, type: selectedFt };
-            }
-
-            // Full-cube X rotations (0 fingertrick penalty)
-            for (const rotKey of ["x", "x'", "x2", "x2'"]) {
-                const key = /** @type {RotationStr} */ (rotKey);
-                const nextGrip = Move.computeNextGrip(grip, key);
-                if (nextGrip) cacheRow[key] = { next: nextGrip, type: "" };
-            }
-
-            // Injected Z rotations when in F F grip (preserve F F grip with 0 fingertrick penalty)
-            if (grip === "F F") {
-                cacheRow["z"] = { next: "F F", type: "" };
-                cacheRow["z'"] = { next: "F F", type: "" };
-                cacheRow["z2"] = { next: "F F", type: "" };
-            }
-
-            cache[grip] = cacheRow;
-        }
-        this.transitionCache = cache;
     }
 
     /**
@@ -301,15 +204,6 @@ export class ScrambleOptimizer {
     }
 
     /**
-     * @param {GripState} grip 
-     * @param {MoveKey | RotationStr} moveKey 
-     * @returns {Transition | null}
-     */
-    getTransitionFor(grip, moveKey) {
-        return this.transitionCache?.[grip]?.[moveKey] || null;
-    }
-
-    /**
      * @param {Move[]} moves 
      * @param {number} index Physical index in moves array
      * @param {number} logicalIndex Logical index in original scramble
@@ -379,19 +273,31 @@ export class ScrambleOptimizer {
              */
             const evaluateMoveAt = (idx, cGrip, cCost) => {
                 const moved = clone[idx];
-                const movedKey = moved.toKey();
-                const directTrans = this.getTransitionFor(cGrip, movedKey);
-                /** @type {TransitionCandidate[]} */
-                const candidates = (!directTrans || this.options.searchRegrips) ? this.findCandidateRegrips(cGrip, movedKey, moved, cCost) : [];
-                if (directTrans) {
-                    const addedCost = this.computeTransitionCost(directTrans, moved);
-                    candidates.unshift({ 
-                        transition: directTrans, 
-                        nextGrip: directTrans.next, 
-                        cost: cCost + addedCost 
+                /** @type {ExecutionStep[]} */
+                const branches = [];
+
+                const direct = this.execution.getDirectStep(cGrip, moved, this.options.cubeSize);
+                if (direct) {
+                    branches.push({
+                        transition: direct.transition,
+                        nextGrip: direct.nextGrip,
+                        cost: cCost + direct.cost
                     });
                 }
-                return candidates;
+
+                if (!direct || this.options.searchRegrips) {
+                    const regripOptions = this.execution.getRegripOptions(cGrip, moved, this.options.cubeSize, this.options.maxRegripBranches ?? 2);
+                    for (let i = 0; i < regripOptions.length; i++) {
+                        const opt = regripOptions[i];
+                        branches.push({
+                            transition: opt.transition,
+                            nextGrip: opt.nextGrip,
+                            cost: cCost + opt.cost
+                        });
+                    }
+                }
+
+                return branches;
             };
 
             /**
@@ -431,9 +337,9 @@ export class ScrambleOptimizer {
 
         // Injected X rotations (when injectXRotations option is enabled)
         if (this.options.injectXRotations) {
-            if (this.getTransitionFor(currentGrip, "x")) branchWith(ScrambleOptimizer.X_INJECT_DESCRIPTOR);
-            if (this.getTransitionFor(currentGrip, "x'")) branchWith(ScrambleOptimizer.X_PRIME_INJECT_DESCRIPTOR);
-            if (this.getTransitionFor(currentGrip, "x2")) branchWith(ScrambleOptimizer.X2_INJECT_DESCRIPTOR);
+            if (this.execution.getTransition(currentGrip, "x")) branchWith(ScrambleOptimizer.X_INJECT_DESCRIPTOR);
+            if (this.execution.getTransition(currentGrip, "x'")) branchWith(ScrambleOptimizer.X_PRIME_INJECT_DESCRIPTOR);
+            if (this.execution.getTransition(currentGrip, "x2")) branchWith(ScrambleOptimizer.X2_INJECT_DESCRIPTOR);
         }
 
         const canWideReplace = this.canWideReplace(move);
@@ -451,61 +357,6 @@ export class ScrambleOptimizer {
                 branchWith(ScrambleOptimizer.PRIME_WIDE_DESCRIPTOR);
             }
         }
-    }
-
-    /**
-     * Evaluates candidate regrips from currentGrip when direct execution is unavailable.
-     * @param {GripState} currentGrip 
-     * @param {MoveKey} movedKey 
-     * @param {Move} moved 
-     * @param {number} cCost 
-     */
-    findCandidateRegrips(currentGrip, movedKey, moved, cCost) {
-        const maxBranches = this.options.maxRegripBranches ?? 2;
-        const baseRegrip = this.config.general.regrip ?? 0;
-        const regripPerStep = this.config.general.regripPerStep ?? 0;
-        const distRow = Move.REGRIP_DIST_CACHE[currentGrip];
-
-        let best1 = null;
-        let best2 = null;
-
-        for (let j = 0; j < this.allGripKeys.length; j++) {
-            const targetGrip = this.allGripKeys[j];
-            if (targetGrip === currentGrip) continue;
-
-            const targetTrans = this.getTransitionFor(targetGrip, movedKey);
-            if (!targetTrans) continue;
-
-            const dist = distRow ? (distRow[targetGrip] ?? 0) : Move.computeRegripDistance(currentGrip, targetGrip);
-            const rCost = baseRegrip + dist * regripPerStep;
-            const regripTrans = {
-                next: targetTrans.next,
-                type: targetTrans.type,
-                regripFrom: currentGrip,
-                regripPrompt: targetGrip,
-                regripCost: rCost
-            };
-            const addedCost = this.computeTransitionCost(regripTrans, moved, currentGrip);
-            const cand = {
-                transition: regripTrans,
-                nextGrip: targetTrans.next,
-                cost: cCost + addedCost,
-                addedCost: addedCost
-            };
-
-            if (!best1 || addedCost < best1.addedCost) {
-                best2 = best1;
-                best1 = cand;
-            } else if (!best2 || addedCost < best2.addedCost) {
-                best2 = cand;
-            }
-        }
-
-        /** @type {TransitionCandidate[]} */
-        const candidates = [];
-        if (best1) candidates.push(best1);
-        if (best2 && maxBranches >= 2) candidates.push(best2);
-        return candidates;
     }
 
     /**
@@ -663,7 +514,7 @@ export class ScrambleOptimizer {
         this.memo = new Map();
         this.iterations = 0;
 
-        const candidateGrips = this.allGripKeys;
+        const candidateGrips = this.execution.allGripKeys;
         const partitionLength = Math.max(0, this.options.partitionLength || 0);
 
         // Check for optimization across all 24 orientations
@@ -688,7 +539,7 @@ export class ScrambleOptimizer {
                 const prevIterations = this.iterations;
 
                 for (const startGrip of candidateGrips) {
-                    const initialCost = this.config.grip[startGrip] || 0;
+                    const initialCost = this.execution.config.grip[startGrip] || 0;
 
                     const effectivePartition = (partitionLength > 0) ? partitionLength : rotatedScramble.length;
                     const results = this.runPartitionSequence(rotatedScramble, startGrip, initialCost, newOrientation, effectivePartition);
@@ -726,50 +577,6 @@ export class ScrambleOptimizer {
     }
 
     /**
-     * @param {Transition} transition 
-     * @param {Move} move
-     * @param {GripState} [regripFromGrip] Optional starting grip if a regrip occurred before this move
-     * @param {CostDetails} [outDetails] Optional object to populate with itemized cost components
-     * @returns {number}
-     */
-    computeTransitionCost(transition, move, regripFromGrip, outDetails) {
-        if (!transition) return Infinity;
-
-        let added = 0;
-        let regripCost = 0;
-        if (transition.regripCost !== undefined) {
-            regripCost = transition.regripCost;
-        } else if (regripFromGrip) {
-            const distance = Move.computeRegripDistance(regripFromGrip, transition.regripPrompt || transition.next);
-            regripCost = (this.config.general.regrip ?? 0) + distance * (this.config.general.regripPerStep ?? 0);
-        }
-        added += regripCost;
-
-        const gripCost = this.config.grip[transition.next] ?? 0;
-        added += gripCost;
-
-        const ftType = /** @type {Fingertrick} */ (transition.type);
-        const ftCost = (ftType && this.config.fingertrick[ftType]) ?? 0;
-        const totalFtCost = this.config.general.perSliceFingertrick ? move.getPhysicalSlices(this.options.cubeSize) * ftCost : ftCost;
-        added += totalFtCost;
-
-        const alphaKey = /** @type {FaceStr} */ (move.isInvertedSlice ? move.alpha.toLowerCase() : move.alpha);
-        const alphaCost = this.config.alpha[alphaKey] ?? 0;
-        added += alphaCost;
-
-        //if(move.isDouble) added += this.config.general.double ?? 0;
-
-        if (outDetails) {
-            outDetails.regrip = regripCost;
-            outDetails.grip = gripCost;
-            outDetails.fingertrick = totalFtCost;
-            outDetails.alpha = alphaCost;
-        }
-
-        return added;
-    }
-
-    /**
      * @param {ScrambleCandidate} [candidate]
      * @param {FormatOptions} [formatOptions]
      * @returns {ScrambleBreakdownEntry[]}
@@ -791,7 +598,7 @@ export class ScrambleOptimizer {
             }
 
             const costBreakdown = {};
-            const addedCost = this.computeTransitionCost(transition, move, transition.regripFrom, costBreakdown);
+            const addedCost = this.execution.computeCost(transition, move, this.options.cubeSize, transition.regripFrom, costBreakdown);
 
             breakdown.push({
                 move: /** @type {MoveStr} */ (move.toString(formatOptions.wedgeNotation, this.options.cubeSize)), 

@@ -2,6 +2,7 @@ import { ScrambleParser } from "../cube/parser.js";
 import { costToColor } from "./stats.js";
 import { defaultCostConfiguration, defaultFormatOptions, defaultRunOptions, defaultFingertricks, defaultColorScheme, strategyPresets } from "../cube/defaults.js";
 import { Move } from "../cube/move.js";
+import { ExecutionEvaluator, THUMB_POSITIONS, RIGHT_FINGERTRICKS, LEFT_FINGERTRICKS, mirrorRightFingertrick, mirrorLeftFingertrick } from "../cube/execution.js";
 import { getElement, queryElementOptional, queryElements } from "./dom.js";
 import { getStorageItem, setStorageItem, removeStorageItem } from "../storage.js";
 /** @import { CostConfig, RunOptions, FormatOptions, ParseResult, NotationMode, TransitionConfig, ThumbPosition, MoveKey, RightFingertrick, LeftFingertrick, Fingertrick, FingerAction, ColorSchemeConfig } from "../types.js" */
@@ -856,7 +857,7 @@ const CANONICAL_MOVE_PAIRS = Object.freeze(
     ["R", "L", "U", "D", "F", "B"].flatMap(face =>
         Move.MODIFIERS.map(mod => {
             const r = /** @type {MoveKey} */ (`${face}${mod}`);
-            const l = Move.mirrorMove(r);
+            const l = Move.MIRROR_MOVE_MAP[r] ?? r;
             return { r, l };
         })
     )
@@ -870,7 +871,6 @@ const CANONICAL_MOVE_PAIRS = Object.freeze(
 function renderTransitionsTab(container, currentTransitions, onTransitionChange) {
     container.replaceChildren();
 
-    const THUMB_POSITIONS = /** @type {ThumbPosition[]} */ (["F", "U", "D", "Bu", "Bd"]);
     let activePosition = /** @type {ThumbPosition} */ ("F");
 
     const subtabBar = document.createElement("div");
@@ -900,7 +900,7 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange)
             const isLinked = !leftSub || leftSub[lMove] === undefined;
 
             const resolvedLFt = isLinked 
-                ? (rFt ? Move.mirrorRightFingertrick(rFt) : null)
+                ? (rFt ? mirrorRightFingertrick(rFt) : null)
                 : (leftSub ? leftSub[lMove] : null);
 
             const row = document.createElement("div");
@@ -919,10 +919,10 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange)
             lNoneOpt.textContent = "None";
             lSelect.appendChild(lNoneOpt);
 
-            for (const action of Move.FINGER_ACTIONS) {
+            for (const ft of LEFT_FINGERTRICKS) {
                 const opt = document.createElement("option");
-                opt.value = `left_${action}`;
-                opt.textContent = `left_${action}`;
+                opt.value = ft;
+                opt.textContent = ft;
                 lSelect.appendChild(opt);
             }
             lSelect.value = resolvedLFt || "";
@@ -944,10 +944,10 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange)
             rNoneOpt.textContent = "None";
             rSelect.appendChild(rNoneOpt);
 
-            for (const action of Move.FINGER_ACTIONS) {
+            for (const ft of RIGHT_FINGERTRICKS) {
                 const opt = document.createElement("option");
-                opt.value = `right_${action}`;
-                opt.textContent = `right_${action}`;
+                opt.value = ft;
+                opt.textContent = ft;
                 rSelect.appendChild(opt);
             }
             rSelect.value = rFt || "";
@@ -969,7 +969,7 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange)
                 const leftSub = currentTransitions.left ? currentTransitions.left[activePosition] : undefined;
                 const isCurrentlyLinked = !leftSub || leftSub[lMove] === undefined;
                 if (isCurrentlyLinked) {
-                    const mirrored = newRFt ? Move.mirrorRightFingertrick(newRFt) : null;
+                    const mirrored = newRFt ? mirrorRightFingertrick(newRFt) : null;
                     lSelect.value = mirrored || "";
                 }
 
@@ -983,7 +983,7 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange)
 
                 if (isCurrentlyLinked) {
                     // Symmetrical link active: update right hand with mirrored value
-                    const newRFt = newLFt ? Move.mirrorLeftFingertrick(newLFt) : null;
+                    const newRFt = newLFt ? mirrorLeftFingertrick(newLFt) : null;
                     if (!currentTransitions.right[activePosition]) {
                         currentTransitions.right[activePosition] = /** @type {any} */ ({});
                     }
@@ -1028,7 +1028,7 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange)
                     }
                     const rightSub = currentTransitions.right[activePosition];
                     const currentRightVal = rightSub ? rightSub[rMove] : null;
-                    const mirrored = currentRightVal ? Move.mirrorRightFingertrick(currentRightVal) : null;
+                    const mirrored = currentRightVal ? mirrorRightFingertrick(currentRightVal) : null;
                     lSelect.value = mirrored || "";
 
                     iconSpan.className = "icon-svg icon-link";

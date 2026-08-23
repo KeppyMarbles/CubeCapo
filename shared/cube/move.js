@@ -1,16 +1,7 @@
 import { ScrambleParser } from "./parser.js";
-/** @import { FaceStr, RotationStr, AxisStr, MoveStr, MiddleStr, MoveKey, ThumbPosition, GripState, Transition, Orientation, ModifierStr, TranspositionMap, ThumbTransitions, RegripDistanceCache, RegripDistanceCacheRow, NextGripCache, NextGripCacheRow, Fingertrick, FingerAction, RightFingertrick, LeftFingertrick } from "../types.js" */
+/** @import { FaceStr, RotationStr, AxisStr, MoveStr, MiddleStr, MoveKey, Transition, Orientation, ModifierStr, TranspositionMap } from "../types.js" */
 
 export class Move {
-    /**
-     * Splits a GripState string into its two ThumbPosition components
-     * @param {GripState} grip
-     * @returns {[ThumbPosition, ThumbPosition]}
-     */
-    static splitGrip(grip) {
-        return /** @type {[ThumbPosition, ThumbPosition]} */ (grip.split(" "));
-    }
-
     /** @type {readonly FaceStr[]} */
     static MOVE_LIST = Object.freeze(["R", "L", "U", "D", "F", "B"]);
 
@@ -19,24 +10,6 @@ export class Move {
 
     /** @type {readonly AxisStr[]} */
     static ROTATION_LIST = Object.freeze(["x", "y", "z"]);
-
-    /** @type {readonly FingerAction[]} */
-    static FINGER_ACTIONS = Object.freeze([
-        "index",
-        "index_push",
-        "index_front",
-        "index_middle",
-        "middle",
-        "middle_push",
-        "ring",
-        "ring_middle",
-        "ring_push",
-        "thumb",
-        "up",
-        "up_double",
-        "down",
-        "down_double"
-    ]);
 
     /** @type {readonly (RotationStr | null)[]} */
     static TOP_ROTATIONS = Object.freeze([null, "x", "x'", "x2", "z", "z'"]);
@@ -56,69 +29,6 @@ export class Move {
         "E": "E'", "E'": "E", "E2": "E2'", "E2'": "E2",
         "S": "S'", "S'": "S", "S2": "S2'", "S2'": "S2",
     });
-
-    /** @type {Record<RightFingertrick, LeftFingertrick>} */
-    static RIGHT_TO_LEFT_FINGERTRICK = Object.freeze({
-        "right_index":        "left_index",
-        "right_index_push":   "left_index_push",
-        "right_index_front":  "left_index_front",
-        "right_index_middle": "left_index_middle",
-        "right_ring":         "left_ring",
-        "right_ring_middle":  "left_ring_middle",
-        "right_ring_push":    "left_ring_push",
-        "right_middle":       "left_middle",
-        "right_middle_push":  "left_middle_push",
-        "right_thumb":        "left_thumb",
-        "right_up":           "left_up",
-        "right_up_double":    "left_up_double",
-        "right_down":         "left_down",
-        "right_down_double":  "left_down_double",
-    });
-
-    /** @type {Record<LeftFingertrick, RightFingertrick>} */
-    static LEFT_TO_RIGHT_FINGERTRICK = Object.freeze({
-        "left_index":         "right_index",
-        "left_index_push":    "right_index_push",
-        "left_index_front":   "right_index_front",
-        "left_index_middle":  "right_index_middle",
-        "left_ring":          "right_ring",
-        "left_ring_middle":   "right_ring_middle",
-        "left_ring_push":     "right_ring_push",
-        "left_middle":        "right_middle",
-        "left_middle_push":   "right_middle_push",
-        "left_thumb":         "right_thumb",
-        "left_up":            "right_up",
-        "left_up_double":     "right_up_double",
-        "left_down":          "right_down",
-        "left_down_double":   "right_down_double",
-    });
-
-    /**
-     * Mirrors a move across the M-slice
-     * @param {MoveKey} moveKey
-     * @returns {MoveKey}
-     */
-    static mirrorMove(moveKey) {
-        return Move.MIRROR_MOVE_MAP[moveKey] ?? moveKey;
-    }
-
-    /**
-     * Mirrors a right-hand fingertrick to the left hand across the M-slice
-     * @param {RightFingertrick} ft
-     * @returns {LeftFingertrick}
-     */
-    static mirrorRightFingertrick(ft) {
-        return Move.RIGHT_TO_LEFT_FINGERTRICK[ft];
-    }
-
-    /**
-     * Mirrors a left-hand fingertrick to the right hand across the M-slice
-     * @param {LeftFingertrick} ft
-     * @returns {RightFingertrick}
-     */
-    static mirrorLeftFingertrick(ft) {
-        return Move.LEFT_TO_RIGHT_FINGERTRICK[ft];
-    }
 
     /** @type {TranspositionMap} */
     static TRANSPOSITIONS = Object.freeze(/** @type {TranspositionMap} */ ({
@@ -184,114 +94,8 @@ export class Move {
         B: 'F'
     });
 
-    /** @type {Record<ThumbPosition, number>} */
-    static THUMB_POSITIONS = Object.freeze({
-        "Bd": 0,
-        "D": 1,
-        "F": 2,
-        "U": 3,
-        "Bu": 4
-    });
-
-    /** @type {Partial<Record<FingerAction, Record<ThumbPosition, ThumbPosition | null>>>} */
-    static WRIST_TRANSITIONS = Object.freeze({
-        "up":          { "Bd": "D",  "D": "F",  "F": "U",  "U": "Bu", "Bu": null },
-        "down":        { "Bu": "U",  "U": "F",  "F": "D",  "D": "Bd", "Bd": null },
-        "up_double":   { "Bd": "F",  "D": "U",  "F": "Bu", "U": null, "Bu": null },
-        "down_double": { "Bu": "F",  "U": "D",  "F": "Bd", "D": null, "Bd": null },
-    });
-
     /** @type {readonly ModifierStr[]} */
     static MODIFIERS = Object.freeze(["", "'", "2", "2'"]);
-
-    /** @type {readonly ThumbPosition[]} */
-    static THUMB_KEYS = Object.freeze(["Bd", "D", "F", "U", "Bu"]);
-
-    /** @type {readonly GripState[]} Flat list of all 25 explicit grip combinations */
-    static ALL_GRIPS = Object.freeze(/** @type {readonly GripState[]} */ (Move.THUMB_KEYS.flatMap(l => Move.THUMB_KEYS.map(r => /** @type {GripState} */ (`${l} ${r}`)))));
-
-    /** @type {RegripDistanceCache} */
-    static REGRIP_DIST_CACHE = Object.freeze((() => {
-        const cache = /** @type {RegripDistanceCache} */ ({});
-        for (const g1 of Move.ALL_GRIPS) {
-            cache[g1] = /** @type {RegripDistanceCacheRow} */ ({});
-            const [l1, r1] = Move.splitGrip(g1);
-            const pL1 = Move.THUMB_POSITIONS[l1] ?? 0;
-            const pR1 = Move.THUMB_POSITIONS[r1] ?? 0;
-            for (const g2 of Move.ALL_GRIPS) {
-                const [l2, r2] = Move.splitGrip(g2);
-                const lDist = Math.abs(pL1 - (Move.THUMB_POSITIONS[l2] ?? 0));
-                const rDist = Math.abs(pR1 - (Move.THUMB_POSITIONS[r2] ?? 0));
-                cache[g1][g2] = lDist + rDist;
-            }
-        }
-        return cache;
-    })());
-
-    /**
-     * Calculates the chain step distance between two grip states along Bd <-> D <-> F <-> U <-> Bu
-     * @param {GripState} fromGrip 
-     * @param {GripState} toGrip 
-     * @returns {number}
-     */
-    static computeRegripDistance(fromGrip, toGrip) {
-        if (!fromGrip || !toGrip || fromGrip === toGrip) return 0;
-        return Move.REGRIP_DIST_CACHE[fromGrip]?.[toGrip] ?? Infinity;
-    }
-
-    /** @type {Partial<Record<RotationStr, FingerAction>>} */
-    static X_ROTATION_ACTIONS = Object.freeze({
-        "x": "up",
-        "x'": "down",
-        "x2": "up_double",
-        "x2'": "down_double"
-    });
-
-    /**
-     * Calculates the resulting grip state after performing a transition with a given fingertrick or rotation.
-     * @param {GripState} currentGrip 
-     * @param {Fingertrick | RotationStr | ""} [transitionType=""]
-     * @returns {GripState | null}
-     */
-    static computeNextGrip(currentGrip, transitionType = "") {
-        if (!currentGrip) return null;
-        if (!transitionType) return currentGrip;
-
-        // Full-cube X rotations
-        if (transitionType.startsWith("x")) {
-            const rotKey = /** @type {RotationStr} */ (transitionType);
-            const action = Move.X_ROTATION_ACTIONS[rotKey];
-            const trans = action ? Move.WRIST_TRANSITIONS[action] : null;
-            if (!trans) return currentGrip;
-            const [l, r] = Move.splitGrip(currentGrip);
-            const nextL = trans[l];
-            const nextR = trans[r];
-            return (nextL && nextR) ? /** @type {GripState} */ (`${nextL} ${nextR}`) : null;
-        }
-
-        // Full-cube Z rotations (preserve F F grip)
-        if (transitionType.startsWith("z")) {
-            return currentGrip === "F F" ? "F F" : null;
-        }
-
-        if (transitionType.startsWith("right_")) {
-            const action = /** @type {FingerAction} */ (transitionType.slice(6));
-            const trans = Move.WRIST_TRANSITIONS[action];
-            if (!trans) return currentGrip;
-            const [l, r] = Move.splitGrip(currentGrip);
-            const nextR = trans[r];
-            return nextR ? /** @type {GripState} */ (`${l} ${nextR}`) : null;
-        } else if (transitionType.startsWith("left_")) {
-            const action = /** @type {FingerAction} */ (transitionType.slice(5));
-            const trans = Move.WRIST_TRANSITIONS[action];
-            if (!trans) return currentGrip;
-            const [l, r] = Move.splitGrip(currentGrip);
-            const nextL = trans[l];
-            return nextL ? /** @type {GripState} */ (`${nextL} ${r}`) : null;
-        }
-
-        return currentGrip;
-    }
 
     /**
      * Transposes an orientation object in-place according to a given cube rotation string.

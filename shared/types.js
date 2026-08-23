@@ -81,12 +81,11 @@
  */
 
 /**
- * A single evaluated move candidate produced by evaluateMoveAt / findCandidateRegrips.
- * @typedef {Object} TransitionCandidate
+ * An evaluated physical execution step for a move from a specific grip.
+ * @typedef {Object} ExecutionStep
  * @property {Transition} transition The transition to apply for this move
  * @property {GripState} nextGrip The resulting grip after the transition
- * @property {number} cost Cumulative cost up to and including this move
- * @property {number} [addedCost] Marginal cost contributed by this move alone
+ * @property {number} cost Step cost contributed by this move
  */
 
 /** @typedef {Record<MoveKey, RightFingertrick | null>} RightHandFingertricks */
