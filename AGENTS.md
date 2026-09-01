@@ -27,7 +27,7 @@ scramblemanip-js/
 │   ├── storage.js           # Cross-environment storage helper (chrome.storage.local with localStorage fallback)
 │   ├── cube/
 │   │   ├── defaults.js      # `defaultColorScheme`, `defaultFormatOptions`, `defaultRunOptions`, `defaultCostConfiguration`, `defaultFingertricks` (`{ right, left? }` 5-state thumb model).
-│   │   ├── execution.js     # ExecutionEvaluator class: 5-state thumb/wrist model, pre-computed transitionCache, transition cost evaluation, candidate regrip search
+│   │   ├── evaluator.js     # ExecutionEvaluator class: 5-state thumb/wrist model, pre-computed transitionCache, transition cost evaluation, candidate regrip search
 │   │   ├── move.js          # Move class: copy/clone/invert methods, transposition matrix, rotation helpers
 │   │   ├── optimizer.js     # ScrambleOptimizer class: branch-and-bound optimization, partition sequencing, orientation search, candidate management
 │   │   ├── parser.js        # ScrambleParser class: tokenization, recursive descent parsing for commutators/conjugates/groups, notation detection & normalization

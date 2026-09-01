@@ -1,5 +1,5 @@
 import { ScrambleOptimizer } from "../shared/cube/optimizer.js";
-import { ExecutionEvaluator } from "../shared/cube/execution.js";
+import { ExecutionEvaluator } from "../shared/cube/evaluator.js";
 import { defaultCostConfiguration, defaultFormatOptions, defaultFingertricks, defaultRunOptions, defaultParseOptions } from "../shared/cube/defaults.js";
 import { ScrambleParser } from "../shared/cube/parser.js";
 /** @import { SendOptimizationResponse } from "../shared/types.js" */
@@ -75,8 +75,8 @@ extAPI.runtime.onMessage.addListener(
                 const runOptions = { ...defaultRunOptions, ...store.runOptions, cubeSize };
                 const formatOptions = { ...defaultFormatOptions, ...store.formatOptions, colorScheme: store.colorScheme || store.formatOptions?.colorScheme || defaultFormatOptions.colorScheme };
 
-                const execution = new ExecutionEvaluator(config, transitions);
-                const optimizer = new ScrambleOptimizer(execution);
+                const evaluator = new ExecutionEvaluator(config, transitions);
+                const optimizer = new ScrambleOptimizer(evaluator);
 
                 const start = performance.now();
                 await optimizer.optimize(parseResult, runOptions);

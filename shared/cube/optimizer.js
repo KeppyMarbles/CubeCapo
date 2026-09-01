@@ -1,7 +1,7 @@
 import { defaultFormatOptions, defaultRunOptions } from "./defaults.js";
 import { Move } from "./move.js";
 import { getOrientationColors, getRestoringRotation, detectCubeSize } from "./util.js";
-/** @import { ExecutionEvaluator } from "./execution.js" */
+/** @import { ExecutionEvaluator } from "./evaluator.js" */
 /** @import { Orientation, GripState, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, RotationStr, ScrambleCandidate, FaceStr, MoveStr, ExecutionStep, TransformDescriptor, ParseResult, AxisStr } from "../types.js" */
 
 /**
@@ -84,12 +84,12 @@ export class ScrambleOptimizer {
     }
 
     /**
-     * @param {ExecutionEvaluator} execution Evaluator for grip transitions and execution costs
+     * @param {ExecutionEvaluator} evaluator Evaluator for grip transitions and execution costs
      * @param {(() => Promise<void> | void) | null} [callback] Function to call when a rotation optimization finishes
      */
-    constructor(execution, callback = null) {
+    constructor(evaluator, callback = null) {
         /** @type {ExecutionEvaluator} Evaluator for grip transitions and execution costs */
-        this.execution = execution;
+        this.evaluator = evaluator;
         /** @type {((() => Promise<void> | void)) | null} Function to call when a rotation optimization finishes */
         this.callback = callback || null;
         /** @type {RunOptions} Active run options for scramble search */
@@ -276,7 +276,7 @@ export class ScrambleOptimizer {
                 /** @type {ExecutionStep[]} */
                 const branches = [];
 
-                const direct = this.execution.getDirectStep(cGrip, moved, this.options.cubeSize);
+                const direct = this.evaluator.getDirectStep(cGrip, moved, this.options.cubeSize);
                 if (direct) {
                     branches.push({
                         transition: direct.transition,
@@ -286,7 +286,7 @@ export class ScrambleOptimizer {
                 }
 
                 if (!direct || this.options.searchRegrips) {
-                    const regripOptions = this.execution.getRegripOptions(cGrip, moved, this.options.cubeSize, this.options.maxRegripBranches ?? 2);
+                    const regripOptions = this.evaluator.getRegripOptions(cGrip, moved, this.options.cubeSize, this.options.maxRegripBranches ?? 2);
                     for (let i = 0; i < regripOptions.length; i++) {
                         const opt = regripOptions[i];
                         branches.push({
@@ -337,9 +337,9 @@ export class ScrambleOptimizer {
 
         // Injected X rotations (when injectXRotations option is enabled)
         if (this.options.injectXRotations) {
-            if (this.execution.getTransition(currentGrip, "x")) branchWith(ScrambleOptimizer.X_INJECT_DESCRIPTOR);
-            if (this.execution.getTransition(currentGrip, "x'")) branchWith(ScrambleOptimizer.X_PRIME_INJECT_DESCRIPTOR);
-            if (this.execution.getTransition(currentGrip, "x2")) branchWith(ScrambleOptimizer.X2_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "x")) branchWith(ScrambleOptimizer.X_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "x'")) branchWith(ScrambleOptimizer.X_PRIME_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "x2")) branchWith(ScrambleOptimizer.X2_INJECT_DESCRIPTOR);
         }
 
         const canWideReplace = this.canWideReplace(move);
@@ -514,7 +514,7 @@ export class ScrambleOptimizer {
         this.memo = new Map();
         this.iterations = 0;
 
-        const candidateGrips = this.execution.allGripKeys;
+        const candidateGrips = this.evaluator.allGripKeys;
         const partitionLength = Math.max(0, this.options.partitionLength || 0);
 
         // Check for optimization across all 24 orientations
@@ -539,7 +539,7 @@ export class ScrambleOptimizer {
                 const prevIterations = this.iterations;
 
                 for (const startGrip of candidateGrips) {
-                    const initialCost = this.execution.config.grip[startGrip] || 0;
+                    const initialCost = this.evaluator.config.grip[startGrip] || 0;
 
                     const effectivePartition = (partitionLength > 0) ? partitionLength : rotatedScramble.length;
                     const results = this.runPartitionSequence(rotatedScramble, startGrip, initialCost, newOrientation, effectivePartition);
@@ -598,7 +598,7 @@ export class ScrambleOptimizer {
             }
 
             const costBreakdown = {};
-            const addedCost = this.execution.computeCost(transition, move, this.options.cubeSize, transition.regripFrom, costBreakdown);
+            const addedCost = this.evaluator.computeCost(transition, move, this.options.cubeSize, transition.regripFrom, costBreakdown);
 
             breakdown.push({
                 move: /** @type {MoveStr} */ (move.toString(formatOptions.wedgeNotation, this.options.cubeSize)), 

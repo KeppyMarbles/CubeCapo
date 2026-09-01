@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ScrambleOptimizer } from './shared/cube/optimizer.js';
-import { ExecutionEvaluator } from './shared/cube/execution.js';
+import { ExecutionEvaluator } from './shared/cube/evaluator.js';
 import { defaultCostConfiguration, defaultFingertricks, defaultRunOptions, strategyPresets } from './shared/cube/defaults.js';
 import { ScrambleParser } from './shared/cube/parser.js';
 /** @import {RunOptions} from './shared/types.js' */

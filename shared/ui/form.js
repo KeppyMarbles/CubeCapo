@@ -2,10 +2,10 @@ import { ScrambleParser } from "../cube/parser.js";
 import { costToColor } from "./stats.js";
 import { defaultCostConfiguration, defaultFormatOptions, defaultRunOptions, defaultFingertricks, defaultColorScheme, strategyPresets } from "../cube/defaults.js";
 import { Move } from "../cube/move.js";
-import { ExecutionEvaluator, THUMB_POSITIONS, RIGHT_FINGERTRICKS, LEFT_FINGERTRICKS, mirrorRightFingertrick, mirrorLeftFingertrick } from "../cube/execution.js";
+import { THUMB_POSITIONS, RIGHT_FINGERTRICKS, LEFT_FINGERTRICKS, mirrorRightFingertrick, mirrorLeftFingertrick } from "../cube/evaluator.js";
 import { getElement, queryElementOptional, queryElements } from "./dom.js";
 import { getStorageItem, setStorageItem, removeStorageItem } from "../storage.js";
-/** @import { CostConfig, RunOptions, FormatOptions, ParseResult, NotationMode, TransitionConfig, ThumbPosition, MoveKey, RightFingertrick, LeftFingertrick, Fingertrick, FingerAction, ColorSchemeConfig } from "../types.js" */
+/** @import { CostConfig, RunOptions, FormatOptions, ParseResult, NotationMode, TransitionConfig, ThumbPosition, MoveKey, RightFingertrick, LeftFingertrick, ColorSchemeConfig } from "../types.js" */
 
 /**
  * @typedef {Object} GroupControl

@@ -1,7 +1,7 @@
 import { setupForm, drawSearchTime, collectFormatOptionsValues } from "./shared/ui/form.js";
 import { getElement } from "./shared/ui/dom.js";
 import { ScrambleOptimizer } from "./shared/cube/optimizer.js";
-import { ExecutionEvaluator } from "./shared/cube/execution.js";
+import { ExecutionEvaluator } from "./shared/cube/evaluator.js";
 import { drawOptimizerStats } from "./shared/ui/stats.js";
 import { defaultFingertricks } from "./shared/cube/defaults.js";
 /** @import { CostConfig, RunOptions, ParseResult, TransitionConfig } from "./shared/types.js" */
@@ -24,8 +24,8 @@ async function onSubmit(config, scramble, options, transitions) {
     currentParseResult = scramble;
     await drawOptimizerStats(null);
 
-    const execution = new ExecutionEvaluator(config, transitions || defaultFingertricks);
-    currentOptimizer = new ScrambleOptimizer(execution, async () => {
+    const evaluator = new ExecutionEvaluator(config, transitions || defaultFingertricks);
+    currentOptimizer = new ScrambleOptimizer(evaluator, async () => {
         await drawOptimizerStats(currentOptimizer, collectFormatOptionsValues(), currentCandidateIndex, currentParseResult);
     });
 
