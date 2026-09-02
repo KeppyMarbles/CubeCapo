@@ -1,5 +1,101 @@
 import { Move } from "./move.js";
-/** @import { ThumbPosition, GripState, FingerAction, RightFingertrick, LeftFingertrick, Fingertrick, RotationStr, MoveKey, CostConfig, TransitionConfig, TransitionCache, TransitionCacheRow, Transition, ExecutionStep, CostDetails, RegripDistanceCache, RegripDistanceCacheRow, FaceStr } from "../types.js" */
+/** @import { FaceStr, WideFaceStr, AxisStr, MoveKey, RotationStr, MoveStr } from "./move.js" */
+
+/** @typedef {'F' | 'U' | 'D' | 'Bu' | 'Bd'} ThumbPosition */
+
+/**
+ * @typedef {(
+ *   | "index"
+ *   | "index_push"
+ *   | "index_front"
+ *   | "index_middle"
+ *   | "ring"
+ *   | "ring_middle"
+ *   | "ring_push"
+ *   | "middle"
+ *   | "middle_push"
+ *   | "thumb"
+ *   | "up"
+ *   | "up_double"
+ *   | "down"
+ *   | "down_double"
+ * )} FingerAction
+ */
+
+/** @typedef {`right_${FingerAction}`} RightFingertrick */
+/** @typedef {`left_${FingerAction}`} LeftFingertrick */
+/** @typedef {RightFingertrick | LeftFingertrick | "rotation" | "rotation_double"} Fingertrick */
+
+/** @typedef {`${ThumbPosition} ${ThumbPosition}`} GripState */
+
+/** @typedef {Partial<Record<Fingertrick, number>>} FingertrickCosts */
+/** @typedef {Partial<Record<GripState, number>>} GripCosts */
+/** @typedef {Partial<Record<WideFaceStr | FaceStr | AxisStr, number>>} AlphaCosts */
+
+/**
+ * @typedef {Object} GeneralCosts
+ * @property {number} regrip Cost of a regrip occuring
+ * @property {number} [regripPerStep] Cost multiplier per chain step distance during regrip
+ * //@property {number} double Cost of a double move
+ * @property {number} repeatPenalty Cost of the same fingertrick occuring twice in a row
+ * @property {boolean} perSliceFingertrick If fingertrick cost should be applied for each effective slice
+ * @property {'right' | 'left'} handedness Dominant hand preference for tiebreaking move fingertricks
+ */
+
+/**
+ * @typedef {Object} CostConfig
+ * @property {GeneralCosts} general
+ * @property {AlphaCosts} alpha Cost of a specific face
+ * @property {GripCosts} grip Cost of a specific grip state
+ * @property {FingertrickCosts} fingertrick Cost of a specific fingertrick
+ */
+
+/**
+ * @typedef {Object} Transition
+ * @property {GripState} next The resulting grip after the fingertrick
+ * @property {Fingertrick | ""} type The fingertrick used
+ * @property {GripState} [regripFrom] Starting grip before a regrip
+ * @property {GripState} [regripPrompt] Target grip for pre-move regrip prompt
+ * @property {number} [regripCost] Pre-calculated cost of the regrip
+ * @property {number} [regripFactor] Fractional hand release multiplier (e.g. 0.5 for partial regrip, 1.0 for full regrip)
+ */
+
+/**
+ * An evaluated physical execution step for a move from a specific grip.
+ * @typedef {Object} ExecutionStep
+ * @property {Transition} transition The transition to apply for this move
+ * @property {GripState} nextGrip The resulting grip after the transition
+ * @property {number} cost Step cost contributed by this move
+ */
+
+/** @typedef {Record<MoveKey, RightFingertrick | null>} RightHandFingertricks */
+/** @typedef {Partial<Record<MoveKey, LeftFingertrick | null>>} LeftHandFingertricks */
+/** @typedef {Record<ThumbPosition, RightHandFingertricks>} RightHandConfig */
+/** @typedef {Partial<Record<ThumbPosition, LeftHandFingertricks>>} LeftHandConfig */
+
+/**
+ * @typedef {Object} TransitionConfig
+ * @property {RightHandConfig} right
+ * @property {LeftHandConfig} [left]
+ */
+
+/** @typedef {Partial<Record<MoveKey, Record<ThumbPosition, ThumbPosition | null>>>} ThumbTransitions */
+/** @typedef {Record<GripState, number>} RegripDistanceCacheRow */
+/** @typedef {Record<GripState, RegripDistanceCacheRow>} RegripDistanceCache */
+/** @typedef {Record<MoveKey | RotationStr, GripState | null>} NextGripCacheRow */
+/** @typedef {Record<GripState, NextGripCacheRow>} NextGripCache */
+/** @typedef {Partial<Record<MoveKey | RotationStr, Transition>>} TransitionCacheRow */
+/** @typedef {Record<GripState, TransitionCacheRow>} TransitionCache */
+
+/**
+ * @typedef CostDetails
+ * @property {number} [regrip] Cost contribution from regripping
+ * @property {number} [grip] Cost contribution from thumb grip placement
+ * @property {number} [fingertrick] Cost contribution from move fingertrick execution
+ * @property {number} [alpha] Cost contribution from face/alpha turn preference
+ * @property {number} [double] Cost contribution from double turns
+ * @property {number} [repeatPenalty] Penalty for repeating identical move fingertricks consecutively
+ */
 
 /** @type {readonly ThumbPosition[]} Standard 5 thumb positions in physical axis order (Bd <-> D <-> F <-> U <-> Bu) */
 export const THUMB_POSITIONS = Object.freeze(/** @type {readonly ThumbPosition[]} */ (["Bd", "D", "F", "U", "Bu"]));

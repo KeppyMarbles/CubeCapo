@@ -1,5 +1,16 @@
 import { ScrambleParser } from "./parser.js";
-/** @import { FaceStr, RotationStr, AxisStr, MoveStr, MiddleStr, MoveKey, Transition, Orientation, ModifierStr, TranspositionMap } from "../types.js" */
+/** @import { Transition } from "./evaluator.js" */
+/** @import { Orientation } from "./util.js" */
+
+/** @typedef {"" | "'" | "2" | "2'"} ModifierStr */
+/** @typedef {"M" | "E" | "S"} MiddleStr */
+/** @typedef {"R" | "L" | "U" | "B" | "D" | "F"} FaceStr */
+/** @typedef {"r" | "l" | "u" | "b" | "d" | "f"} WideFaceStr */
+/** @typedef {"x" | "y" | "z"} AxisStr */
+/** @typedef {`${FaceStr | MiddleStr}${ModifierStr}`} MoveKey */
+/** @typedef {`${FaceStr | MiddleStr | WideFaceStr}${"w" | ""}${ModifierStr}`} MoveStr */
+/** @typedef {`${AxisStr}${ModifierStr}`} RotationStr */
+/** @typedef {Record<RotationStr, Record<FaceStr | AxisStr, FaceStr | AxisStr>>} TranspositionMap */
 
 export class Move {
     /** @type {readonly FaceStr[]} */

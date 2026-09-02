@@ -42,11 +42,10 @@
         "extension/content.js",
         "shared/ui/dom.js",
         "shared/ui/stats.js",
-        "shared/cube/defaults.js",
+        "shared/defaults.js",
         "shared/cube/scramble.js",
         "shared/cube/move.js",
         "shared/cube/util.js",
-        "shared/types.js",
         "shared/storage.js",
         "extension/content.css"
       ],

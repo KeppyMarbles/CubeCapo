@@ -3,9 +3,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { ScrambleOptimizer } from './shared/cube/optimizer.js';
 import { ExecutionEvaluator } from './shared/cube/evaluator.js';
-import { defaultCostConfiguration, defaultFingertricks, defaultRunOptions, strategyPresets } from './shared/cube/defaults.js';
+import { defaultCostConfiguration, defaultFingertricks, defaultRunOptions, strategyPresets } from './shared/defaults.js';
 import { ScrambleParser } from './shared/cube/parser.js';
-/** @import {RunOptions} from './shared/types.js' */
+/** @import { RunOptions } from './shared/cube/optimizer.js' */
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

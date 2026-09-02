@@ -1,6 +1,19 @@
 import { Move } from "./move.js";
-import { defaultParseOptions } from "./defaults.js";
-/** @import { ParseOptions, ParseResult, NotationMode } from "../types.js" */
+import { defaultParseOptions } from "../defaults.js";
+
+/** @typedef {'wca' | 'sign' | null} NotationMode */
+
+/**
+ * @typedef {Object} ParseOptions
+ * @property {NotationMode} notation Notation mode convention to use (null for auto-detect)
+ * @property {number} maxNestingDepth Maximum allowed nesting depth for commutators/conjugates/groups
+ */
+
+/**
+ * @typedef {Object} ParseResult
+ * @property {Move[]} moves Fully expanded, flat Move array
+ * @property {NotationMode} resolvedNotation The resolved notation mode that was used ('wca' | 'sign')
+ */
 
 const MOVE_REGEX = /^(\d*)([RLUDFBrludfbMESxyz])(w)?(2)?(')?$/;
 

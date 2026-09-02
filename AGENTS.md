@@ -23,10 +23,9 @@ scramblemanip-js/
 │   └── scrambles.txt        # 100 newline-separated 3x3 scrambles for testing and statistical analysis
 ├── scratch/                 # Test script folder for agents. Excluded from git.
 ├── shared/
-│   ├── types.js             # JSDoc type definitions (@typedef for Move, CostConfig, Transition, Options, etc.)
+│   ├── defaults.js          # Default configurations: `defaultColorScheme`, `defaultFormatOptions`, `defaultRunOptions`, `defaultCostConfiguration`, `defaultFingertricks`, `strategyPresets`
 │   ├── storage.js           # Cross-environment storage helper (chrome.storage.local with localStorage fallback)
 │   ├── cube/
-│   │   ├── defaults.js      # `defaultColorScheme`, `defaultFormatOptions`, `defaultRunOptions`, `defaultCostConfiguration`, `defaultFingertricks` (`{ right, left? }` 5-state thumb model).
 │   │   ├── evaluator.js     # ExecutionEvaluator class: 5-state thumb/wrist model, pre-computed transitionCache, transition cost evaluation, candidate regrip search
 │   │   ├── move.js          # Move class: copy/clone/invert methods, transposition matrix, rotation helpers
 │   │   ├── optimizer.js     # ScrambleOptimizer class: branch-and-bound optimization, partition sequencing, orientation search, candidate management

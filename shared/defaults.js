@@ -1,4 +1,7 @@
-/** @import { FormatOptions, RunOptions, CostConfig, TransitionConfig, ColorSchemeConfig, ParseOptions, FingerAction } from "../types.js" */
+/** @import { FormatOptions, RunOptions } from "./cube/optimizer.js" */
+/** @import { CostConfig, TransitionConfig } from "./cube/evaluator.js" */
+/** @import { ColorSchemeConfig } from "./cube/util.js" */
+/** @import { ParseOptions } from "./cube/parser.js" */
 
 /**
  * Default Western color scheme (WCA standard)

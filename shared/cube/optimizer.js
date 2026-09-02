@@ -1,8 +1,92 @@
-import { defaultFormatOptions, defaultRunOptions } from "./defaults.js";
+import { defaultFormatOptions, defaultRunOptions } from "../defaults.js";
 import { Move } from "./move.js";
 import { getOrientationColors, getRestoringRotation, detectCubeSize } from "./util.js";
-/** @import { ExecutionEvaluator } from "./evaluator.js" */
-/** @import { Orientation, GripState, RunOptions, FormatOptions, OrientationResultInfo, ScrambleBreakdownEntry, RotationStr, ScrambleCandidate, FaceStr, MoveStr, ExecutionStep, TransformDescriptor, ParseResult, AxisStr } from "../types.js" */
+/** @import { ExecutionEvaluator, GripState, Transition, ExecutionStep, CostDetails } from "./evaluator.js" */
+/** @import { Orientation, StartingRotation, ColorSchemeConfig } from "./util.js" */
+/** @import { ParseResult, NotationMode } from "./parser.js" */
+/** @import { FaceStr, MoveStr, RotationStr, AxisStr } from "./move.js" */
+
+/**
+ * @typedef {Object} FormatOptions
+ * @property {boolean} [showGrips] If grip prompts (starting grip and regrip transitions) should be included in output
+ * @property {boolean} [showBoundaries] If the scramble should show `|` where partitions were made
+ * @property {boolean} [wedgeNotation] If wide moves should be output using wedge count notation (e.g. Rw, 3Rw)
+ * @property {boolean} [showOrientationColors] If starting orientation should be displayed as color names (e.g. White top, Green front)
+ * @property {boolean} [reorient] If ending rotation moves should be appended to undo starting rotation
+ * @property {ColorSchemeConfig} [colorScheme] Color mapping for faces
+ */
+
+/**
+ * @typedef {Object} RunOptions
+ * @property {number | null} cubeSize Target cube size (e.g. 3 for 3x3, 7 for 7x7), detected automatically if null
+ * @property {number} depth The branch pruning threshold
+ * @property {number} maxIterations Number of iterations to try before bailing out
+ * @property {number} [maxRegripBranches] Maximum number of candidate regrips to explore when a regrip is required
+ * @property {boolean} searchRotations If all orientations should be searched
+ * @property {boolean} pruneRotations If an orientation search should be stopped if worse than best orientation
+ * @property {boolean} memoize If search shouldn't continue if same index, orientation and grip is reached
+ * @property {boolean} [wideReplace] If search should try replacing single moves with wide moves
+ * @property {boolean} [searchRegrips] If regrip candidates should always be explored, even when a direct transition exists
+ * @property {boolean} [injectXRotations] If search should try injecting X rotations mid-scramble
+ * @property {boolean} [injectYRotations] If search should try injecting Y rotations mid-scramble
+ * @property {boolean} [injectZRotations] If search should try injecting Z rotations mid-scramble
+ * @property {number} [partitionLength] Maximum length of scramble partitions (0 or undefined to disable)
+ * @property {number} [maxCapacity] Maximum number of candidate scrambles to retain (default 50)
+ */
+
+/**
+ * @typedef OrientationResultInfo
+ * @property {StartingRotation} rotation The rotation applied at the beginning of the scramble
+ * @property {GripState} [startingGrip] The starting grip used
+ * @property {number} cost The scramble cost
+ * @property {number} iterations The number of iterations of bruteforceOptimize
+ * @property {boolean} maxed If the max iteration count was hit
+ */
+
+/**
+ * @typedef {Object} TransformDescriptor
+ * @property {number} logicalSkip Number of original (logical) moves this transform consumes
+ * @property {number} physicalCount Number of physical moves this transform produces in the clone
+ * @property {(moves: Move[], index: number, orientation: Orientation) => void} apply Function to apply the transformation in-place
+ */
+
+/**
+ * @typedef {Object} ScrambleCandidate
+ * @property {Move[]} scramble Transposed candidate scramble moves
+ * @property {number} cost Total cost of candidate
+ * @property {StartingRotation} rotation Starting rotation applied
+ * @property {Orientation} finalOrientation Final orientation of the cube after scramble
+ * @property {GripState} startingGrip Starting thumb placement grip
+ * @property {number[]} partitionBoundaries Indices where partition boundaries occur
+ * @property {GripState} finalGrip Final thumb placement grip after candidate execution
+ * @property {number} [physicalOffset] Cumulative physical index offset due to length-changing transforms
+ * @property {number} [logicalIndex] Current logical progress index in the original scramble
+ */
+
+/**
+ * @typedef ScrambleBreakdownEntry
+ * @property {MoveStr} move The move for this step
+ * @property {Transition} transition The transition occuring from this move
+ * @property {number} addedCost The total cost of the transition
+ * @property {CostDetails} [costBreakdown] Itemized breakdown of the cost components (fingertrick, grip, alpha, etc.)
+ * @property {boolean} [isPartitionBoundary] If this move starts a new partition
+ */
+
+/**
+ * @typedef OptimizationResult
+ * @property {boolean} success Whether optimization completed successfully
+ * @property {string} [bestScrambleStr] Transposed best scramble string
+ * @property {ScrambleBreakdownEntry[]} [breakdown] Move-by-move breakdown entries
+ * @property {number} [bestCost] Total cost of the optimized scramble
+ * @property {number} [searchTime] Search runtime in milliseconds
+ * @property {number | null} [cubeSize] Detected cube dimension (e.g. 3 for 3x3)
+ * @property {NotationMode} [resolvedNotation] Resolved notation mode ('wca' | 'sign')
+ * @property {string} [error] Error message if optimization failed
+ */
+
+/**
+ * @typedef {(response: OptimizationResult) => void} SendOptimizationResponse
+ */
 
 /**
  * @typedef {Object} SearchContext

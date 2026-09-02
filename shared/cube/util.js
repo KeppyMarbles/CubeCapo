@@ -1,6 +1,22 @@
 import { Move } from "./move.js";
-import { defaultColorScheme } from "./defaults.js";
-/** @import { Orientation, StartingRotation, FaceStr, ColorSchemeConfig, RotationStr } from "../types.js" */
+import { defaultColorScheme } from "../defaults.js";
+/** @import { FaceStr, RotationStr } from "./move.js" */
+
+/** 
+ * @typedef {Object} Orientation
+ * @property {FaceStr} up The face on top
+ * @property {FaceStr} front The face in front
+ */
+
+/** 
+ * @typedef {Object} StartingRotation
+ * @property {RotationStr | null} up The top rotation
+ * @property {RotationStr | null} front The front rotation
+ */
+
+/**
+ * @typedef {Record<FaceStr, string>} ColorSchemeConfig
+ */
 
 /**
  * Detects the cube size (2, 3, 4, 5, 6, 7, ...) from a parsed Move array.

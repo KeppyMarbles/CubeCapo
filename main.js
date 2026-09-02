@@ -3,8 +3,10 @@ import { getElement } from "./shared/ui/dom.js";
 import { ScrambleOptimizer } from "./shared/cube/optimizer.js";
 import { ExecutionEvaluator } from "./shared/cube/evaluator.js";
 import { drawOptimizerStats } from "./shared/ui/stats.js";
-import { defaultFingertricks } from "./shared/cube/defaults.js";
-/** @import { CostConfig, RunOptions, ParseResult, TransitionConfig } from "./shared/types.js" */
+import { defaultFingertricks } from "./shared/defaults.js";
+/** @import { CostConfig, TransitionConfig } from "./shared/cube/evaluator.js" */
+/** @import { RunOptions } from "./shared/cube/optimizer.js" */
+/** @import { ParseResult } from "./shared/cube/parser.js" */
 
 /** @type {ScrambleOptimizer | null} */
 let currentOptimizer = null;

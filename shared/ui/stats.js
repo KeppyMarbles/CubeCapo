@@ -1,6 +1,6 @@
 import { getElement, queryElementOptional } from "./dom.js";
-/** @import { ScrambleBreakdownEntry, OrientationResultInfo, FormatOptions, ParseResult } from "../types.js" */
-/** @import { ScrambleOptimizer } from "../cube/optimizer.js" */
+/** @import { ScrambleBreakdownEntry, OrientationResultInfo, FormatOptions, ScrambleOptimizer } from "../cube/optimizer.js" */
+/** @import { ParseResult } from "../cube/parser.js" */
 
 /**
  * Show all the results of the scramble optimizer
