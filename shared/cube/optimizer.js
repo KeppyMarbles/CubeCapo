@@ -1,6 +1,6 @@
 import { defaultFormatOptions, defaultRunOptions } from "../defaults.js";
 import { Move } from "./move.js";
-import { getOrientationColors, getRestoringRotation, detectCubeSize } from "./util.js";
+import { getOrientationColors, getRestoringRotation, detectCubeSize, normalizeScramble, getFinalOrientation } from "./util.js";
 /** @import { ExecutionEvaluator, GripState, Transition, ExecutionStep, CostDetails } from "./evaluator.js" */
 /** @import { Orientation, StartingRotation, ColorSchemeConfig } from "./util.js" */
 /** @import { ParseResult, NotationMode } from "./parser.js" */
@@ -250,27 +250,6 @@ export class ScrambleOptimizer {
      */
     static copyScramble(moves) {
         return moves.map(move => move.clone());
-    }
-
-    /**
-     * Calculates the resulting orientation after applying a sequence of moves (including rotations and wide moves)
-     * starting from an initial orientation.
-     * @param {Move[]} moves 
-     * @param {Orientation} [initialOrientation] 
-     * @returns {Orientation}
-     */
-    static getFinalOrientation(moves, initialOrientation = { up: "U", front: "F" }) {
-        const orientation = { ...initialOrientation };
-        if (!Array.isArray(moves)) return orientation;
-        for (let i = 0; i < moves.length; i++) {
-            const move = moves[i];
-            if (!move) continue;
-            const { rotation } = move.decompose();
-            if (rotation) {
-                Move.transposeOrientation(orientation, rotation);
-            }
-        }
-        return orientation;
     }
 
     /**
@@ -568,37 +547,9 @@ export class ScrambleOptimizer {
             throw new Error("ScrambleOptimizer.optimize requires a valid ParseResult object");
         }
 
-        /** @type {Orientation} */
-        const orientation = {up: "U", front: "F"};
         const rawScramble = parseResult.moves;
-        const preprocessedScramble = [];
-
-        this.originalFinalOrientation = ScrambleOptimizer.getFinalOrientation(rawScramble);
-
-        // Remove all orientation changes, wide moves, and slice moves in the input scramble
-        const decompContainer = { faceMoves: [], rotation: null };
-
-        for (let i = 0; i < rawScramble.length; i++) {
-            const move = rawScramble[i];
-            const { rotation } = move.decompose(decompContainer);
-            if (rotation) {
-                Move.transposeOrientation(orientation, rotation);
-            }
-        }
-        for (let i = rawScramble.length - 1; i >= 0; i--) {
-            const move = rawScramble[i];
-            const { faceMoves, rotation } = move.decompose(decompContainer);
-            if (rotation) {
-                for (let j = 0; j < preprocessedScramble.length; j++) {
-                    preprocessedScramble[j].transposeInverse(rotation);
-                }
-            }
-            if (faceMoves) {
-                for (let k = faceMoves.length - 1; k >= 0; k--) {
-                    preprocessedScramble.unshift(faceMoves[k]);
-                }
-            }
-        }
+        this.originalFinalOrientation = getFinalOrientation(rawScramble);
+        const preprocessedScramble = normalizeScramble(rawScramble);
 
         const cubeSize = options?.cubeSize || detectCubeSize(preprocessedScramble);
 
@@ -616,7 +567,8 @@ export class ScrambleOptimizer {
         for (const top_rot of Move.TOP_ROTATIONS) {
             for (const front_rot of Move.FRONT_ROTATIONS) {
                 const rotatedScramble = ScrambleOptimizer.copyScramble(preprocessedScramble);
-                const newOrientation = { ...orientation };
+                /** @type {Orientation} */
+                const newOrientation = { up: "U", front: "F" };
 
                 // transpose all moves according to the starting rotation
                 if (top_rot !== null) {
@@ -746,7 +698,7 @@ export class ScrambleOptimizer {
         if (candidate.rotation?.up) Move.transposeOrientation(solverStartOrientation, candidate.rotation.up);
         if (candidate.rotation?.front) Move.transposeOrientation(solverStartOrientation, candidate.rotation.front);
 
-        const solverFinalOrientation = ScrambleOptimizer.getFinalOrientation(candidate.scramble, solverStartOrientation);
+        const solverFinalOrientation = getFinalOrientation(candidate.scramble, solverStartOrientation);
         const restoringRot = getRestoringRotation(solverFinalOrientation, this.originalFinalOrientation);
         const endRotations = options.reorient
             ? [restoringRot.up, restoringRot.front].filter(Boolean)

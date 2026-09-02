@@ -122,3 +122,56 @@ export function getRestoringRotation(fromOrientation, toOrientation = { up: "U",
     }
     return { up: null, front: null };
 }
+
+/**
+ * Calculates the resulting orientation after applying a sequence of moves (including rotations and wide moves)
+ * starting from an initial orientation.
+ * @param {readonly Move[]} moves 
+ * @param {Orientation} [initialOrientation={ up: "U", front: "F" }] 
+ * @returns {Orientation}
+ */
+export function getFinalOrientation(moves, initialOrientation = { up: "U", front: "F" }) {
+    const orientation = { ...initialOrientation };
+    if (!Array.isArray(moves)) return orientation;
+    for (let i = 0; i < moves.length; i++) {
+        const move = moves[i];
+        if (!move) continue;
+        const { rotation } = move.decompose();
+        if (rotation) {
+            Move.transposeOrientation(orientation, rotation);
+        }
+    }
+    return orientation;
+}
+
+/**
+ * Flattens and normalizes a sequence of moves by decomposing slice and wide moves
+ * and propagating mid-scramble rotations into pure face moves.
+ * @param {readonly Move[]} moves Sequence of moves to normalize
+ * @returns {Move[]} Normalized, rotation-free sequence of pure face moves
+ */
+export function normalizeScramble(moves) {
+    if (!Array.isArray(moves) || moves.length === 0) return [];
+
+    /** @type {Move[]} */
+    const normalized = [];
+    const decompContainer = { faceMoves: /** @type {Move[]} */ ([]), rotation: /** @type {RotationStr | null} */ (null) };
+
+    for (let i = moves.length - 1; i >= 0; i--) {
+        const move = moves[i];
+        if (!move) continue;
+        const { faceMoves, rotation } = move.decompose(decompContainer);
+        if (rotation) {
+            for (let j = 0; j < normalized.length; j++) {
+                normalized[j].transposeInverse(rotation);
+            }
+        }
+        if (faceMoves) {
+            for (let k = faceMoves.length - 1; k >= 0; k--) {
+                normalized.unshift(faceMoves[k]);
+            }
+        }
+    }
+
+    return normalized;
+}

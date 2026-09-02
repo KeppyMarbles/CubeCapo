@@ -30,7 +30,7 @@ scramblemanip-js/
 │   │   ├── move.js          # Move class: copy/clone/invert methods, transposition matrix, rotation helpers
 │   │   ├── optimizer.js     # ScrambleOptimizer class: branch-and-bound optimization, partition sequencing, orientation search, candidate management
 │   │   ├── parser.js        # ScrambleParser class: tokenization, recursive descent parsing for commutators/conjugates/groups, notation detection & normalization
-│   │   └── util.js          # Cube utility functions: getOrientationColors, getRestoringRotation, detectCubeSize
+│   │   └── util.js          # Cube utility functions: normalizeScramble, getFinalOrientation, getOrientationColors, getRestoringRotation, detectCubeSize
 │   ├── ui/
 │   │   ├── dom.js           # Type-safe DOM element getters & query helpers (getElement, getOptionalElement, queryElement, queryElementOptional, queryElements)
 │   │   ├── form.js          # Form handler: input parsing, cost config tab setup, import/export, unsaved bar
