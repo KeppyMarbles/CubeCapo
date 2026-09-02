@@ -50,6 +50,10 @@ export class ScrambleOptimizer {
     static X_PRIME_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("x'");
     static X2_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("x2");
 
+    static Y_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("y");
+    static Y_PRIME_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("y'");
+    static Y2_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("y2");
+
     /**
      * Computes a unique signature string for deduplicating scramble candidates.
      * @param {ScrambleCandidate} candidate 
@@ -328,11 +332,11 @@ export class ScrambleOptimizer {
         // Normal branch
         branchWith(ScrambleOptimizer.IDENTITY_DESCRIPTOR);
 
-        // Injected Z rotations (when in F F grip and injectZRotations or injectRotations option is enabled)
-        if (this.options.injectZRotations && currentGrip === "F F") {
-            branchWith(ScrambleOptimizer.Z_INJECT_DESCRIPTOR);
-            branchWith(ScrambleOptimizer.Z_PRIME_INJECT_DESCRIPTOR);
-            branchWith(ScrambleOptimizer.Z2_INJECT_DESCRIPTOR);
+        // Injected Z rotations (when injectZRotations option is enabled)
+        if (this.options.injectZRotations) {
+            if (this.evaluator.getTransition(currentGrip, "z")) branchWith(ScrambleOptimizer.Z_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "z'")) branchWith(ScrambleOptimizer.Z_PRIME_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "z2")) branchWith(ScrambleOptimizer.Z2_INJECT_DESCRIPTOR);
         }
 
         // Injected X rotations (when injectXRotations option is enabled)
@@ -340,6 +344,13 @@ export class ScrambleOptimizer {
             if (this.evaluator.getTransition(currentGrip, "x")) branchWith(ScrambleOptimizer.X_INJECT_DESCRIPTOR);
             if (this.evaluator.getTransition(currentGrip, "x'")) branchWith(ScrambleOptimizer.X_PRIME_INJECT_DESCRIPTOR);
             if (this.evaluator.getTransition(currentGrip, "x2")) branchWith(ScrambleOptimizer.X2_INJECT_DESCRIPTOR);
+        }
+
+        // Injected Y rotations (when injectYRotations option is enabled)
+        if (this.options.injectYRotations) {
+            if (this.evaluator.getTransition(currentGrip, "y")) branchWith(ScrambleOptimizer.Y_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "y'")) branchWith(ScrambleOptimizer.Y_PRIME_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "y2")) branchWith(ScrambleOptimizer.Y2_INJECT_DESCRIPTOR);
         }
 
         const canWideReplace = this.canWideReplace(move);

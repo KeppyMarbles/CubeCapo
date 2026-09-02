@@ -52,4 +52,5 @@ scramblemanip-js/
 2. Avoid using type assertions to satisfy the type checker.
 3. Avoid hardcoding default values. For example, only say `const cubeSize = size || 3` if this is the first occurence of `3`. Do not use fallbacks if they could conceal an error. For example, the text `undefinedxundefined` is preferred over `3x3`.
 4. Do not use inline imports for js types; import them at the top of the file.
-5. Update this file if it becomes outdated or has errors.
+5. Save temporary test scripts and verification files directly in the workspace `scratch/` folder so that project-relative imports (e.g. `../shared/...`) and ES module package boundaries resolve cleanly.
+6. Update this file if it becomes outdated or has errors.

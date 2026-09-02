@@ -42,7 +42,7 @@
 
 /** @typedef {`right_${FingerAction}`} RightFingertrick */
 /** @typedef {`left_${FingerAction}`} LeftFingertrick */
-/** @typedef {RightFingertrick | LeftFingertrick} Fingertrick */
+/** @typedef {RightFingertrick | LeftFingertrick | "rotation" | "rotation_double"} Fingertrick */
 
 /** @typedef {`${ThumbPosition} ${ThumbPosition}`} GripState */
 /** @typedef {`${FaceStr | MiddleStr}${ModifierStr}`} MoveKey */
@@ -78,6 +78,7 @@
  * @property {GripState} [regripFrom] Starting grip before a regrip
  * @property {GripState} [regripPrompt] Target grip for pre-move regrip prompt
  * @property {number} [regripCost] Pre-calculated cost of the regrip
+ * @property {number} [regripFactor] Fractional hand release multiplier (e.g. 0.5 for partial regrip, 1.0 for full regrip)
  */
 
 /**
@@ -145,7 +146,8 @@
  * @property {boolean} [wideReplace] If search should try replacing single moves with wide moves
  * @property {boolean} [searchRegrips] If regrip candidates should always be explored, even when a direct transition exists
  * @property {boolean} [injectXRotations] If search should try injecting X rotations mid-scramble
- * @property {boolean} [injectZRotations] If search should try injecting Z rotations mid-scramble when in F F grip
+ * @property {boolean} [injectYRotations] If search should try injecting Y rotations mid-scramble
+ * @property {boolean} [injectZRotations] If search should try injecting Z rotations mid-scramble
  * @property {number} [partitionLength] Maximum length of scramble partitions (0 or undefined to disable)
  * @property {number} [maxCapacity] Maximum number of candidate scrambles to retain (default 50)
  */

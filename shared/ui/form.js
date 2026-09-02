@@ -85,10 +85,8 @@ export async function setupForm(onSubmit, onFormatChange) {
             "repeatPenalty": "Repeat Penalty",
             "perSliceFingertrick": "Slice Fingertrick",
             "handedness": "Dominant Hand",
-
-            "x": "X Rotation",
-            "y": "Y Rotation",
-            "z": "Z Rotation",
+            "rotation": "Rotation",
+            "rotation_double": "Double Rotation",
         };
 
         /** @type {Record<string, string>} */
@@ -103,6 +101,8 @@ export async function setupForm(onSubmit, onFormatChange) {
             "x": "Cost to perform an X rotation",
             "y": "Cost to perform a Y rotation",
             "z": "Cost to perform a Z rotation",
+            "rotation": "Cost to execute a single 90° full-cube rotation",
+            "rotation_double": "Cost to execute a double 180° full-cube rotation",
         };
 
         /** @type {Record<string, string>} */
@@ -122,6 +122,7 @@ export async function setupForm(onSubmit, onFormatChange) {
                 return idx !== -1 ? idx : 0;
             },
             "fingertrick": (key) => {
+                if (key.startsWith("rotation")) return 2;
                 if (key.startsWith("right_")) return 1;
                 return 0;
             }
@@ -235,6 +236,7 @@ export async function setupForm(onSubmit, onFormatChange) {
         "wideReplace",
         "searchRegrips",
         "injectXRotations",
+        "injectYRotations",
         "injectZRotations",
         //"wideReplaceDouble",
         "partitionLength",
@@ -421,6 +423,8 @@ export async function setupForm(onSubmit, onFormatChange) {
         { label: "", targets: []},
         { label: "Right Hand", targets: ["right_index", "right_index_push", "right_index_front", "right_index_middle", "right_middle", "right_middle_push", "right_ring", "right_ring_middle", "right_ring_push", "right_thumb", "right_up", "right_up_double", "right_down", "right_down_double"]},
         { label: "Left Hand", targets: ["left_index", "left_index_push", "left_index_front", "left_index_middle", "left_middle", "left_middle_push", "left_ring", "left_ring_middle", "left_ring_push", "left_thumb", "left_up", "left_up_double", "left_down", "left_down_double"]},
+        { label: "", targets: []},
+        { label: "Rotations", targets: ["rotation", "rotation_double"]},
     ]);
 
     addGroupControls(form, "grip", [
@@ -730,6 +734,7 @@ function collectRunOptionsValues() {
         memoize: getElement("memoize", HTMLInputElement).checked,
         wideReplace: getElement("wideReplace", HTMLInputElement).checked,
         injectXRotations:  getElement("injectXRotations", HTMLInputElement).checked,
+        injectYRotations:  getElement("injectYRotations", HTMLInputElement).checked,
         injectZRotations: getElement("injectZRotations", HTMLInputElement).checked,
         searchRegrips: getElement("searchRegrips", HTMLInputElement).checked,
         partitionLength: parseFloat(getElement("partitionLength", HTMLInputElement).value),
@@ -795,6 +800,7 @@ function applyRunOptionsValues(runOpts) {
     if (runOpts.memoize !== undefined) getElement("memoize", HTMLInputElement).checked = Boolean(runOpts.memoize);
     if (runOpts.wideReplace !== undefined) getElement("wideReplace", HTMLInputElement).checked = Boolean(runOpts.wideReplace);
     if (runOpts.injectXRotations !== undefined) getElement("injectXRotations", HTMLInputElement).checked = Boolean(runOpts.injectXRotations);
+    if (runOpts.injectYRotations !== undefined) getElement("injectYRotations", HTMLInputElement).checked = Boolean(runOpts.injectYRotations);
     if (runOpts.injectZRotations !== undefined) getElement("injectZRotations", HTMLInputElement).checked = Boolean(runOpts.injectZRotations);
     if (runOpts.searchRegrips !== undefined) getElement("searchRegrips", HTMLInputElement).checked = Boolean(runOpts.searchRegrips);
     if (runOpts.partitionLength !== undefined) getElement("partitionLength", HTMLInputElement).value = String(runOpts.partitionLength);

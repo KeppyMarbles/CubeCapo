@@ -40,6 +40,7 @@ export const defaultRunOptions = Object.freeze({
     wideReplace: true,
     //wideReplaceDouble: false,
     injectXRotations: false,
+    injectYRotations: false,
     injectZRotations: false,
     searchRegrips: false,
     partitionLength: 20,
@@ -57,6 +58,7 @@ export const strategyPresets = Object.freeze({
         searchRegrips: false,
         wideReplace: true,
         injectXRotations: false,
+        injectYRotations: false,
         injectZRotations: false,
         depth: 0,
         memoize: true,
@@ -69,6 +71,7 @@ export const strategyPresets = Object.freeze({
         searchRegrips: false,
         wideReplace: true,
         injectXRotations: false,
+        injectYRotations: false,
         injectZRotations: true,
         depth: 0,
         memoize: true,
@@ -81,6 +84,7 @@ export const strategyPresets = Object.freeze({
         searchRegrips: true,
         wideReplace: true,
         injectXRotations: true,
+        injectYRotations: true,
         injectZRotations: true,
         depth: 0,
         memoize: true,
@@ -137,7 +141,9 @@ export const defaultCostConfiguration = Object.freeze({
         "left_up": 0,
         "left_up_double": 0,
         "left_down": 0,
-        "left_down_double": 0
+        "left_down_double": 0,
+        "rotation": 0,
+        "rotation_double": 0
     }
 });
 

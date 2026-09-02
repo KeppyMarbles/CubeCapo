@@ -109,6 +109,105 @@ export function computeRegripDistance(fromGrip, toGrip) {
 }
 
 /**
+ * Programmatically computes the transition (next grip, fingertrick, and regrip factor) for a y rotation.
+ * @param {GripState} grip - Starting grip state (e.g. "F F", "U D", "F Bu")
+ * @param {RotationStr} rotKey - "y" | "y'" | "y2" | "y2'"
+ * @returns {Transition | null}
+ */
+export function computeYTransition(grip, rotKey) {
+    if (!grip) return null;
+    const [l, r] = splitGrip(grip);
+
+    const isPivotL = l === "U" || l === "D";
+    const isPivotR = r === "U" || r === "D";
+    const isBackL = l === "Bu" || l === "Bd";
+    const isBackR = r === "Bu" || r === "Bd";
+    const isFrontL = l === "F";
+    const isFrontR = r === "F";
+
+    let nextL = l;
+    let nextR = r;
+    let regripL = false;
+    let regripR = false;
+
+    if (rotKey === "y" || rotKey === "y'") {
+        // 90° Rotations
+        if (isPivotL && isPivotR) {
+            nextL = l;
+            nextR = r;
+        } else if (isPivotL) {
+            nextL = l;
+            nextR = isPivotR ? r : "F";
+            regripR = !isPivotR;
+        } else if (isPivotR) {
+            nextR = r;
+            nextL = isPivotL ? l : "F";
+            regripL = !isPivotL;
+        } else {
+            nextL = "F";
+            nextR = "F";
+            regripL = true;
+            regripR = true;
+        }
+    } else {
+        // 180° Rotations (y2, y2')
+        if (isPivotL && isPivotR) {
+            nextL = l;
+            nextR = r;
+        } else if (rotKey === "y2" && isFrontL && isBackR) {
+            // CW: Left F -> Bu, Right B -> F
+            nextL = "Bu";
+            nextR = "F";
+        } else if (rotKey === "y2'" && isBackL && isFrontR) {
+            // CCW: Left B -> F, Right F -> Bu
+            nextL = "F";
+            nextR = "Bu";
+        } else if (isPivotL && isBackR && rotKey === "y2") {
+            // Left pivot, Right B -> F
+            nextL = l;
+            nextR = "F";
+        } else if (isPivotR && isBackL && rotKey === "y2'") {
+            // Right pivot, Left B -> F
+            nextL = "F";
+            nextR = r;
+        } else if (isBackL && isBackR) {
+            // Both on back: matching thumb pivots to F, non-matching thumb regrips (partial regrip)
+            nextL = "F";
+            nextR = "F";
+            if (rotKey === "y2") regripL = true;
+            else regripR = true;
+        } else if (isPivotL) {
+            nextL = l;
+            nextR = isPivotR ? r : "F";
+            regripR = !isPivotR;
+        } else if (isPivotR) {
+            nextR = r;
+            nextL = isPivotL ? l : "F";
+            regripL = !isPivotL;
+        } else {
+            nextL = "F";
+            nextR = "F";
+            regripL = true;
+            regripR = true;
+        }
+    }
+
+    /** @type {Fingertrick} */
+    const type = (rotKey === "y" || rotKey === "y'") ? "rotation" : "rotation_double";
+
+    // Regrip factor: 1.0 (full regrip) if both hands lift, 0.5 (half regrip) if one hand lifts, 0 if pure pivot
+    let regripFactor = 0;
+    if (regripL && regripR) {
+        regripFactor = 1.0;
+    } else if (regripL || regripR) {
+        regripFactor = 0.5;
+    }
+
+    const nextGrip = /** @type {GripState} */ (`${nextL} ${nextR}`);
+    return { next: nextGrip, type, regripFactor };
+}
+
+/**
  * Calculates the resulting grip state after performing a transition with a given fingertrick or rotation.
  * @param {GripState} currentGrip 
  * @param {Fingertrick | RotationStr | ""} [transitionType=""]
@@ -130,9 +229,18 @@ export function computeNextGrip(currentGrip, transitionType = "") {
         return (nextL && nextR) ? /** @type {GripState} */ (`${nextL} ${nextR}`) : null;
     }
 
-    // Full-cube Z rotations (preserve F F grip)
+    // Full-cube Y rotations
+    if (transitionType.startsWith("y")) {
+        const trans = computeYTransition(currentGrip, /** @type {RotationStr} */ (transitionType));
+        return trans ? trans.next : null;
+    }
+
+    // Full-cube Z rotations (preserve grips on the F-B axis)
     if (transitionType.startsWith("z")) {
-        return currentGrip === "F F" ? "F F" : null;
+        const [l, r] = splitGrip(currentGrip);
+        const isFBL = l === "F" || l === "Bu" || l === "Bd";
+        const isFBR = r === "F" || r === "Bu" || r === "Bd";
+        return (isFBL && isFBR) ? currentGrip : null;
     }
 
     if (transitionType.startsWith("right_")) {
@@ -241,18 +349,28 @@ export class ExecutionEvaluator {
                 if (nextGrip) cacheRow[key] = { next: nextGrip, type: selectedFt };
             }
 
-            // Full-cube X rotations (0 fingertrick penalty)
+            // Full-cube X rotations
             for (const rotKey of ["x", "x'", "x2", "x2'"]) {
                 const key = /** @type {RotationStr} */ (rotKey);
                 const nextGrip = computeNextGrip(grip, key);
-                if (nextGrip) cacheRow[key] = { next: nextGrip, type: "" };
+                const type = (key === "x" || key === "x'") ? "rotation" : "rotation_double";
+                if (nextGrip) cacheRow[key] = { next: nextGrip, type };
             }
 
-            // Injected Z rotations when in F F grip (preserve F F grip with 0 fingertrick penalty)
-            if (grip === "F F") {
-                cacheRow["z"] = { next: "F F", type: "" };
-                cacheRow["z'"] = { next: "F F", type: "" };
-                cacheRow["z2"] = { next: "F F", type: "" };
+            // Full-cube Y rotations
+            for (const rotKey of ["y", "y'", "y2", "y2'"]) {
+                const key = /** @type {RotationStr} */ (rotKey);
+                const trans = computeYTransition(grip, key);
+                if (trans) cacheRow[key] = trans;
+            }
+
+            // Full-cube Z rotations (grips on F-B axis form a pivot across the B-F axis)
+            const isFBL = l === "F" || l === "Bu" || l === "Bd";
+            const isFBR = r === "F" || r === "Bu" || r === "Bd";
+            if (isFBL && isFBR) {
+                cacheRow["z"] = { next: grip, type: "rotation" };
+                cacheRow["z'"] = { next: grip, type: "rotation" };
+                cacheRow["z2"] = { next: grip, type: "rotation_double" };
             }
 
             cache[grip] = cacheRow;
@@ -283,7 +401,9 @@ export class ExecutionEvaluator {
 
         let added = 0;
         let regripCost = 0;
-        if (transition.regripCost !== undefined) {
+        if (transition.regripFactor !== undefined) {
+            regripCost = transition.regripFactor * (this.config.general.regrip ?? 0);
+        } else if (transition.regripCost !== undefined) {
             regripCost = transition.regripCost;
         } else if (regripFromGrip) {
             const distance = computeRegripDistance(regripFromGrip, transition.regripPrompt || transition.next);
