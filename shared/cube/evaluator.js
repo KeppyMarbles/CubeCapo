@@ -449,7 +449,7 @@ export class ExecutionEvaluator {
 
     /**
      * Evaluates available candidate regrips to execute a move from a given grip.
-     * Returns candidate steps sorted by lowest step cost.
+     * Returns candidate steps sorted by lowest step cost, bounded by limit.
      * @param {GripState} currentGrip 
      * @param {Move} move 
      * @param {number | null} [cubeSize=null] 
@@ -457,13 +457,15 @@ export class ExecutionEvaluator {
      * @returns {ExecutionStep[]}
      */
     getRegripOptions(currentGrip, move, cubeSize = null, limit = Infinity) {
+        if (limit <= 0) return [];
+
         const movedKey = move.toKey();
         const baseRegrip = this.config.general.regrip ?? 0;
         const regripPerStep = this.config.general.regripPerStep ?? 0;
         const distRow = REGRIP_DIST_CACHE[currentGrip];
 
         /** @type {ExecutionStep[]} */
-        const options = [];
+        const topK = [];
 
         for (let j = 0; j < this.allGripKeys.length; j++) {
             const targetGrip = this.allGripKeys[j];
@@ -483,14 +485,23 @@ export class ExecutionEvaluator {
                 regripCost: rCost
             };
             const stepCost = this.computeCost(regripTrans, move, cubeSize, currentGrip);
-            options.push({
-                transition: regripTrans,
-                nextGrip: targetTrans.next,
-                cost: stepCost
-            });
+
+            if (topK.length < limit || stepCost < topK[topK.length - 1].cost) {
+                /** @type {ExecutionStep} */
+                const step = {
+                    transition: regripTrans,
+                    nextGrip: targetTrans.next,
+                    cost: stepCost
+                };
+                let insertIdx = topK.length;
+                while (insertIdx > 0 && topK[insertIdx - 1].cost > stepCost) {
+                    insertIdx--;
+                }
+                topK.splice(insertIdx, 0, step);
+                if (topK.length > limit) topK.pop();
+            }
         }
 
-        options.sort((a, b) => a.cost - b.cost);
-        return Number.isFinite(limit) ? options.slice(0, limit) : options;
+        return topK;
     }
 }
