@@ -4,7 +4,7 @@ import { getOrientationColors, getRestoringRotation, detectCubeSize, normalizeSc
 /** @import { ExecutionEvaluator, GripState, Transition, ExecutionStep, CostDetails } from "./evaluator.js" */
 /** @import { Orientation, StartingRotation, ColorSchemeConfig } from "./util.js" */
 /** @import { ParseResult, NotationMode } from "./parser.js" */
-/** @import { FaceStr, MoveStr, RotationStr, AxisStr } from "./move.js" */
+/** @import { FaceStr, MoveStr, RotationStr, AxisStr, FacePermutation } from "./move.js" */
 
 /**
  * @typedef {Object} FormatOptions
@@ -51,9 +51,14 @@ import { getOrientationColors, getRestoringRotation, detectCubeSize, normalizeSc
 
 /**
  * @typedef {Object} TransformDescriptor
- * @property {number} logicalSkip Number of original (logical) moves this transform consumes
- * @property {number} physicalCount Number of physical moves this transform produces in the clone
- * @property {(moves: Move[], index: number, orientation: Orientation) => void} apply Function to apply the transformation in-place
+ * @property {number} physicalCount Number of moves this transform executes in place of the current move
+ * @property {(move: Move, steps: Move[], orientation: Orientation) => RotationStr | null} apply Fills `steps` with the moves to execute in place of `move`, updates the orientation, and returns the rotation that all later moves must be transposed by
+ */
+
+/**
+ * @typedef {Object} PathNode A move executed during the search, linked back to the moves before it
+ * @property {Move} move
+ * @property {PathNode | null} prev
  */
 
 /**
@@ -95,41 +100,66 @@ import { getOrientationColors, getRestoringRotation, detectCubeSize, normalizeSc
  */
 
 /**
- * @typedef {Object} SearchContext
- * @property {number} minCost
- * @property {ScrambleCandidate[]} minResults
- * @property {Move[] | null} minScramble
- * @property {GripState} minStartingGrip
- * @property {GripState} minFinalGrip
- * @property {Orientation | null} minFinalOrientation
+ * @typedef {Object} SearchContext One partition search, from a fixed starting point to a fixed end
+ * @property {Move[]} moves The scramble being searched; never modified
+ * @property {number} startIndex Index in moves where the search begins
+ * @property {number} endIndex Index in moves where the search ends
+ * @property {GripState} startGrip The grip the whole scramble started with
+ * @property {number} minCost Lowest cost found so far
+ * @property {ScrambleCandidate[]} minResults Candidates tied for lowest cost
  */
 
 export class ScrambleOptimizer {
     /** @type {TransformDescriptor} */
-    static IDENTITY_DESCRIPTOR = Object.freeze({ logicalSkip: 1, physicalCount: 1, apply: () => {} });
+    static IDENTITY_DESCRIPTOR = Object.freeze({
+        logicalSkip: 1,
+        physicalCount: 1,
+        apply: (move, steps) => {
+            steps[0] = move.clone();
+            return null;
+        }
+    });
 
     /** @type {TransformDescriptor} */
-    static WIDE_DESCRIPTOR = Object.freeze({ logicalSkip: 1, physicalCount: 1, apply: (arr, idx, or) => ScrambleOptimizer.wideReplace(arr, idx, or) });
+    static WIDE_DESCRIPTOR = Object.freeze({
+        logicalSkip: 1,
+        physicalCount: 1,
+        apply: (move, steps, orientation) => ScrambleOptimizer.wideReplace(move.clone(), steps, orientation)
+    });
 
     /** @type {TransformDescriptor} */
-    static PRIME_DESCRIPTOR = Object.freeze({ logicalSkip: 1, physicalCount: 1, apply: (arr, idx, or) => ScrambleOptimizer.primeReplace(arr, idx, or) });
+    static PRIME_DESCRIPTOR = Object.freeze({
+        logicalSkip: 1,
+        physicalCount: 1,
+        apply: (move, steps) => {
+            steps[0] = move.clone().invert();
+            return null;
+        }
+    });
 
     /** @type {TransformDescriptor} */
-    static PRIME_WIDE_DESCRIPTOR = Object.freeze({ 
-        logicalSkip: 1, 
-        physicalCount: 1, 
-        apply: (arr, idx, or) => { 
-            ScrambleOptimizer.primeReplace(arr, idx, or); 
-            ScrambleOptimizer.wideReplace(arr, idx, or); 
-        } 
+    static PRIME_WIDE_DESCRIPTOR = Object.freeze({
+        logicalSkip: 1,
+        physicalCount: 1,
+        apply: (move, steps, orientation) => ScrambleOptimizer.wideReplace(move.clone().invert(), steps, orientation)
     });
 
     /**
-     * @param {RotationStr} rotKey 
+     * @param {RotationStr} rotKey
      * @returns {TransformDescriptor}
      */
     static makeRotationInjectDescriptor(rotKey) {
-        return Object.freeze({ logicalSkip: 1, physicalCount: 2, apply: (clone, index, newOrientation) => ScrambleOptimizer.injectRotation(clone, index, newOrientation, rotKey) });
+        return Object.freeze({
+            logicalSkip: 1,
+            physicalCount: 2,
+            apply: (move, steps, orientation) => {
+                steps[0] = new Move(/** @type {AxisStr} */ (rotKey[0]), rotKey.includes("'"), rotKey.includes("2"), true);
+                steps[1] = move.clone();
+                steps[1].transpose(rotKey);
+                Move.transposeOrientation(orientation, rotKey);
+                return rotKey;
+            }
+        });
     }
 
     static Z_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("z");
@@ -155,6 +185,23 @@ export class ScrambleOptimizer {
         const rotFront = candidate.rotation?.front || "";
         const movesStr = candidate.scramble ? candidate.scramble.join(" ") : "";
         return `${candidate.startingGrip || ""}|${rotUp}|${rotFront}|${movesStr}`;
+    }
+
+    static FACE_INDEXES = Object.freeze({ U: 0, D: 1, F: 2, B: 3, R: 4, L: 5 });
+
+    /**
+     * Packs a search state into a single number for use as a memo key.
+     * @param {number} logicalIndex 
+     * @param {number} gripIndex 
+     * @param {number} gripCount 
+     * @param {Orientation} orientation 
+     * @returns {number}
+     */
+    static getMemoKey(logicalIndex, gripIndex, gripCount, orientation) {
+        const faces = Object.keys(ScrambleOptimizer.FACE_INDEXES).length;
+        const up = ScrambleOptimizer.FACE_INDEXES[orientation.up];
+        const front = ScrambleOptimizer.FACE_INDEXES[orientation.front];
+        return ((logicalIndex * gripCount + gripIndex) * faces + up) * faces + front;
     }
 
     /**
@@ -196,58 +243,42 @@ export class ScrambleOptimizer {
         this.candidates = [];
         /** @type {OrientationResultInfo[] | null} */
         this.rotationInfo = null;
-        /** @type {Map<string, number>} Memoization for all orientations */
+        /** @type {Map<number, number>} Memoization for all orientations */
         this.memo = new Map();
     }
 
     /**
-     * Applies rotation to all moves after `index` and updates orientation.
-     * @param {Move[]} moves 
-     * @param {number} index 
-     * @param {Orientation} orientation 
-     * @param {RotationStr} rotKey 
+     * Turns a move into its wide equivalent and updates the orientation
+     * @param {Move} move Move to convert in-place
+     * @param {Move[]} steps Receives the converted move
+     * @param {Orientation} orientation
+     * @returns {RotationStr | null} The rotation later moves must be transposed by
      */
-    static applyRotation(moves, index, orientation, rotKey) {
-        if (!rotKey) return;
-        Move.transposeOrientation(orientation, rotKey);
-        for (let i = index + 1; i < moves.length; i++) {
-            moves[i].transpose(rotKey);
+    static wideReplace(move, steps, orientation) {
+        steps[0] = move.toWide();
+        const rotKey = move.getAssociatedRotation();
+        if (rotKey) Move.transposeOrientation(orientation, rotKey);
+        return rotKey;
+    }
+
+    /**
+     * Builds the full scramble for a finished search: the moves before the search, the moves chosen by it, and the untouched remainder transposed by the search's rotations
+     * @param {SearchContext} ctx 
+     * @param {FacePermutation | null} permutation 
+     * @param {PathNode | null} path 
+     * @returns {Move[]}
+     */
+    static buildScramble(ctx, permutation, path) {
+        const chosen = [];
+        for (let node = path; node; node = node.prev) {
+            chosen.push(node.move.clone());
         }
-    }
+        chosen.reverse();
 
-    /**
-     * Inserts a rotation move at a given index and transposes subsequent moves + orientation
-     * @param {Move[]} moves 
-     * @param {number} index 
-     * @param {Orientation} orientation 
-     * @param {RotationStr} rotKey 
-     */
-    static injectRotation(moves, index, orientation, rotKey) {
-        if (!rotKey) return;
-        const rotMove = new Move(/** @type {AxisStr} */ (rotKey[0]), rotKey.includes("'"), rotKey.includes("2"), true);
-        moves.splice(index, 0, rotMove);
-        ScrambleOptimizer.applyRotation(moves, index, orientation, rotKey);
-    }
+        const tail = ScrambleOptimizer.copyScramble(ctx.moves.slice(ctx.endIndex));
+        tail.forEach(move => move.transposeWith(permutation));
 
-    /**
-     * Changes the move at a given index to a wide move and updates the orientation
-     * @param {Move[]} moves 
-     * @param {number} index 
-     * @param {Orientation} orientation 
-     */
-    static wideReplace(moves, index, orientation) {
-        const rotKey = moves[index].toWide().getAssociatedRotation();
-        if (rotKey) ScrambleOptimizer.applyRotation(moves, index, orientation, rotKey);
-    }
-
-    /**
-     * Changes the move at a given index to a prime move (assumes given move is double)
-     * @param {Move[]} moves 
-     * @param {number} index 
-     * @param {Orientation} orientation 
-     */
-    static primeReplace(moves, index, orientation) {
-        moves[index].invert();
+        return [...ScrambleOptimizer.copyScramble(ctx.moves.slice(0, ctx.startIndex)), ...chosen, ...tail];
     }
 
     /**
@@ -277,17 +308,16 @@ export class ScrambleOptimizer {
     }
 
     /**
-     * @param {Move[]} moves 
-     * @param {number} index Physical index in moves array
+     * @param {SearchContext} ctx 
+     * @param {number} index Index in ctx.moves of the next move to execute
      * @param {number} logicalIndex Logical index in original scramble
      * @param {GripState} currentGrip 
      * @param {number} currentCost 
      * @param {Orientation} orientation 
-     * @param {GripState} [startGrip]
-     * @param {number} [endIndex]
-     * @param {SearchContext} [ctx]
+     * @param {FacePermutation | null} permutation Net rotation applied so far to the moves from `index` onward
+     * @param {PathNode | null} path Moves executed so far since the search began
      */
-    bruteforceOptimize(moves, index, logicalIndex, currentGrip, currentCost, orientation, startGrip = "F F", endIndex = moves.length, ctx) {
+    bruteforceOptimize(ctx, index, logicalIndex, currentGrip, currentCost, orientation, permutation = null, path = null) {
         if (this.iterations >= this.options.maxIterations) {
             return;
         }
@@ -295,17 +325,17 @@ export class ScrambleOptimizer {
         if (this.options.pruneRotations && currentCost > bestCost + this.options.depth) {
             return;
         }
-        if (ctx && currentCost > ctx.minCost + this.options.depth) {
+        if (currentCost > ctx.minCost + this.options.depth) {
             return;
         }
-        if (index >= endIndex) {
-            if (ctx) {
+        if (index >= ctx.endIndex) {
+            if (ctx.minResults.length === 0 || currentCost <= ctx.minResults[0].cost) {
                 /** @type {ScrambleCandidate} */
                 const candidateItem = {
-                    scramble: ScrambleOptimizer.copyScramble(moves),
+                    scramble: ScrambleOptimizer.buildScramble(ctx, permutation, path),
                     cost: currentCost,
                     rotation: { up: null, front: null },
-                    startingGrip: startGrip,
+                    startingGrip: ctx.startGrip,
                     finalOrientation: { ...orientation },
                     partitionBoundaries: [],
                     finalGrip: currentGrip,
@@ -318,34 +348,34 @@ export class ScrambleOptimizer {
             return;
         }
         if (this.options.memoize) {
-            const key = `${logicalIndex}|${currentGrip}|${orientation.up}${orientation.front}`;
-            if ((this.memo.get(key) ?? Infinity) + this.options.depth <= currentCost) 
+            const key = ScrambleOptimizer.getMemoKey(logicalIndex, this.evaluator.getGripIndex(currentGrip), this.evaluator.allGripKeys.length, orientation);
+            if ((this.memo.get(key) ?? Infinity) + this.options.depth <= currentCost)
                 return;
             this.memo.set(key, currentCost);
         }
 
+        this.iterations++;
+        const move = ctx.moves[index].clone();
+        move.transposeWith(permutation);
+
         /**
-         * Create a new branch with a copied scramble using a TransformDescriptor
-         * @param {TransformDescriptor} descriptor 
+         * Create a new branch by replacing the current move using a TransformDescriptor
+         * @param {TransformDescriptor} descriptor
          */
         const branchWith = (descriptor) => {
-            const clone = ScrambleOptimizer.copyScramble(moves);
+            /** @type {Move[]} */
+            const steps = new Array(descriptor.physicalCount);
             const newOrientation = { ...orientation };
-            descriptor.apply(clone, index, newOrientation);
-
-            const delta = descriptor.physicalCount - descriptor.logicalSkip;
-            const newEndIndex = endIndex + delta;
-            const newLogicalIndex = logicalIndex + descriptor.logicalSkip;
-            const physicalEnd = index + descriptor.physicalCount;
+            const rotKey = descriptor.apply(move, steps, newOrientation);
+            const newPermutation = rotKey ? Move.composeTransposition(permutation, rotKey) : permutation;
 
             /**
-             * Evaluates direct move execution or candidate regrips at a specific scramble index.
-             * @param {number} idx Index of the move in clone
+             * Evaluates direct move execution or candidate regrips for a step of this branch.
+             * @param {Move} moved Move to execute
              * @param {GripState} cGrip Current grip state
              * @param {number} cCost Cumulative cost up to this move
              */
-            const evaluateMoveAt = (idx, cGrip, cCost) => {
-                const moved = clone[idx];
+            const evaluateMove = (moved, cGrip, cCost) => {
                 /** @type {ExecutionStep[]} */
                 const branches = [];
 
@@ -375,28 +405,27 @@ export class ScrambleOptimizer {
 
             /**
              * Recursively evaluates candidate branches for multi-move sequence variations.
-             * @param {number} subIdx Current index in clone
+             * @param {number} stepIdx Current index in steps
              * @param {GripState} cGrip Current grip state
              * @param {number} cCost Cumulative cost
+             * @param {PathNode | null} cPath Moves executed so far
              */
-            const evaluateSequenceBranch = (subIdx, cGrip, cCost) => {
-                if (subIdx >= physicalEnd) {
-                    this.bruteforceOptimize(clone, subIdx, newLogicalIndex, cGrip, cCost, newOrientation, startGrip, newEndIndex, ctx);
+            const evaluateSequenceBranch = (stepIdx, cGrip, cCost, cPath) => {
+                if (stepIdx >= steps.length) {
+                    this.bruteforceOptimize(ctx, index + 1, logicalIndex + 1, cGrip, cCost, newOrientation, newPermutation, cPath);
                     return;
                 }
-                const branches = evaluateMoveAt(subIdx, cGrip, cCost);
+                const step = steps[stepIdx];
+                const branches = evaluateMove(step, cGrip, cCost);
                 for (let i = 0; i < branches.length; i++) {
                     const b = branches[i];
-                    clone[subIdx].transition = b.transition;
-                    evaluateSequenceBranch(subIdx + 1, b.nextGrip, b.cost);
+                    step.transition = b.transition;
+                    evaluateSequenceBranch(stepIdx + 1, b.nextGrip, b.cost, { move: step, prev: cPath });
                 }
             };
 
-            evaluateSequenceBranch(index, currentGrip, currentCost);
+            evaluateSequenceBranch(0, currentGrip, currentCost, path);
         };
-
-        this.iterations++;
-        const move = moves[index];
 
         // Normal branch
         branchWith(ScrambleOptimizer.IDENTITY_DESCRIPTOR);
@@ -492,15 +521,15 @@ export class ScrambleOptimizer {
 
                 /** @type {SearchContext} */
                 const ctx = {
+                    moves: cand.scramble,
+                    startIndex: physicalStartIndex,
+                    endIndex: physicalEndIndex,
+                    startGrip,
                     minCost: Infinity,
-                    minResults: [],
-                    minScramble: null,
-                    minStartingGrip: startGrip,
-                    minFinalGrip: currentGrip,
-                    minFinalOrientation: null
+                    minResults: []
                 };
 
-                this.bruteforceOptimize(cand.scramble, physicalStartIndex, candLogicalStart, currentGrip, cand.cost, cand.finalOrientation, startGrip, physicalEndIndex, ctx);
+                this.bruteforceOptimize(ctx, physicalStartIndex, candLogicalStart, currentGrip, cand.cost, cand.finalOrientation);
 
                 if (!ctx.minResults || ctx.minResults.length === 0) {
                     continue;

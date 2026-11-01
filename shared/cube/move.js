@@ -11,6 +11,7 @@ import { ScrambleParser } from "./parser.js";
 /** @typedef {`${FaceStr | MiddleStr | WideFaceStr}${"w" | ""}${ModifierStr}`} MoveStr */
 /** @typedef {`${AxisStr}${ModifierStr}`} RotationStr */
 /** @typedef {Record<RotationStr, Record<FaceStr | AxisStr, FaceStr | AxisStr>>} TranspositionMap */
+/** @typedef {Readonly<Record<string, FaceStr | AxisStr>>} FacePermutation The net effect of a sequence of rotations on move faces */
 
 export class Move {
     /** @type {readonly FaceStr[]} */
@@ -107,6 +108,39 @@ export class Move {
 
     /** @type {readonly ModifierStr[]} */
     static MODIFIERS = Object.freeze(["", "'", "2", "2'"]);
+
+    /** @type {Map<string, FacePermutation>} Interned permutations, so there are only 24 */
+    static PERMUTATIONS = new Map();
+
+    /** @type {Map<FacePermutation | null, Map<RotationStr, FacePermutation>>} Memoized composeTransposition results */
+    static COMPOSITIONS = new Map();
+
+    /**
+     * Appends a rotation to a face permutation. A null permutation is the identity (leaves every move untouched).
+     * Applying the result to a move is equivalent to transposing it by each rotation in order.
+     * @param {FacePermutation | null} permutation 
+     * @param {RotationStr} rotKey 
+     * @returns {FacePermutation}
+     */
+    static composeTransposition(permutation, rotKey) {
+        let compositions = Move.COMPOSITIONS.get(permutation);
+        if (!compositions) {
+            compositions = new Map();
+            Move.COMPOSITIONS.set(permutation, compositions);
+        }
+        let result = compositions.get(rotKey);
+        if (!result) {
+            const rotation = Move.TRANSPOSITIONS[rotKey];
+            const composed = permutation
+                ? Object.fromEntries(Object.entries(permutation).map(([face, to]) => [face, rotation[to]]))
+                : rotation;
+            const signature = JSON.stringify(composed);
+            result = Move.PERMUTATIONS.get(signature) ?? Object.freeze({ ...composed });
+            Move.PERMUTATIONS.set(signature, result);
+            compositions.set(rotKey, result);
+        }
+        return result;
+    }
 
     /**
      * Transposes an orientation object in-place according to a given cube rotation string.
@@ -218,6 +252,14 @@ export class Move {
      */
     transpose(string) {
         this.alpha = Move.TRANSPOSITIONS[string][/** @type {FaceStr} */ (this.alpha)]; // TODO isMiddle?
+    }
+
+    /**
+     * Update this move to its equivalent after all rotations in a face permutation are performed
+     * @param {FacePermutation | null} permutation 
+     */
+    transposeWith(permutation) {
+        if (permutation) this.alpha = permutation[this.alpha];
     }
 
     /**

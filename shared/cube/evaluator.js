@@ -363,8 +363,35 @@ export class ExecutionEvaluator {
         this.transitions = transitions;
         /** @type {GripState[]} Invariant list of grip keys */
         this.allGripKeys = /** @type {GripState[]} */ (Object.keys(this.config.grip));
+        /** @type {Map<GripState, number>} Index of each grip within allGripKeys */
+        this.gripIndexes = new Map(this.allGripKeys.map((grip, i) => [grip, i]));
         /** @type {TransitionCache} Cache for transitions */
         this.transitionCache = this.initTransitionCache();
+        // Step costs depend only on the fixed config, so they can be memoized per evaluator
+        /** @type {Map<string, ExecutionStep | null>} */
+        this.directStepCache = new Map();
+        /** @type {Map<string, ExecutionStep[]>} */
+        this.regripOptionsCache = new Map();
+    }
+
+    /**
+     * @param {GripState} grip
+     * @returns {number}
+     */
+    getGripIndex(grip) {
+        const index = this.gripIndexes.get(grip);
+        if (index === undefined) throw new Error(`Unknown grip: ${grip}`);
+        return index;
+    }
+
+    /**
+     * Key identifying everything about a move that affects its step costs.
+     * @param {Move} move
+     * @param {number | null} cubeSize
+     * @returns {string}
+     */
+    static getStepKey(move, cubeSize) {
+        return `${move.toKey()}|${move.sliceNum}|${move.isInvertedSlice}|${cubeSize}`;
     }
 
     /**
@@ -527,10 +554,14 @@ export class ExecutionEvaluator {
      * @returns {ExecutionStep | null}
      */
     getDirectStep(grip, move, cubeSize = null) {
+        const cacheKey = `${grip}|${ExecutionEvaluator.getStepKey(move, cubeSize)}`;
+        const cached = this.directStepCache.get(cacheKey);
+        if (cached !== undefined) return cached;
+
         const transition = this.getTransition(grip, move.toKey());
-        if (!transition) return null;
-        const cost = this.computeCost(transition, move, cubeSize);
-        return { transition, nextGrip: transition.next, cost };
+        const step = transition ? { transition, nextGrip: transition.next, cost: this.computeCost(transition, move, cubeSize) } : null;
+        this.directStepCache.set(cacheKey, step);
+        return step;
     }
 
     /**
@@ -544,6 +575,10 @@ export class ExecutionEvaluator {
      */
     getRegripOptions(currentGrip, move, cubeSize = null, limit = Infinity) {
         if (limit <= 0) return [];
+
+        const cacheKey = `${currentGrip}|${limit}|${ExecutionEvaluator.getStepKey(move, cubeSize)}`;
+        const cached = this.regripOptionsCache.get(cacheKey);
+        if (cached) return cached;
 
         const movedKey = move.toKey();
         const baseRegrip = this.config.general.regrip ?? 0;
@@ -588,6 +623,7 @@ export class ExecutionEvaluator {
             }
         }
 
+        this.regripOptionsCache.set(cacheKey, topK);
         return topK;
     }
 }
