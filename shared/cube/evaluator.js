@@ -1,5 +1,5 @@
 import { Move } from "./move.js";
-/** @import { FaceStr, WideFaceStr, AxisStr, MoveKey, RotationStr, MoveStr } from "./move.js" */
+/** @import { FaceStr, WideFaceStr, AxisStr, MiddleStr, MoveKey, RotationStr, MoveStr } from "./move.js" */
 
 /** @typedef {'F' | 'U' | 'D' | 'Bu' | 'Bd'} ThumbPosition */
 
@@ -352,6 +352,13 @@ export function computeZTransition(grip, rotKey) {
 }
 
 export class ExecutionEvaluator {
+    /** @type {readonly (FaceStr | MiddleStr | AxisStr)[]} Every value a move's alpha can take */
+    static ALPHAS = Object.freeze([...Move.MOVE_LIST, ...Move.MIDDLE_MOVE_LIST, ...Move.ROTATION_LIST]);
+    static ALPHA_COUNT = ExecutionEvaluator.ALPHAS.length;
+    static ALPHA_INDEXES = Object.freeze(Object.fromEntries(ExecutionEvaluator.ALPHAS.map((alpha, i) => [alpha, i])));
+    /** Exclusive upper bound for cube size and slice count, used to pack step keys */
+    static MAX_CUBE_SIZE = 1024;
+
     /**
      * @param {CostConfig} config 
      * @param {TransitionConfig} transitions 
@@ -368,9 +375,9 @@ export class ExecutionEvaluator {
         /** @type {TransitionCache} Cache for transitions */
         this.transitionCache = this.initTransitionCache();
         // Step costs depend only on the fixed config, so they can be memoized per evaluator
-        /** @type {Map<string, ExecutionStep | null>} */
+        /** @type {Map<number, ExecutionStep | null>} */
         this.directStepCache = new Map();
-        /** @type {Map<string, ExecutionStep[]>} */
+        /** @type {Map<number, ExecutionStep[]>} */
         this.regripOptionsCache = new Map();
     }
 
@@ -385,13 +392,17 @@ export class ExecutionEvaluator {
     }
 
     /**
-     * Key identifying everything about a move that affects its step costs.
+     * Packs a grip and everything about a move that affects its step costs into a single number.
+     * @param {GripState} grip
      * @param {Move} move
      * @param {number | null} cubeSize
-     * @returns {string}
+     * @returns {number}
      */
-    static getStepKey(move, cubeSize) {
-        return `${move.toKey()}|${move.sliceNum}|${move.isInvertedSlice}|${cubeSize}`;
+    getStepKey(grip, move, cubeSize) {
+        const alphaIndex = ExecutionEvaluator.ALPHA_INDEXES[move.alpha];
+        const modifiers = (Number(move.isPrime) * 2 + Number(move.isDouble)) * 2 + Number(move.isInvertedSlice);
+        const sliceKey = (move.sliceNum * ExecutionEvaluator.MAX_CUBE_SIZE) + (cubeSize ?? 0);
+        return ((this.getGripIndex(grip) * ExecutionEvaluator.ALPHA_COUNT + alphaIndex) * 8 + modifiers) * ExecutionEvaluator.MAX_CUBE_SIZE ** 2 + sliceKey;
     }
 
     /**
@@ -554,7 +565,7 @@ export class ExecutionEvaluator {
      * @returns {ExecutionStep | null}
      */
     getDirectStep(grip, move, cubeSize = null) {
-        const cacheKey = `${grip}|${ExecutionEvaluator.getStepKey(move, cubeSize)}`;
+        const cacheKey = this.getStepKey(grip, move, cubeSize);
         const cached = this.directStepCache.get(cacheKey);
         if (cached !== undefined) return cached;
 
@@ -576,7 +587,7 @@ export class ExecutionEvaluator {
     getRegripOptions(currentGrip, move, cubeSize = null, limit = Infinity) {
         if (limit <= 0) return [];
 
-        const cacheKey = `${currentGrip}|${limit}|${ExecutionEvaluator.getStepKey(move, cubeSize)}`;
+        const cacheKey = this.getStepKey(currentGrip, move, cubeSize) * (this.allGripKeys.length + 1) + Math.min(limit, this.allGripKeys.length);
         const cached = this.regripOptionsCache.get(cacheKey);
         if (cached) return cached;
 
