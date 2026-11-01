@@ -365,41 +365,7 @@ export class ScrambleOptimizer {
             const newPermutation = rotKey ? Move.composeTransposition(permutation, rotKey) : permutation;
 
             /**
-             * Evaluates direct move execution or candidate regrips for a step of this branch.
-             * @param {Move} moved Move to execute
-             * @param {GripState} cGrip Current grip state
-             * @param {number} cCost Cumulative cost up to this move
-             */
-            const evaluateMove = (moved, cGrip, cCost) => {
-                /** @type {ExecutionStep[]} */
-                const branches = [];
-
-                const direct = this.evaluator.getDirectStep(cGrip, moved, this.options.cubeSize);
-                if (direct) {
-                    branches.push({
-                        transition: direct.transition,
-                        nextGrip: direct.nextGrip,
-                        cost: cCost + direct.cost
-                    });
-                }
-
-                if (!direct || this.options.searchRegrips) {
-                    const regripOptions = this.evaluator.getRegripOptions(cGrip, moved, this.options.cubeSize, this.options.maxRegripBranches ?? 2);
-                    for (let i = 0; i < regripOptions.length; i++) {
-                        const opt = regripOptions[i];
-                        branches.push({
-                            transition: opt.transition,
-                            nextGrip: opt.nextGrip,
-                            cost: cCost + opt.cost
-                        });
-                    }
-                }
-
-                return branches;
-            };
-
-            /**
-             * Recursively evaluates candidate branches for multi-move sequence variations.
+             * Recursively evaluates the direct move execution and candidate regrips for each step of this branch.
              * @param {number} stepIdx Current index in steps
              * @param {GripState} cGrip Current grip state
              * @param {number} cCost Cumulative cost
@@ -411,11 +377,20 @@ export class ScrambleOptimizer {
                     return;
                 }
                 const step = steps[stepIdx];
-                const branches = evaluateMove(step, cGrip, cCost);
-                for (let i = 0; i < branches.length; i++) {
-                    const b = branches[i];
-                    step.transition = b.transition;
-                    evaluateSequenceBranch(stepIdx + 1, b.nextGrip, b.cost, { move: step, prev: cPath });
+
+                const direct = this.evaluator.getDirectStep(cGrip, step, this.options.cubeSize);
+                if (direct) {
+                    step.transition = direct.transition;
+                    evaluateSequenceBranch(stepIdx + 1, direct.nextGrip, cCost + direct.cost, { move: step, prev: cPath });
+                }
+
+                if (!direct || this.options.searchRegrips) {
+                    const regripOptions = this.evaluator.getRegripOptions(cGrip, step, this.options.cubeSize, this.options.maxRegripBranches ?? 2);
+                    for (let i = 0; i < regripOptions.length; i++) {
+                        const opt = regripOptions[i];
+                        step.transition = opt.transition;
+                        evaluateSequenceBranch(stepIdx + 1, opt.nextGrip, cCost + opt.cost, { move: step, prev: cPath });
+                    }
                 }
             };
 
