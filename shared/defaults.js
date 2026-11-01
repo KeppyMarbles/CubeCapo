@@ -1,4 +1,4 @@
-/** @import { FormatOptions, RunOptions } from "./cube/optimizer.js" */
+/** @import { FormatOptions, RunOptions, SearchOptions, ScrambleOptions } from "./cube/optimizer.js" */
 /** @import { CostConfig, TransitionConfig } from "./cube/evaluator.js" */
 /** @import { ColorSchemeConfig } from "./cube/util.js" */
 /** @import { ParseOptions } from "./cube/parser.js" */
@@ -32,8 +32,8 @@ export const defaultParseOptions = Object.freeze({
     maxNestingDepth: 3
 });
 
-/** @type {RunOptions} */
-export const defaultRunOptions = Object.freeze({
+/** @type {SearchOptions} */
+export const defaultSearchOptions = Object.freeze({
     depth: 0,
     maxIterations: 999999,
     maxRegripBranches: 2,
@@ -48,7 +48,17 @@ export const defaultRunOptions = Object.freeze({
     searchRegrips: false,
     partitionLength: 20,
     maxCapacity: 50,
+});
+
+/** @type {ScrambleOptions} */
+export const defaultScrambleOptions = Object.freeze({
     cubeSize: null,
+});
+
+/** @type {RunOptions} */
+export const defaultRunOptions = Object.freeze({
+    ...defaultSearchOptions,
+    ...defaultScrambleOptions,
 });
 
 /** @type {Record<"fast" | "balanced" | "exhaustive", Partial<RunOptions>>} */

@@ -1,4 +1,5 @@
 import { getElement } from "../shared/ui/dom.js";
+import { DEFAULT_PROFILE_NAME, createDefaultProfile, loadProfiles, loadActiveProfileName, saveActiveProfileName, persistActiveProfile } from "../shared/profiles.js";
 
 const extAPI = /** @type {any} */ (globalThis).browser || globalThis.chrome;
 
@@ -87,8 +88,34 @@ document.addEventListener("DOMContentLoaded", async () => {
         extAPI.runtime.openOptionsPage();
     });
 
+    // Switch the active settings profile
+    const profileSelect = getElement("profileSelect", HTMLSelectElement);
+    const profiles = await loadProfiles();
+    for (const name of [DEFAULT_PROFILE_NAME, ...Object.keys(profiles)]) {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        profileSelect.appendChild(option);
+    }
+    profileSelect.value = await loadActiveProfileName();
+
+    profileSelect.addEventListener("change", async () => {
+        const name = profileSelect.value;
+        await persistActiveProfile(name === DEFAULT_PROFILE_NAME ? createDefaultProfile() : profiles[name]);
+        await saveActiveProfileName(name);
+
+        // Notify the options page / content scripts of the settings change
+        const tabs = await extAPI.tabs.query({});
+        for (const openTab of tabs) {
+            if (!openTab.id) continue;
+            extAPI.tabs.sendMessage(openTab.id, { action: "SETTINGS_CHANGED" }, () => {
+                if (extAPI.runtime.lastError) { /* ignore */ }
+            });
+        }
+    });
+
     // Bind quick computation & format options
-    await setupOptionsBinding("runOptions", {
+    await setupOptionsBinding("scrambleOptions", {
         cubeSize: { id: "cubeSizeSelect", type: "number" }
     }, tab);
 
@@ -99,7 +126,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 /**
  * Bind DOM inputs to chrome.storage.local options and broadcast changes
- * @param {string} storageKey - Target storage key (e.g. 'runOptions', 'formatOptions')
+ * @param {string} storageKey - Target storage key (e.g. 'scrambleOptions', 'parseOptions')
  * @param {Record<string, { id: string, type?: string }>} bindings - Map of option property to DOM element ID
  * @param {any} [activeTab] - Active tab to notify on settings change
  */

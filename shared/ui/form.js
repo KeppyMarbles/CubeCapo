@@ -1,15 +1,19 @@
 import { ScrambleParser } from "../cube/parser.js";
 import { costToColor } from "./stats.js";
-import { defaultCostConfiguration, defaultFormatOptions, defaultRunOptions, defaultFingertricks, defaultColorScheme, strategyPresets } from "../defaults.js";
+import { defaultCostConfiguration, defaultFormatOptions, defaultSearchOptions, defaultScrambleOptions, defaultFingertricks, defaultColorScheme, strategyPresets } from "../defaults.js";
 import { Move } from "../cube/move.js";
 import { THUMB_POSITIONS, RIGHT_FINGERTRICKS, LEFT_FINGERTRICKS, mirrorRightFingertrick, mirrorLeftFingertrick } from "../cube/evaluator.js";
-import { getElement, queryElementOptional, queryElements } from "./dom.js";
-import { getStorageItem, setStorageItem, removeStorageItem } from "../storage.js";
+import { getElement, queryElement, queryElementOptional, queryElements } from "./dom.js";
+import { getStorageItem, setStorageItem, removeStorageItem, notifySettingsChanged } from "../storage.js";
+import { DEFAULT_PROFILE_NAME, createDefaultProfile, migrateConfig, persistActiveProfile, loadProfiles, saveProfiles, loadActiveProfileName, saveActiveProfileName, uniqueProfileName, parseImportedProfile } from "../profiles.js";
+/** @import { Profile, ProfileMap } from "../profiles.js" */
 /** @import { CostConfig, TransitionConfig, ThumbPosition, RightFingertrick, LeftFingertrick } from "../cube/evaluator.js" */
-/** @import { RunOptions, FormatOptions } from "../cube/optimizer.js" */
+/** @import { RunOptions, SearchOptions, ScrambleOptions, FormatOptions } from "../cube/optimizer.js" */
 /** @import { ParseResult, NotationMode } from "../cube/parser.js" */
 /** @import { MoveKey } from "../cube/move.js" */
 /** @import { ColorSchemeConfig } from "../cube/util.js" */
+
+const PROFILE_AUTOSAVE_DELAY_MS = 300;
 
 /**
  * @typedef {Object} GroupControl
@@ -29,14 +33,11 @@ export async function setupForm(onSubmit, onFormatChange) {
     else
         initialConfig = defaultCostConfiguration;
 
-    let savedConfig = structuredClone(initialConfig);
-
     let initialTransitions = await loadTransitionConfig();
     if (!initialTransitions || !initialTransitions.right) {
         initialTransitions = defaultFingertricks;
     }
     let currentTransitions = structuredClone(initialTransitions);
-    let savedTransitions = structuredClone(initialTransitions);
 
     /**
      * Set scramble input value, clean up pending storage, and trigger auto-submit
@@ -196,40 +197,12 @@ export async function setupForm(onSubmit, onFormatChange) {
         }
     }
 
-    const runOpts = /** @type {RunOptions} */ (await loadOptions("runOptions", defaultRunOptions));
-    let savedRunOpts = structuredClone(runOpts);
-    applyRunOptionsValues(runOpts);
-
-    const formatOpts = /** @type {FormatOptions} */ (await loadOptions("formatOptions", defaultFormatOptions));
-    applyFormatOptionsValues(formatOpts);
-
-    const colorScheme = /** @type {ColorSchemeConfig} */ (await loadOptions("colorScheme", defaultColorScheme));
-    let savedColorScheme = structuredClone(colorScheme);
-    applyColorSchemeValues(colorScheme);
+    applyScrambleOptionsValues(await loadOptions("scrambleOptions", defaultScrambleOptions));
 
     const transitionsTabEl = getElement("transitions", HTMLElement);
-    renderTransitionsTab(transitionsTabEl, currentTransitions, () => checkUnsavedChanges());
+    renderTransitionsTab(transitionsTabEl, currentTransitions, () => handleSettingsChange(), false);
 
-    // Live update check for unsaved bar
-    const checkUnsavedChanges = () => {
-        const currentConfig = collectCostConfig(form, savedConfig);
-        const currentRunOpts = collectRunOptionsValues();
-        const currentColorScheme = collectColorSchemeValues();
-
-        const configDiff = JSON.stringify(currentConfig) !== JSON.stringify(savedConfig);
-        const optsDiff = JSON.stringify(currentRunOpts) !== JSON.stringify(savedRunOpts);
-        const transDiff = JSON.stringify(currentTransitions) !== JSON.stringify(savedTransitions);
-        const colorsDiff = JSON.stringify(currentColorScheme) !== JSON.stringify(savedColorScheme);
-
-        const bar = getElement("unsavedChangesBar", HTMLElement);
-        if (configDiff || optsDiff || transDiff || colorsDiff) {
-            bar.classList.remove("hidden");
-        } else {
-            bar.classList.add("hidden");
-        }
-    };
-
-    // Attach change detection to computation settings (require explicit save)
+    // Attach change detection to computation settings
     const computeInputIds = [
         "depth",
         "iterations",
@@ -248,15 +221,15 @@ export async function setupForm(onSubmit, onFormatChange) {
     ];
     computeInputIds.forEach(id => {
         const el = getElement(id, HTMLElement);
-        el.addEventListener("input", checkUnsavedChanges);
-        el.addEventListener("change", checkUnsavedChanges);
+        el.addEventListener("input", () => handleSettingsChange());
+        el.addEventListener("change", () => handleSettingsChange());
     });
 
     // Strategy Preset quick buttons
     const applyPreset = (/** @type {Partial<RunOptions>} */ preset) => {
-        applyRunOptionsValues(preset);
+        applySearchOptionsValues(preset);
         form.dispatchEvent(new Event("input", { bubbles: true }));
-        checkUnsavedChanges();
+        handleSettingsChange();
     };
 
     getElement("presetFast", HTMLButtonElement).addEventListener("click", () => applyPreset(strategyPresets.fast));
@@ -275,16 +248,16 @@ export async function setupForm(onSubmit, onFormatChange) {
     colorInputIds.forEach(id => {
         const el = getElement(id, HTMLInputElement);
         el.addEventListener("input", () => {
-            checkUnsavedChanges();
+            handleSettingsChange();
             onFormatChange?.();
         });
         el.addEventListener("change", () => {
-            checkUnsavedChanges();
+            handleSettingsChange();
             onFormatChange?.();
         });
     });
 
-    // Format options: auto-save on change and trigger live update (no unsaved bar)
+    // Format options are part of the profile: autosave on change and trigger live update
     const formatInputIds = [ 
         "showGrips", 
         //"showBoundaries", 
@@ -294,57 +267,273 @@ export async function setupForm(onSubmit, onFormatChange) {
     ];
     formatInputIds.forEach(id => {
         const el = getElement(id, HTMLElement);
-        el.addEventListener("change", async () => {
-            await saveOptions("formatOptions", collectFormatOptionsValues());
+        el.addEventListener("change", () => {
+            handleSettingsChange();
             onFormatChange?.();
         });
     });
 
-    // Unsaved Changes Bar click listeners
-    getElement("saveChangesButton", HTMLButtonElement).addEventListener("click", async () => {
-        const config = collectCostConfig(form, savedConfig);
-        await saveCostConfig(config);
-
-        const runOptions = collectRunOptionsValues();
-        await saveOptions("runOptions", runOptions);
-
-        await saveOptions("transitionConfig", currentTransitions);
-
-        const colorSchemeVals = collectColorSchemeValues();
-        await saveOptions("colorScheme", colorSchemeVals);
-
-        savedConfig = structuredClone(config);
-        savedRunOpts = structuredClone(runOptions);
-        savedTransitions = structuredClone(currentTransitions);
-        savedColorScheme = structuredClone(colorSchemeVals);
-
-        // Notify options page / content scripts of settings change
-        if (typeof chrome !== "undefined" && chrome.tabs) {
-            chrome.tabs.query({}, (tabs) => {
-                tabs.forEach(tab => {
-                    if (tab.id) {
-                        chrome.tabs.sendMessage(tab.id, { action: "SETTINGS_CHANGED" }, () => {
-                            if (chrome.runtime.lastError) { /* ignore */ }
-                        });
-                    }
-                });
-            });
-        }
-
-        checkUnsavedChanges();
+    /** @returns {Profile} */
+    const collectProfile = () => ({
+        costConfig: collectCostConfig(form, initialConfig),
+        searchOptions: collectSearchOptionsValues(),
+        formatOptions: collectFormatOptionsValues(),
+        transitionConfig: structuredClone(currentTransitions),
     });
 
-    getElement("revertChangesButton", HTMLButtonElement).addEventListener("click", () => {
-        applyConfig(form, savedConfig);
-        applyRunOptionsValues(savedRunOpts);
-        applyColorSchemeValues(savedColorScheme);
-        currentTransitions = structuredClone(savedTransitions);
-        renderTransitionsTab(transitionsTabEl, currentTransitions, () => checkUnsavedChanges());
+    getElement("cubeSize", HTMLSelectElement).addEventListener("change", async (e) => {
+        if (!(e.target instanceof HTMLSelectElement)) return;
+        await saveOptions("scrambleOptions", collectScrambleOptionsValues());
+        notifySettingsChanged();
+    });
 
+    // Controls that edit the active profile; these are disabled for the read-only Default profile
+    const PROFILE_CONTROLS = "#mainTabStrategy :is(input, select, button), #mainTabPenalties :is(input, select, .btn-adjust, .btn-zero), #mainTabFormat :is(input, select)";
+
+    /** @param {boolean} readOnly */
+    const updateReadOnly = (readOnly) => {
+        for (const el of queryElements(form, PROFILE_CONTROLS, HTMLElement))
+            el.toggleAttribute("disabled", readOnly);
+        getElement("readOnlyNotice", HTMLElement).classList.toggle("hidden", !readOnly);
+        form.classList.toggle("read-only", readOnly);
+        renderTransitionsTab(transitionsTabEl, currentTransitions, () => handleSettingsChange(), readOnly);
+    };
+
+    /**
+     * Show a profile's values in the form without saving
+     * @param {Profile} profile
+     * @param {boolean} readOnly
+     */
+    const showProfileInForm = (profile, readOnly) => {
+        applyConfig(form, profile.costConfig);
+        applySearchOptionsValues(profile.searchOptions);
+        applyFormatOptionsValues(profile.formatOptions);
+        currentTransitions = structuredClone(profile.transitionConfig);
+        updateReadOnly(readOnly);
         updateCostInputColors(form);
-        checkUnsavedChanges();
+    };
+
+    // Profiles: the active settings live in the flat storage keys (read by the extension);
+    // named profiles are stored separately. Edits to the active profile are autosaved to both.
+    let profiles = await loadProfiles();
+    let activeProfileName = await loadActiveProfileName();
+    if (activeProfileName !== DEFAULT_PROFILE_NAME && !(activeProfileName in profiles))
+        activeProfileName = DEFAULT_PROFILE_NAME;
+
+    // Each profile as it was when the page opened (or when it was created), for resetting
+    /** @type {ProfileMap} */
+    const baselines = structuredClone(profiles);
+
+    const listEl = getElement("profileList", HTMLElement);
+    const template = getElement("profileCardTemplate", HTMLTemplateElement);
+    const activeProfileCard = getElement("activeProfileCard", HTMLElement);
+
+    /** @param {string} name */
+    const getProfile = (name) => name === DEFAULT_PROFILE_NAME ? createDefaultProfile() : profiles[name];
+
+    /** @param {Profile} profile */
+    const persistActiveSettings = async (profile) => {
+        await persistActiveProfile(profile);
+        notifySettingsChanged();
+    };
+
+    /**
+     * Show a profile in the form and update the displayed output
+     * @param {Profile} profile
+     */
+    const applyProfile = (profile) => {
+        showProfileInForm(profile, activeProfileName === DEFAULT_PROFILE_NAME);
         onFormatChange?.();
+    };
+
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
+    let saveTimer;
+
+    const flushPendingSave = async () => {
+        if (saveTimer === undefined) return;
+        clearTimeout(saveTimer);
+        saveTimer = undefined;
+        await saveProfiles(profiles);
+        if (activeProfileName !== DEFAULT_PROFILE_NAME)
+            await persistActiveSettings(profiles[activeProfileName]);
+    };
+    window.addEventListener("pagehide", flushPendingSave);
+
+    // Called whenever a profile setting is edited
+    const handleSettingsChange = () => {
+        if (activeProfileName === DEFAULT_PROFILE_NAME) return;
+
+        const profile = collectProfile();
+        // Wait for the user to finish typing rather than saving a half-entered number
+        if (hasNaN(profile.costConfig) || hasNaN(profile.searchOptions)) return;
+
+        profiles[activeProfileName] = profile;
+        render();
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(flushPendingSave, PROFILE_AUTOSAVE_DELAY_MS);
+    };
+
+    /** @param {string} name */
+    const activate = async (name) => {
+        if (name === activeProfileName) return;
+        await flushPendingSave();
+        const profile = getProfile(name);
+        activeProfileName = name;
+        applyProfile(profile);
+        await persistActiveSettings(profile);
+        await saveActiveProfileName(name);
+        render();
+    };
+
+    /** @type {Record<string, (name: string) => void | Promise<void>>} */
+    const actions = {
+        reset: async (name) => {
+            if (!confirm(`Reset "${name}" to how it was when the page was opened?`)) return;
+            profiles[name] = structuredClone(baselines[name]);
+            if (name === activeProfileName) {
+                applyProfile(profiles[name]);
+                await persistActiveSettings(profiles[name]);
+            }
+            await saveProfiles(profiles);
+            render();
+        },
+
+        rename: async (name) => {
+            const newName = promptProfileName("Rename profile:", name, profiles, name);
+            if (newName === null || newName === name) return;
+
+            // Rebuild the maps so the renamed profile keeps its position
+            /** @type {ProfileMap} */
+            const renamed = {};
+            /** @type {ProfileMap} */
+            const renamedBaselines = {};
+            for (const key of Object.keys(profiles)) {
+                const newKey = key === name ? newName : key;
+                renamed[newKey] = profiles[key];
+                renamedBaselines[newKey] = baselines[key];
+            }
+            profiles = renamed;
+            Object.keys(baselines).forEach(key => delete baselines[key]);
+            Object.assign(baselines, renamedBaselines);
+
+            await saveProfiles(profiles);
+            if (activeProfileName === name) {
+                activeProfileName = newName;
+                await saveActiveProfileName(newName);
+            }
+            render();
+        },
+
+        clone: async (name) => {
+            // "Default copy" reads oddly, since this is how you make your own profile
+            const baseName = name === DEFAULT_PROFILE_NAME ? "Custom" : `${name} copy`;
+            const cloneName = uniqueProfileName(baseName, profiles);
+            profiles[cloneName] = structuredClone(getProfile(name));
+            baselines[cloneName] = structuredClone(profiles[cloneName]);
+            await saveProfiles(profiles);
+            await activate(cloneName);
+        },
+
+        export: (name) => exportProfile(name, getProfile(name)),
+
+        delete: async (name) => {
+            if (!confirm(`Delete profile "${name}"? This can't be undone.`)) return;
+            delete profiles[name];
+            delete baselines[name];
+            await saveProfiles(profiles);
+            if (activeProfileName === name) {
+                activeProfileName = DEFAULT_PROFILE_NAME;
+                const profile = getProfile(activeProfileName);
+                applyProfile(profile);
+                await persistActiveSettings(profile);
+                await saveActiveProfileName(activeProfileName);
+            }
+            render();
+        },
+    };
+
+    listEl.addEventListener("click", async (e) => {
+        if (!(e.target instanceof Element)) return;
+        const card = e.target.closest(".profile-card");
+        if (!(card instanceof HTMLElement) || card.dataset.name === undefined) return;
+
+        const button = e.target.closest("button");
+        if (!button) {
+            await activate(card.dataset.name);
+        }
+        else if (!button.disabled && button.dataset.action !== undefined) {
+            await actions[button.dataset.action](card.dataset.name);
+        }
     });
+
+    const render = () => {
+        activeProfileCard.textContent = activeProfileName;
+        listEl.replaceChildren();
+        for (const name of [DEFAULT_PROFILE_NAME, ...Object.keys(profiles)]) {
+            const isDefault = name === DEFAULT_PROFILE_NAME;
+            const isModified = !isDefault && JSON.stringify(profiles[name]) !== JSON.stringify(baselines[name]);
+
+            const fragment = /** @type {DocumentFragment} */ (template.content.cloneNode(true));
+            const card = queryElement(fragment, ".profile-card", HTMLElement);
+            card.dataset.name = name;
+            card.classList.toggle("active", name === activeProfileName);
+            queryElement(card, ".profile-name", HTMLElement).textContent = name;
+
+            // The built-in default profile can't be changed
+            queryElement(card, '[data-action="reset"]', HTMLButtonElement).disabled = !isModified;
+            queryElement(card, '[data-action="rename"]', HTMLButtonElement).disabled = isDefault;
+            queryElement(card, '[data-action="delete"]', HTMLButtonElement).disabled = isDefault;
+
+            listEl.appendChild(card);
+        }
+    };
+
+    const importFile = getElement("importFile", HTMLInputElement);
+    getElement("importButton", HTMLButtonElement).addEventListener("click", () => importFile.click());
+    importFile.addEventListener("change", async () => {
+        const file = importFile.files?.[0];
+        if (!file) return;
+
+        try {
+            const { name, profile } = parseImportedProfile(JSON.parse(await file.text()), file.name.replace(/\.json$/i, ""));
+            const importedName = uniqueProfileName(name, profiles);
+            profiles[importedName] = profile;
+            baselines[importedName] = structuredClone(profile);
+            await saveProfiles(profiles);
+            render();
+        }
+        catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            alert("Error importing configuration: " + msg);
+        }
+        finally {
+            importFile.value = "";
+        }
+    });
+
+    // The extension popup can switch the active profile while this page is open
+    if (typeof chrome !== "undefined") {
+        chrome.storage?.onChanged?.addListener(async (changes, area) => {
+            const switchedTo = changes.activeProfile?.newValue;
+            if (area !== "local" || typeof switchedTo !== "string" || switchedTo === activeProfileName) return;
+            if (switchedTo !== DEFAULT_PROFILE_NAME && !(switchedTo in profiles)) return;
+
+            // Keep edits to the old profile, but don't overwrite the active settings the popup just wrote
+            clearTimeout(saveTimer);
+            saveTimer = undefined;
+            await saveProfiles(profiles);
+
+            activeProfileName = switchedTo;
+            applyProfile(getProfile(switchedTo));
+            render();
+        });
+    }
+
+    // The active profile is the source of truth for the form and the active settings
+    const profile = getProfile(activeProfileName);
+    showProfileInForm(profile, activeProfileName === DEFAULT_PROFILE_NAME);
+    await persistActiveSettings(profile);
+    render();
 
     // Submit handler
     getElement("submitButton", HTMLButtonElement).addEventListener("click", async (e) => {
@@ -352,7 +541,7 @@ export async function setupForm(onSubmit, onFormatChange) {
         const errEl = getElement("errorMessage", HTMLElement);
         errEl.textContent = "";
         try {
-            const config = collectCostConfig(form, savedConfig);
+            const config = collectCostConfig(form, initialConfig);
             const scrambleInput = getElement("scramble", HTMLInputElement);
             const rawText = scrambleInput.value.trim();
             if (!rawText) {
@@ -362,24 +551,13 @@ export async function setupForm(onSubmit, onFormatChange) {
             const notationVal = notationSelect.value;
             const notation = /** @type {NotationMode} */ (notationVal ? notationVal : null);
             const parseResult = ScrambleParser.parse(rawText, { notation });
-            const options = collectRunOptionsValues();
+            const options = { ...collectSearchOptionsValues(), ...collectScrambleOptionsValues() };
             await onSubmit(config, parseResult, options, currentTransitions);
         } 
         catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             errEl.textContent = "Error: " + msg;
         }
-    });
-
-    getElement("resetDefaultButton", HTMLButtonElement).addEventListener("click", () => {
-        applyConfig(form, defaultCostConfiguration);
-        applyRunOptionsValues(defaultRunOptions);
-        applyColorSchemeValues(defaultColorScheme);
-        currentTransitions = structuredClone(defaultFingertricks);
-        renderTransitionsTab(transitionsTabEl, currentTransitions, () => checkUnsavedChanges());
-        form.dispatchEvent(new Event("input", { bubbles: true }));
-        checkUnsavedChanges();
-        onFormatChange?.();
     });
 
     // Level 1 Main Tabs (Move Execution vs Cost Penalties vs Search Strategy vs Format vs Profile)
@@ -459,100 +637,83 @@ export async function setupForm(onSubmit, onFormatChange) {
         //{ label: "Rotation", targets: ["x", "y", "z"]},
     ]);
 
-    getElement("exportButton", HTMLButtonElement).addEventListener("click", () => {
-        try {
-            const config = collectCostConfig(form, initialConfig);
-            const colorSchemeVals = collectColorSchemeValues();
-            const unifiedProfile = {
-                costConfig: config,
-                transitionConfig: currentTransitions,
-                colorScheme: colorSchemeVals,
-            };
-            const json = JSON.stringify(unifiedProfile, null, 2);
-            const blob = new Blob([json], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "cube-capo-config.json";
-            a.click();
-            URL.revokeObjectURL(url);
-        } 
-        catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            alert("Error exporting configuration: " + msg);
-        }
-    });
-    
-    const importFile = getElement("importFile", HTMLInputElement);
-
-    getElement("importButton", HTMLButtonElement).addEventListener("click", () => {
-        importFile.click();
-    });
-
-    importFile.addEventListener("change", async (e) => {
-        const target = e.target;
-        if (!(target instanceof HTMLInputElement)) return;
-        const file = target.files?.[0];
-        if (!file) return;
-
-        try {
-            const text = await file.text();
-            const parsed = JSON.parse(text);
-            if (!parsed || typeof parsed !== "object" || !parsed.costConfig || !parsed.transitionConfig) {
-                throw new Error("Invalid configuration format. The file must contain both 'costConfig' and 'transitionConfig'.");
-            }
-            const costForm = getElement("costForm", HTMLFormElement);
-            applyConfig(costForm, parsed.costConfig);
-            currentTransitions = structuredClone(parsed.transitionConfig);
-            applyColorSchemeValues(parsed.colorScheme);
-            renderTransitionsTab(transitionsTabEl, currentTransitions, () => checkUnsavedChanges());
-            form.dispatchEvent(new Event("input", { bubbles: true }));
-            checkUnsavedChanges();
-            onFormatChange?.();
-        } 
-        catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            alert("Error importing configuration: " + msg);
-        }
-        finally {
-            importFile.value = "";
-        }
-    });
-
     form.addEventListener("input", (e) => {
         const target = e.target;
         if (target instanceof HTMLInputElement && target.type === "number") {
             updateCostInputColors(form);
         }
-        checkUnsavedChanges();
+        handleSettingsChange();
     });
 
     updateCostInputColors(form);
 }
 
 /**
- * @param {Record<string, any>} imported 
- * @param {Record<string, any>} defaults 
- * @returns {CostConfig}
+ * Whether a number anywhere in the value is NaN
+ * @param {unknown} value
+ * @returns {boolean}
  */
-function migrateConfig(imported, defaults) {
-    const output = /** @type {any} */ (structuredClone(defaults));
-    for (const [key, value] of Object.entries(imported)) {
-        if (key in defaults) {
-            if (typeof value === "object" && value !== null) {
-                for (const [sub, subVal] of Object.entries(value)) {
-                    if (sub in defaults[key] && typeof subVal === typeof defaults[key][sub]) {
-                        output[key][sub] = subVal;
-                    }
-                }
-            } 
-            else if (typeof value === typeof defaults[key]) {
-                output[key] = value;
-            }
-        }
+function hasNaN(value) {
+    if (typeof value === "number") return Number.isNaN(value);
+    if (typeof value === "object" && value !== null) return Object.values(value).some(hasNaN);
+    return false;
+}
+
+/**
+ * Ask for a profile name until a valid one is given
+ * @param {string} message
+ * @param {string} initial
+ * @param {ProfileMap} profiles Existing profiles, whose names can't be reused
+ * @param {string} [current] Name being renamed, which may be kept
+ * @returns {string | null} null if cancelled
+ */
+function promptProfileName(message, initial, profiles, current) {
+    let value = initial;
+    for (;;) {
+        const answer = prompt(message, value);
+        if (answer === null) return null;
+        const name = answer.trim();
+        if (name === current) return name;
+        if (!name) message = "Name cannot be empty.";
+        else if (name === DEFAULT_PROFILE_NAME || name in profiles) message = `A profile named "${name}" already exists.`;
+        else return name;
+        value = name;
     }
-    return /** @type {CostConfig} */ (output);
+}
+
+/**
+ * Save a profile as a JSON file, asking where to put it where the browser supports that
+ * @param {string} name
+ * @param {Profile} profile
+ */
+async function exportProfile(name, profile) {
+    const json = JSON.stringify({ name, ...profile }, null, 2);
+    const fileName = `CubeCapo-${name}.json`;
+
+    if ("showSaveFilePicker" in window) {
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: fileName,
+                types: [{ description: "JSON", accept: { "application/json": [".json"] } }],
+            });
+            const writable = await handle.createWritable();
+            await writable.write(json);
+            await writable.close();
+        }
+        catch (err) {
+            // Cancelling the picker isn't an error
+            if (!(err instanceof DOMException && err.name === "AbortError"))
+                throw err;
+        }
+        return;
+    }
+
+    const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 /**
@@ -565,22 +726,27 @@ function addGroupControls(form, groupName, controls) {
     const groupDiv = queryElementOptional(form, `[data-group="${groupName}"]`, HTMLElement);
     if (!groupDiv) return;
 
+    // Wrapped so the whole section can be hidden for the read-only profile
+    const adjustments = document.createElement("div");
+    adjustments.className = "adjustments";
+    groupDiv.appendChild(adjustments);
+
     // Add a visual separator
     const separator = document.createElement("hr");
     separator.className = "group-separator";
-    groupDiv.appendChild(separator);
+    adjustments.appendChild(separator);
 
     // Create a section header
     const header = document.createElement("h4");
     header.textContent = "Adjustments";
-    groupDiv.appendChild(header);
+    adjustments.appendChild(header);
 
     // Create controls
     for (const ctrl of controls) {
         if (ctrl.label === "") {
             const spacer = document.createElement("div");
             spacer.style.height = "8px";
-            groupDiv.appendChild(spacer);
+            adjustments.appendChild(spacer);
             continue;
         }
 
@@ -611,7 +777,7 @@ function addGroupControls(form, groupName, controls) {
         btnGroup.appendChild(minus);
         btnGroup.appendChild(plus);
         wrapper.appendChild(btnGroup);
-        groupDiv.appendChild(wrapper);
+        adjustments.appendChild(wrapper);
 
         for (const btn of [minus, plus]) {
             btn.addEventListener('click', () => {
@@ -632,7 +798,7 @@ function addGroupControls(form, groupName, controls) {
     zeroButton.textContent = "Zero All";
     zeroButton.type = "button";
     zeroButton.className = "btn-zero";
-    groupDiv.appendChild(zeroButton);
+    adjustments.appendChild(zeroButton);
 
     zeroButton.addEventListener('click', () => {
         queryElements(form, `[name^="${groupName}."]`, HTMLInputElement).forEach(input => {
@@ -724,12 +890,12 @@ function collectCostConfig(form, initialConfig) {
 }
 
 /**
- * Gather the current compute run option values from the DOM
- * @returns {RunOptions}
+ * Gather the current search option values from the DOM
+ * @returns {SearchOptions}
  */
-function collectRunOptionsValues() {
+function collectSearchOptionsValues() {
     return {
-        ...defaultRunOptions,
+        ...defaultSearchOptions,
         depth: parseFloat(getElement("depth", HTMLInputElement).value),
         maxIterations: parseFloat(getElement("iterations", HTMLInputElement).value),
         maxRegripBranches: parseFloat(getElement("maxRegripBranches", HTMLInputElement).value),
@@ -742,7 +908,17 @@ function collectRunOptionsValues() {
         injectZRotations: getElement("injectZRotations", HTMLInputElement).checked,
         searchRegrips: getElement("searchRegrips", HTMLInputElement).checked,
         partitionLength: parseFloat(getElement("partitionLength", HTMLInputElement).value),
-        cubeSize: getElement("cubeSize", HTMLSelectElement).value ? Number(getElement("cubeSize", HTMLSelectElement).value) : null,
+    };
+}
+
+/**
+ * Gather the current scramble option values from the DOM
+ * @returns {ScrambleOptions}
+ */
+function collectScrambleOptionsValues() {
+    const cubeSize = getElement("cubeSize", HTMLSelectElement).value;
+    return {
+        cubeSize: cubeSize ? Number(cubeSize) : null,
     };
 }
 
@@ -792,10 +968,10 @@ export function collectFormatOptionsValues() {
 }
 
 /**
- * Populate the compute option DOM elements with the provided values
- * @param {Partial<RunOptions>} runOpts
+ * Populate the search option DOM elements with the provided values
+ * @param {Partial<SearchOptions>} runOpts
  */
-function applyRunOptionsValues(runOpts) {
+function applySearchOptionsValues(runOpts) {
     if (runOpts.depth !== undefined) getElement("depth", HTMLInputElement).value = String(runOpts.depth);
     if (runOpts.maxIterations !== undefined) getElement("iterations", HTMLInputElement).value = String(runOpts.maxIterations);
     if (runOpts.maxRegripBranches !== undefined) getElement("maxRegripBranches", HTMLInputElement).value = String(runOpts.maxRegripBranches);
@@ -808,7 +984,14 @@ function applyRunOptionsValues(runOpts) {
     if (runOpts.injectZRotations !== undefined) getElement("injectZRotations", HTMLInputElement).checked = Boolean(runOpts.injectZRotations);
     if (runOpts.searchRegrips !== undefined) getElement("searchRegrips", HTMLInputElement).checked = Boolean(runOpts.searchRegrips);
     if (runOpts.partitionLength !== undefined) getElement("partitionLength", HTMLInputElement).value = String(runOpts.partitionLength);
-    if (runOpts.cubeSize !== undefined) getElement("cubeSize", HTMLSelectElement).value = String(runOpts.cubeSize);
+}
+
+/**
+ * Populate the scramble option DOM elements with the provided values
+ * @param {ScrambleOptions} scrambleOpts
+ */
+function applyScrambleOptionsValues(scrambleOpts) {
+    getElement("cubeSize", HTMLSelectElement).value = scrambleOpts.cubeSize === null ? "" : String(scrambleOpts.cubeSize);
 }
 
 /**
@@ -818,6 +1001,7 @@ function applyRunOptionsValues(runOpts) {
 function applyFormatOptionsValues(formatOpts) {
     const opts = { ...defaultFormatOptions, ...formatOpts };
 
+    applyColorSchemeValues(opts.colorScheme);
     getElement("showGrips", HTMLInputElement).checked = Boolean(opts.showGrips ?? defaultFormatOptions.showGrips);
     //getElement("showBoundaries", HTMLInputElement).checked = Boolean(opts.showBoundaries ?? defaultFormatOptions.showBoundaries);
     getElement("wedgeNotation", HTMLInputElement).checked = Boolean(opts.wedgeNotation ?? defaultFormatOptions.wedgeNotation);
@@ -877,8 +1061,9 @@ const CANONICAL_MOVE_PAIRS = Object.freeze(
  * @param {HTMLElement} container
  * @param {TransitionConfig} currentTransitions
  * @param {() => void} onTransitionChange
+ * @param {boolean} readOnly If the selects and link toggles should be disabled
  */
-function renderTransitionsTab(container, currentTransitions, onTransitionChange) {
+function renderTransitionsTab(container, currentTransitions, onTransitionChange, readOnly) {
     container.replaceChildren();
 
     let activePosition = /** @type {ThumbPosition} */ ("F");
@@ -936,6 +1121,7 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange)
                 lSelect.appendChild(opt);
             }
             lSelect.value = resolvedLFt || "";
+            lSelect.disabled = readOnly;
 
             // Link Toggle Button
             const linkBtn = document.createElement("button");
@@ -946,6 +1132,7 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange)
             const iconSpan = document.createElement("span");
             iconSpan.className = `icon-svg ${isLinked ? "icon-link" : "icon-unlink"}`;
             linkBtn.appendChild(iconSpan);
+            linkBtn.disabled = readOnly;
 
             // Right Hand Select
             const rSelect = document.createElement("select");
@@ -961,6 +1148,7 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange)
                 rSelect.appendChild(opt);
             }
             rSelect.value = rFt || "";
+            rSelect.disabled = readOnly;
 
             // Right Move Label
             const rLabel = document.createElement("span");

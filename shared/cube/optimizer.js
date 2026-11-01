@@ -17,8 +17,12 @@ import { getOrientationColors, getRestoringRotation, detectCubeSize, normalizeSc
  */
 
 /**
- * @typedef {Object} RunOptions
+ * @typedef {Object} ScrambleOptions Settings that describe the scramble being optimized
  * @property {number | null} cubeSize Target cube size (e.g. 3 for 3x3, 7 for 7x7), detected automatically if null
+ */
+
+/**
+ * @typedef {Object} SearchOptions Settings that control how the search is performed
  * @property {number} depth The branch pruning threshold
  * @property {number} maxIterations Number of iterations to try before bailing out
  * @property {number} [maxRegripBranches] Maximum number of candidate regrips to explore when a regrip is required
@@ -33,6 +37,8 @@ import { getOrientationColors, getRestoringRotation, detectCubeSize, normalizeSc
  * @property {number} [partitionLength] Maximum length of scramble partitions (0 or undefined to disable)
  * @property {number} [maxCapacity] Maximum number of candidate scrambles to retain (default 50)
  */
+
+/** @typedef {SearchOptions & ScrambleOptions} RunOptions */
 
 /**
  * @typedef OrientationResultInfo

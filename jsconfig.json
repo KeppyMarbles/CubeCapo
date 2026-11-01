@@ -7,7 +7,8 @@
     "target": "es2022",
     "types": [
       "node",
-      "chrome"
+      "chrome",
+      "wicg-file-system-access"
     ]
   },
   "exclude": [

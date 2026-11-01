@@ -98,3 +98,20 @@ export async function removeStorageItem(key) {
         // Ignore errors
     }
 }
+
+/**
+ * Tell the options page and content scripts in all tabs that the stored settings changed.
+ * @returns {void}
+ */
+export function notifySettingsChanged() {
+    if (typeof chrome === "undefined" || !chrome.tabs) return;
+    chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+            if (tab.id) {
+                chrome.tabs.sendMessage(tab.id, { action: "SETTINGS_CHANGED" }, () => {
+                    if (chrome.runtime.lastError) { /* ignore */ }
+                });
+            }
+        });
+    });
+}

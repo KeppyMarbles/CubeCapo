@@ -91,19 +91,38 @@
       </div>
       <div class="cost-section">   
           <form id="costForm" class="cost-form">
-            <h2>Configuration</h2>
+            <h2 class="config-header">
+              <span>Configuration</span>
+              <span id="activeProfileCard" class="profile-badge" title="Active profile"></span>
+            </h2>
+            <p id="readOnlyNotice" class="profile-desc hidden"></p>
             <div class="config-tabs">
               <!-- Main Tabs -->
               <div class="main-tab-buttons">
-                <button type="button" class="main-tab-btn active" data-main-tab="strategy">Compute</button>
+                <button type="button" class="main-tab-btn active" data-main-tab="profile">Profile</button>
+                <button type="button" class="main-tab-btn" data-main-tab="strategy">Compute</button>
                 <button type="button" class="main-tab-btn" data-main-tab="penalties">Costs</button>
                 <button type="button" class="main-tab-btn" data-main-tab="format">Formatting</button>
                 <button type="button" class="main-tab-btn" data-main-tab="execution">Execution</button>
-                <button type="button" class="main-tab-btn" data-main-tab="profile">Profile</button>
+              </div>
+
+              <!-- Tab: Profile & Storage -->
+              <div class="main-tab-content active" id="mainTabProfile">
+                <div class="strategy-container">
+                  <div class="strategy-group">
+                    <h3>Profiles</h3>
+                    <p class="profile-desc">Select a profile to use its compute settings, costs, colors and move executions. Default can't be edited, so clone it to make your own.</p>
+                    <div id="profileList" class="profile-list"></div>
+                    <div class="profile-actions">
+                      <button type="button" id="importButton" class="btn-profile">Import</button>
+                      <input id="importFile" type="file" accept=".json" class="hidden">
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <!-- Tab: Search Strategy -->
-              <div class="main-tab-content active" id="mainTabStrategy">
+              <div class="main-tab-content" id="mainTabStrategy">
                 <div class="strategy-container">
                   <div class="strategy-group">
                     <h3>Presets</h3>
@@ -236,28 +255,6 @@
                 <div id="transitions" data-group="transitions"></div>
               </div>
 
-              <!-- Tab: Profile & Storage -->
-              <div class="main-tab-content" id="mainTabProfile">
-                <div class="strategy-container">
-                  <div class="strategy-group">
-                    <h3>Import & Export</h3>
-                    <p class="profile-desc">Save move executions and cost penalties to a JSON file or load an existing profile.</p>
-                    <div class="profile-actions">
-                      <button type="button" id="exportButton" class="btn-profile">Export</button>
-                      <button type="button" id="importButton" class="btn-profile">Import</button>
-                      <input id="importFile" type="file" accept=".json" class="hidden">
-                    </div>
-                  </div>
-
-                  <div class="strategy-group">
-                    <h3>Reset</h3>
-                    <p class="profile-desc">Restore all move execution mappings, cost penalties, and search strategy options to default.</p>
-                    <div class="profile-actions">
-                      <button type="button" id="resetDefaultButton" class="btn-profile btn-danger">Reset To Defaults</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           </form>
       </div>
@@ -268,13 +265,18 @@
     </footer>
   </div>
 
-  <div id="unsavedChangesBar" class="unsaved-changes-bar hidden">
-    <span>You have unsaved changes.</span>
-    <div class="bar-buttons">
-      <button type="button" id="revertChangesButton" class="btn-revert">Revert</button>
-      <button type="button" id="saveChangesButton" class="btn-save">Save</button>
+  <template id="profileCardTemplate">
+    <div class="profile-card">
+      <span class="profile-name"></span>
+      <div class="profile-icon-buttons">
+        <button type="button" class="btn-profile-icon" data-action="reset" title="Undo changes made since the page was opened" aria-label="Undo changes made since the page was opened"><span class="icon-svg icon-reset"></span></button>
+        <button type="button" class="btn-profile-icon" data-action="rename" title="Rename" aria-label="Rename"><span class="icon-svg icon-rename"></span></button>
+        <button type="button" class="btn-profile-icon" data-action="clone" title="Clone" aria-label="Clone"><span class="icon-svg icon-copy"></span></button>
+        <button type="button" class="btn-profile-icon" data-action="export" title="Export" aria-label="Export"><span class="icon-svg icon-export"></span></button>
+        <button type="button" class="btn-profile-icon btn-danger" data-action="delete" title="Delete" aria-label="Delete"><span class="icon-svg icon-delete"></span></button>
+      </div>
     </div>
-  </div>
+  </template>
 
   <script type="module" src="main.js"></script>
 </body>

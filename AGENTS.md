@@ -18,13 +18,14 @@ scramblemanip-js/
 ├── styles.css               # Web UI CSS styles (modern, dark/light theme options, grid layouts)
 ├── package.json             # ES Module declaration ("type": "module") & npm test script
 ├── manifest.json            # WebExtension (Manifest V3) definition
-├── assets/                  # SVG icons (link.svg, unlink.svg, github.svg)
+├── assets/                  # SVG icons, used as CSS mask icons (link, unlink, github, copy, rename, file-export, trash-can, reset)
 ├── data/
 │   └── scrambles.txt        # 100 newline-separated 3x3 scrambles for testing and statistical analysis
 ├── scratch/                 # Test script folder for agents. Excluded from git.
 ├── shared/
-│   ├── defaults.js          # Default configurations: `defaultColorScheme`, `defaultFormatOptions`, `defaultRunOptions`, `defaultCostConfiguration`, `defaultFingertricks`, `strategyPresets`
-│   ├── storage.js           # Cross-environment storage helper (chrome.storage.local with localStorage fallback)
+│   ├── defaults.js          # Default configurations: `defaultColorScheme`, `defaultFormatOptions`, `defaultSearchOptions`, `defaultScrambleOptions`, `defaultRunOptions`, `defaultCostConfiguration`, `defaultFingertricks`, `strategyPresets`
+│   ├── profiles.js          # Profile type, built-in Default profile, storage helpers for saved profiles / active profile name, and imported profile parsing
+│   ├── storage.js           # Cross-environment storage helper (chrome.storage.local with localStorage fallback) and the SETTINGS_CHANGED tab notification
 │   ├── cube/
 │   │   ├── evaluator.js     # ExecutionEvaluator class: 5-state thumb/wrist model, pre-computed transitionCache, transition cost evaluation, candidate regrip search
 │   │   ├── move.js          # Move class: copy/clone/invert methods, transposition matrix, rotation helpers
@@ -33,7 +34,7 @@ scramblemanip-js/
 │   │   └── util.js          # Cube utility functions: normalizeScramble, getFinalOrientation, getOrientationColors, getRestoringRotation, detectCubeSize
 │   ├── ui/
 │   │   ├── dom.js           # Type-safe DOM element getters & query helpers (getElement, getOptionalElement, queryElement, queryElementOptional, queryElements)
-│   │   ├── form.js          # Form handler: input parsing, cost config tab setup, import/export, unsaved bar
+│   │   ├── form.js          # Form handler: input parsing, cost config tab setup, profile list (cards from a <template>, delegated actions: activate/reset/rename/clone/export/delete/import), autosave to the active profile
 │   │   └── stats.js         # Optimization stats: CSS bar chart, breakdown table renderer, orientation matrix, cost color mapping
 └── extension/
     ├── background.js        # Service worker: handles async OPTIMIZE_SCRAMBLE & OPEN_OPTIONS_PAGE messages
