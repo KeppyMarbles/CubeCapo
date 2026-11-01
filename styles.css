@@ -663,6 +663,11 @@ summary {
   background: var(--border);
 }
 
+.btn-profile.active {
+  border-color: var(--primary);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
 .btn-profile.btn-danger {
   color: #ef4444;
   border-color: rgba(239, 68, 68, 0.3);

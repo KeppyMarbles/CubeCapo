@@ -75,6 +75,7 @@ export const strategyPresets = Object.freeze({
         injectZRotations: false,
         depth: 0,
         memoize: true,
+        maxIterations: defaultSearchOptions.maxIterations,
     }),
     balanced: Object.freeze({
         partitionLength: 20,
@@ -88,6 +89,7 @@ export const strategyPresets = Object.freeze({
         injectZRotations: true,
         depth: 0,
         memoize: true,
+        maxIterations: defaultSearchOptions.maxIterations,
     }),
     exhaustive: Object.freeze({
         partitionLength: 20,
@@ -101,6 +103,7 @@ export const strategyPresets = Object.freeze({
         injectZRotations: true,
         depth: 0,
         memoize: true,
+        maxIterations: defaultSearchOptions.maxIterations,
     }),
 });
 

@@ -232,9 +232,20 @@ export async function setupForm(onSubmit, onFormatChange) {
         handleSettingsChange();
     };
 
-    getElement("presetFast", HTMLButtonElement).addEventListener("click", () => applyPreset(strategyPresets.fast));
-    getElement("presetBalanced", HTMLButtonElement).addEventListener("click", () => applyPreset(strategyPresets.balanced));
-    getElement("presetExhaustive", HTMLButtonElement).addEventListener("click", () => applyPreset(strategyPresets.exhaustive));
+    const presetButtons = [
+        { button: getElement("presetFast", HTMLButtonElement), preset: strategyPresets.fast },
+        { button: getElement("presetBalanced", HTMLButtonElement), preset: strategyPresets.balanced },
+        { button: getElement("presetExhaustive", HTMLButtonElement), preset: strategyPresets.exhaustive },
+    ];
+    presetButtons.forEach(({ button, preset }) => button.addEventListener("click", () => applyPreset(preset)));
+
+    // Highlight the preset that the current search options match
+    const updatePresetHighlight = () => {
+        const current = new Map(Object.entries(collectSearchOptionsValues()));
+        for (const { button, preset } of presetButtons)
+            button.classList.toggle("active", Object.entries(preset).every(([key, value]) => current.get(key) === value));
+    };
+    form.addEventListener("input", updatePresetHighlight);
 
     // Attach change detection to color scheme settings
     const colorInputIds = [
@@ -311,6 +322,7 @@ export async function setupForm(onSubmit, onFormatChange) {
         currentTransitions = structuredClone(profile.transitionConfig);
         updateReadOnly(readOnly);
         updateCostInputColors(form);
+        updatePresetHighlight();
     };
 
     // Profiles: the active settings live in the flat storage keys (read by the extension);
