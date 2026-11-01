@@ -351,14 +351,15 @@ export function computeZTransition(grip, rotKey) {
     return { next: grip, type };
 }
 
-export class ExecutionEvaluator {
-    /** @type {readonly (FaceStr | MiddleStr | AxisStr)[]} Every value a move's alpha can take */
-    static ALPHAS = Object.freeze([...Move.MOVE_LIST, ...Move.MIDDLE_MOVE_LIST, ...Move.ROTATION_LIST]);
-    static ALPHA_COUNT = ExecutionEvaluator.ALPHAS.length;
-    static ALPHA_INDEXES = Object.freeze(Object.fromEntries(ExecutionEvaluator.ALPHAS.map((alpha, i) => [alpha, i])));
-    /** Exclusive upper bound for cube size and slice count, used to pack step keys */
-    static MAX_CUBE_SIZE = 1024;
+/** @type {readonly (FaceStr | MiddleStr | AxisStr)[]} Every value a move's alpha can take */
+const ALPHAS = Object.freeze([...Move.MOVE_LIST, ...Move.MIDDLE_MOVE_LIST, ...Move.ROTATION_LIST]);
+const ALPHA_COUNT = ALPHAS.length;
+const ALPHA_INDEXES = Object.freeze(Object.fromEntries(ALPHAS.map((alpha, i) => [alpha, i])));
 
+/** Exclusive upper bound for cube size and slice count, used to pack step keys */
+const MAX_CUBE_SIZE = 1024;
+
+export class ExecutionEvaluator {
     /**
      * @param {CostConfig} config 
      * @param {TransitionConfig} transitions 
@@ -399,10 +400,10 @@ export class ExecutionEvaluator {
      * @returns {number}
      */
     getStepKey(grip, move, cubeSize) {
-        const alphaIndex = ExecutionEvaluator.ALPHA_INDEXES[move.alpha];
+        const alphaIndex = ALPHA_INDEXES[move.alpha];
         const modifiers = (Number(move.isPrime) * 2 + Number(move.isDouble)) * 2 + Number(move.isInvertedSlice);
-        const sliceKey = (move.sliceNum * ExecutionEvaluator.MAX_CUBE_SIZE) + (cubeSize ?? 0);
-        return ((this.getGripIndex(grip) * ExecutionEvaluator.ALPHA_COUNT + alphaIndex) * 8 + modifiers) * ExecutionEvaluator.MAX_CUBE_SIZE ** 2 + sliceKey;
+        const sliceKey = (move.sliceNum * MAX_CUBE_SIZE) + (cubeSize ?? 0);
+        return ((this.getGripIndex(grip) * ALPHA_COUNT + alphaIndex) * 8 + modifiers) * MAX_CUBE_SIZE ** 2 + sliceKey;
     }
 
     /**

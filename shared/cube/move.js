@@ -13,6 +13,12 @@ import { ScrambleParser } from "./parser.js";
 /** @typedef {Record<RotationStr, Record<FaceStr | AxisStr, FaceStr | AxisStr>>} TranspositionMap */
 /** @typedef {Readonly<Record<string, FaceStr | AxisStr>>} FacePermutation The net effect of a sequence of rotations on move faces */
 
+/** @type {Map<string, FacePermutation>} Interned permutations, so there are only 24 */
+const PERMUTATIONS = new Map();
+
+/** @type {Map<FacePermutation | null, Map<RotationStr, FacePermutation>>} Memoized Move.composeTransposition results */
+const COMPOSITIONS = new Map();
+
 export class Move {
     /** @type {readonly FaceStr[]} */
     static MOVE_LIST = Object.freeze(["R", "L", "U", "D", "F", "B"]);
@@ -109,12 +115,6 @@ export class Move {
     /** @type {readonly ModifierStr[]} */
     static MODIFIERS = Object.freeze(["", "'", "2", "2'"]);
 
-    /** @type {Map<string, FacePermutation>} Interned permutations, so there are only 24 */
-    static PERMUTATIONS = new Map();
-
-    /** @type {Map<FacePermutation | null, Map<RotationStr, FacePermutation>>} Memoized composeTransposition results */
-    static COMPOSITIONS = new Map();
-
     /**
      * Appends a rotation to a face permutation. A null permutation is the identity (leaves every move untouched).
      * Applying the result to a move is equivalent to transposing it by each rotation in order.
@@ -123,10 +123,10 @@ export class Move {
      * @returns {FacePermutation}
      */
     static composeTransposition(permutation, rotKey) {
-        let compositions = Move.COMPOSITIONS.get(permutation);
+        let compositions = COMPOSITIONS.get(permutation);
         if (!compositions) {
             compositions = new Map();
-            Move.COMPOSITIONS.set(permutation, compositions);
+            COMPOSITIONS.set(permutation, compositions);
         }
         let result = compositions.get(rotKey);
         if (!result) {
@@ -135,8 +135,8 @@ export class Move {
                 ? Object.fromEntries(Object.entries(permutation).map(([face, to]) => [face, rotation[to]]))
                 : rotation;
             const signature = JSON.stringify(composed);
-            result = Move.PERMUTATIONS.get(signature) ?? Object.freeze({ ...composed });
-            Move.PERMUTATIONS.set(signature, result);
+            result = PERMUTATIONS.get(signature) ?? Object.freeze({ ...composed });
+            PERMUTATIONS.set(signature, result);
             compositions.set(rotKey, result);
         }
         return result;

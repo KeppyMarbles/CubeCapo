@@ -109,71 +109,82 @@ import { getOrientationColors, getRestoringRotation, detectCubeSize, normalizeSc
  * @property {ScrambleCandidate[]} minResults Candidates tied for lowest cost
  */
 
-export class ScrambleOptimizer {
-    /** @type {TransformDescriptor} */
-    static IDENTITY_DESCRIPTOR = Object.freeze({
-        logicalSkip: 1,
-        physicalCount: 1,
-        apply: (move, steps) => {
-            steps[0] = move.clone();
-            return null;
-        }
-    });
+const FACE_INDEXES = Object.freeze({ U: 0, D: 1, F: 2, B: 3, R: 4, L: 5 });
 
-    /** @type {TransformDescriptor} */
-    static WIDE_DESCRIPTOR = Object.freeze({
-        logicalSkip: 1,
-        physicalCount: 1,
-        apply: (move, steps, orientation) => ScrambleOptimizer.wideReplace(move.clone(), steps, orientation)
-    });
+/**
+ * Turns a move into its wide equivalent and updates the orientation
+ * @param {Move} move Move to convert in-place
+ * @param {Move[]} steps Receives the converted move
+ * @param {Orientation} orientation
+ * @returns {RotationStr | null} The rotation later moves must be transposed by
+ */
+function wideReplace(move, steps, orientation) {
+    steps[0] = move.toWide();
+    const rotKey = move.getAssociatedRotation();
+    if (rotKey) Move.transposeOrientation(orientation, rotKey);
+    return rotKey;
+}
 
-    /** @type {TransformDescriptor} */
-    static PRIME_DESCRIPTOR = Object.freeze({
-        logicalSkip: 1,
-        physicalCount: 1,
-        apply: (move, steps) => {
-            steps[0] = move.clone().invert();
-            return null;
-        }
-    });
-
-    /** @type {TransformDescriptor} */
-    static PRIME_WIDE_DESCRIPTOR = Object.freeze({
-        logicalSkip: 1,
-        physicalCount: 1,
-        apply: (move, steps, orientation) => ScrambleOptimizer.wideReplace(move.clone().invert(), steps, orientation)
-    });
-
-    /**
-     * @param {RotationStr} rotKey
-     * @returns {TransformDescriptor}
-     */
-    static makeRotationInjectDescriptor(rotKey) {
-        return Object.freeze({
-            logicalSkip: 1,
-            physicalCount: 2,
-            apply: (move, steps, orientation) => {
-                steps[0] = new Move(/** @type {AxisStr} */ (rotKey[0]), rotKey.includes("'"), rotKey.includes("2"), true);
-                steps[1] = move.clone();
-                steps[1].transpose(rotKey);
-                Move.transposeOrientation(orientation, rotKey);
-                return rotKey;
-            }
-        });
+/** @type {TransformDescriptor} */
+const IDENTITY_DESCRIPTOR = Object.freeze({
+    physicalCount: 1,
+    apply: (move, steps) => {
+        steps[0] = move.clone();
+        return null;
     }
+});
 
-    static Z_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("z");
-    static Z_PRIME_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("z'");
-    static Z2_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("z2");
+/** @type {TransformDescriptor} */
+const WIDE_DESCRIPTOR = Object.freeze({
+    physicalCount: 1,
+    apply: (move, steps, orientation) => wideReplace(move.clone(), steps, orientation)
+});
 
-    static X_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("x");
-    static X_PRIME_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("x'");
-    static X2_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("x2");
+/** @type {TransformDescriptor} */
+const PRIME_DESCRIPTOR = Object.freeze({
+    physicalCount: 1,
+    apply: (move, steps) => {
+        steps[0] = move.clone().invert();
+        return null;
+    }
+});
 
-    static Y_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("y");
-    static Y_PRIME_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("y'");
-    static Y2_INJECT_DESCRIPTOR = ScrambleOptimizer.makeRotationInjectDescriptor("y2");
+/** @type {TransformDescriptor} */
+const PRIME_WIDE_DESCRIPTOR = Object.freeze({
+    physicalCount: 1,
+    apply: (move, steps, orientation) => wideReplace(move.clone().invert(), steps, orientation)
+});
 
+/**
+ * @param {RotationStr} rotKey
+ * @returns {TransformDescriptor}
+ */
+function makeRotationInjectDescriptor(rotKey) {
+    return Object.freeze({
+        physicalCount: 2,
+        apply: (move, steps, orientation) => {
+            steps[0] = new Move(/** @type {AxisStr} */ (rotKey[0]), rotKey.includes("'"), rotKey.includes("2"), true);
+            steps[1] = move.clone();
+            steps[1].transpose(rotKey);
+            Move.transposeOrientation(orientation, rotKey);
+            return rotKey;
+        }
+    });
+}
+
+const Z_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("z");
+const Z_PRIME_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("z'");
+const Z2_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("z2");
+
+const X_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("x");
+const X_PRIME_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("x'");
+const X2_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("x2");
+
+const Y_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("y");
+const Y_PRIME_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("y'");
+const Y2_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("y2");
+
+export class ScrambleOptimizer {
     /**
      * Computes a unique signature string for deduplicating scramble candidates.
      * @param {ScrambleCandidate} candidate 
@@ -187,8 +198,6 @@ export class ScrambleOptimizer {
         return `${candidate.startingGrip || ""}|${rotUp}|${rotFront}|${movesStr}`;
     }
 
-    static FACE_INDEXES = Object.freeze({ U: 0, D: 1, F: 2, B: 3, R: 4, L: 5 });
-
     /**
      * Packs a search state into a single number for use as a memo key.
      * @param {number} logicalIndex 
@@ -198,9 +207,9 @@ export class ScrambleOptimizer {
      * @returns {number}
      */
     static getMemoKey(logicalIndex, gripIndex, gripCount, orientation) {
-        const faces = Object.keys(ScrambleOptimizer.FACE_INDEXES).length;
-        const up = ScrambleOptimizer.FACE_INDEXES[orientation.up];
-        const front = ScrambleOptimizer.FACE_INDEXES[orientation.front];
+        const faces = Object.keys(FACE_INDEXES).length;
+        const up = FACE_INDEXES[orientation.up];
+        const front = FACE_INDEXES[orientation.front];
         return ((logicalIndex * gripCount + gripIndex) * faces + up) * faces + front;
     }
 
@@ -245,20 +254,6 @@ export class ScrambleOptimizer {
         this.rotationInfo = null;
         /** @type {Map<number, number>} Memoization for all orientations */
         this.memo = new Map();
-    }
-
-    /**
-     * Turns a move into its wide equivalent and updates the orientation
-     * @param {Move} move Move to convert in-place
-     * @param {Move[]} steps Receives the converted move
-     * @param {Orientation} orientation
-     * @returns {RotationStr | null} The rotation later moves must be transposed by
-     */
-    static wideReplace(move, steps, orientation) {
-        steps[0] = move.toWide();
-        const rotKey = move.getAssociatedRotation();
-        if (rotKey) Move.transposeOrientation(orientation, rotKey);
-        return rotKey;
     }
 
     /**
@@ -428,42 +423,42 @@ export class ScrambleOptimizer {
         };
 
         // Normal branch
-        branchWith(ScrambleOptimizer.IDENTITY_DESCRIPTOR);
+        branchWith(IDENTITY_DESCRIPTOR);
 
         // Injected Z rotations (when injectZRotations option is enabled)
         if (this.options.injectZRotations) {
-            if (this.evaluator.getTransition(currentGrip, "z")) branchWith(ScrambleOptimizer.Z_INJECT_DESCRIPTOR);
-            if (this.evaluator.getTransition(currentGrip, "z'")) branchWith(ScrambleOptimizer.Z_PRIME_INJECT_DESCRIPTOR);
-            if (this.evaluator.getTransition(currentGrip, "z2")) branchWith(ScrambleOptimizer.Z2_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "z")) branchWith(Z_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "z'")) branchWith(Z_PRIME_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "z2")) branchWith(Z2_INJECT_DESCRIPTOR);
         }
 
         // Injected X rotations (when injectXRotations option is enabled)
         if (this.options.injectXRotations) {
-            if (this.evaluator.getTransition(currentGrip, "x")) branchWith(ScrambleOptimizer.X_INJECT_DESCRIPTOR);
-            if (this.evaluator.getTransition(currentGrip, "x'")) branchWith(ScrambleOptimizer.X_PRIME_INJECT_DESCRIPTOR);
-            if (this.evaluator.getTransition(currentGrip, "x2")) branchWith(ScrambleOptimizer.X2_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "x")) branchWith(X_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "x'")) branchWith(X_PRIME_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "x2")) branchWith(X2_INJECT_DESCRIPTOR);
         }
 
         // Injected Y rotations (when injectYRotations option is enabled)
         if (this.options.injectYRotations) {
-            if (this.evaluator.getTransition(currentGrip, "y")) branchWith(ScrambleOptimizer.Y_INJECT_DESCRIPTOR);
-            if (this.evaluator.getTransition(currentGrip, "y'")) branchWith(ScrambleOptimizer.Y_PRIME_INJECT_DESCRIPTOR);
-            if (this.evaluator.getTransition(currentGrip, "y2")) branchWith(ScrambleOptimizer.Y2_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "y")) branchWith(Y_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "y'")) branchWith(Y_PRIME_INJECT_DESCRIPTOR);
+            if (this.evaluator.getTransition(currentGrip, "y2")) branchWith(Y2_INJECT_DESCRIPTOR);
         }
 
         const canWideReplace = this.canWideReplace(move);
 
         // wide variation (single-layer wide)
         if (canWideReplace)
-            branchWith(ScrambleOptimizer.WIDE_DESCRIPTOR);
+            branchWith(WIDE_DESCRIPTOR);
 
         // prime variation for double (toggle R2 <-> R2')
         if(move.isDouble) { 
-            branchWith(ScrambleOptimizer.PRIME_DESCRIPTOR);
+            branchWith(PRIME_DESCRIPTOR);
 
             // Combinations (prime + wide, prime + wideReplaceDouble, etc.)
             if (canWideReplace) {
-                branchWith(ScrambleOptimizer.PRIME_WIDE_DESCRIPTOR);
+                branchWith(PRIME_WIDE_DESCRIPTOR);
             }
         }
     }
