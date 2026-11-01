@@ -24,7 +24,7 @@ export async function drawOptimizerStats(optimizer, formatOptions, candidateInde
         const candidate = optimizer.candidates[validIndex];
 
         drawDistributionChart(optimizer.distribution || new Map());
-        drawRotationInfoTable(optimizer.rotationInfo || []);
+        drawOrientationInfoTable(optimizer.orientationInfo || []);
         outputEl.textContent = optimizer.formatCandidate(candidate, formatOptions);
         drawCostTable(optimizer.analyzeCandidate(candidate, formatOptions));
 
@@ -43,7 +43,7 @@ export async function drawOptimizerStats(optimizer, formatOptions, candidateInde
     }
     else {
         drawDistributionChart(new Map());
-        drawRotationInfoTable([]);
+        drawOrientationInfoTable([]);
         drawCostTable([]);
         outputEl.textContent = "";
         getElement("searchTime", HTMLElement).textContent = "";
@@ -263,8 +263,8 @@ function drawCostTable(breakdowns) {
  * Show the iteration count and best cost for each orientation
  * @param {OrientationResultInfo[]} info
  */
-function drawRotationInfoTable(info) {
-    const tbody = queryElementOptional(document, "#rotationTable tbody", HTMLTableSectionElement);
+function drawOrientationInfoTable(info) {
+    const tbody = queryElementOptional(document, "#orientationTable tbody", HTMLTableSectionElement);
     if (!tbody) return;
     tbody.replaceChildren();
 
@@ -274,8 +274,8 @@ function drawRotationInfoTable(info) {
         const tr = document.createElement("tr");
 
         const tdRotation = document.createElement("td");
-        const rotStr = [row.rotation?.up, row.rotation?.front].filter(Boolean).join(" ");
-        tdRotation.textContent = rotStr || "(none)";
+        const startRotations = [row.startingRotation?.up, row.startingRotation?.front].filter(Boolean).join(" ");
+        tdRotation.textContent = startRotations || "(none)";
 
         const tdIterations = document.createElement("td");
         if (row.maxed) {

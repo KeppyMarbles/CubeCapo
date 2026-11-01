@@ -207,8 +207,8 @@ export async function setupForm(onSubmit, onFormatChange) {
         "depth",
         "iterations",
         "maxRegripBranches",
-        "searchRotations",
-        "pruneRotations",
+        "searchStartingOrientations",
+        "pruneStartingOrientations",
         "memoize",
         "wideReplace",
         "searchRegrips",
@@ -911,8 +911,8 @@ function collectSearchOptionsValues() {
         depth: parseFloat(getElement("depth", HTMLInputElement).value),
         maxIterations: parseFloat(getElement("iterations", HTMLInputElement).value),
         maxRegripBranches: parseFloat(getElement("maxRegripBranches", HTMLInputElement).value),
-        searchRotations: getElement("searchRotations", HTMLInputElement).checked,
-        pruneRotations: getElement("pruneRotations", HTMLInputElement).checked,
+        searchStartingOrientations: getElement("searchStartingOrientations", HTMLInputElement).checked,
+        pruneStartingOrientations: getElement("pruneStartingOrientations", HTMLInputElement).checked,
         memoize: getElement("memoize", HTMLInputElement).checked,
         wideReplace: getElement("wideReplace", HTMLInputElement).checked,
         injectXRotations:  getElement("injectXRotations", HTMLInputElement).checked,
@@ -987,8 +987,8 @@ function applySearchOptionsValues(runOpts) {
     if (runOpts.depth !== undefined) getElement("depth", HTMLInputElement).value = String(runOpts.depth);
     if (runOpts.maxIterations !== undefined) getElement("iterations", HTMLInputElement).value = String(runOpts.maxIterations);
     if (runOpts.maxRegripBranches !== undefined) getElement("maxRegripBranches", HTMLInputElement).value = String(runOpts.maxRegripBranches);
-    if (runOpts.searchRotations !== undefined) getElement("searchRotations", HTMLInputElement).checked = Boolean(runOpts.searchRotations);
-    if (runOpts.pruneRotations !== undefined) getElement("pruneRotations", HTMLInputElement).checked = Boolean(runOpts.pruneRotations);
+    if (runOpts.searchStartingOrientations !== undefined) getElement("searchStartingOrientations", HTMLInputElement).checked = Boolean(runOpts.searchStartingOrientations);
+    if (runOpts.pruneStartingOrientations !== undefined) getElement("pruneStartingOrientations", HTMLInputElement).checked = Boolean(runOpts.pruneStartingOrientations);
     if (runOpts.memoize !== undefined) getElement("memoize", HTMLInputElement).checked = Boolean(runOpts.memoize);
     if (runOpts.wideReplace !== undefined) getElement("wideReplace", HTMLInputElement).checked = Boolean(runOpts.wideReplace);
     if (runOpts.injectXRotations !== undefined) getElement("injectXRotations", HTMLInputElement).checked = Boolean(runOpts.injectXRotations);

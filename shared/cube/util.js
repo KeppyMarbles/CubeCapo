@@ -10,8 +10,8 @@ import { defaultColorScheme } from "../defaults.js";
 
 /** 
  * @typedef {Object} StartingRotation
- * @property {RotationStr | null} up The top rotation
- * @property {RotationStr | null} front The front rotation
+ * @property {RotationStr | null} up Rotation that moves the up face into place
+ * @property {RotationStr | null} front Rotation that moves the front face into place
  */
 
 /**

@@ -67,10 +67,10 @@
           </table>
       </div>
       <div class="middle-section">
-          <h2>Rotations</h2>
-          <table class="breakdown-table" id="rotationTable">
+          <h2>Orientations</h2>
+          <table class="breakdown-table" id="orientationTable">
             <thead>
-              <tr><th>Rotation</th><th>Iterations</th><th>Best Cost</th>
+              <tr><th>Starting Orientation</th><th>Iterations</th><th>Best Cost</th>
             </thead>
             <tbody></tbody>
           </table>
@@ -154,11 +154,11 @@
                   <div class="strategy-group">
                     <h3>Search Exploration</h3>
                     <div class="strategy-fields">
-                      <label title="If the search should explore all starting cube orientations">Search Starting Rotations
-                        <input type="checkbox" id="searchRotations"/>
+                      <label title="If the search should explore all starting cube orientations">Search Starting Orientations
+                        <input type="checkbox" id="searchStartingOrientations"/>
                       </label>
-                      <label title="If a rotation search should stop early if worse than the best rotation">Prune Starting Rotations
-                        <input type="checkbox" id="pruneRotations"/>
+                      <label title="If an orientation search should stop early if worse than the best orientation">Prune Starting Orientations
+                        <input type="checkbox" id="pruneStartingOrientations"/>
                       </label>
                       <label title="Always explore regrip candidates even when a direct transition exists">Search Regrips
                         <input type="checkbox" id="searchRegrips"/>

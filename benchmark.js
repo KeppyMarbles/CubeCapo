@@ -30,7 +30,7 @@ let totalCandidates = 0;
 const options = {
     ...defaultRunOptions,
     ...strategyPresets.fast,
-    searchRotations: false,
+    searchStartingOrientations: false,
 };
 console.log(options);
 

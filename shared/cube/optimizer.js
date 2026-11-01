@@ -30,8 +30,8 @@ import { getOrientationColors, getRestoringRotation, detectCubeSize, normalizeSc
  * @property {number} depth The branch pruning threshold
  * @property {number} maxIterations Number of iterations to try before bailing out
  * @property {number} [maxRegripBranches] Maximum number of candidate regrips to explore when a regrip is required
- * @property {boolean} searchRotations If all orientations should be searched
- * @property {boolean} pruneRotations If an orientation search should be stopped if worse than best orientation
+ * @property {boolean} searchStartingOrientations If all orientations should be searched
+ * @property {boolean} pruneStartingOrientations If an orientation search should be stopped if worse than best orientation
  * @property {boolean} memoize If search shouldn't continue if same index, orientation and grip is reached
  * @property {boolean} [wideReplace] If search should try replacing single moves with wide moves
  * @property {boolean} [searchRegrips] If regrip candidates should always be explored, even when a direct transition exists
@@ -46,7 +46,7 @@ import { getOrientationColors, getRestoringRotation, detectCubeSize, normalizeSc
 
 /**
  * @typedef OrientationResultInfo
- * @property {StartingRotation} rotation The rotation applied at the beginning of the scramble
+ * @property {StartingRotation} startingRotation The rotations that put the cube in this starting orientation
  * @property {GripState} [startingGrip] The starting grip used
  * @property {number} cost The scramble cost
  * @property {number} iterations The number of iterations of search
@@ -57,7 +57,7 @@ import { getOrientationColors, getRestoringRotation, detectCubeSize, normalizeSc
  * @typedef {Object} ScrambleCandidate
  * @property {Move[]} scramble Transposed candidate scramble moves
  * @property {number} cost Total cost of candidate
- * @property {StartingRotation} rotation Starting rotation applied
+ * @property {StartingRotation} startingRotation The rotations applied at the start to reach the starting orientation
  * @property {Orientation} finalOrientation Final orientation of the cube after scramble
  * @property {GripState} startingGrip Starting thumb placement grip
  * @property {number[]} partitionBoundaries Indices where partition boundaries occur
@@ -134,8 +134,8 @@ export class ScrambleOptimizer {
      */
     static getCandidateSignature(candidate) {
         if (!candidate) return "";
-        const rotUp = candidate.rotation?.up || "";
-        const rotFront = candidate.rotation?.front || "";
+        const rotUp = candidate.startingRotation?.up || "";
+        const rotFront = candidate.startingRotation?.front || "";
         const movesStr = candidate.scramble ? candidate.scramble.join(" ") : "";
         return `${candidate.startingGrip || ""}|${rotUp}|${rotFront}|${movesStr}`;
     }
@@ -162,12 +162,12 @@ export class ScrambleOptimizer {
 
     /**
      * @param {ExecutionEvaluator} evaluator Evaluator for grip transitions and execution costs
-     * @param {(() => Promise<void> | void) | null} [callback] Function to call when a rotation optimization finishes
+     * @param {(() => Promise<void> | void) | null} [callback] Function to call when an orientation optimization finishes
      */
     constructor(evaluator, callback = null) {
         /** @type {ExecutionEvaluator} Evaluator for grip transitions and execution costs */
         this.evaluator = evaluator;
-        /** @type {((() => Promise<void> | void)) | null} Function to call when a rotation optimization finishes */
+        /** @type {((() => Promise<void> | void)) | null} Function to call when an orientation optimization finishes */
         this.callback = callback || null;
         /** @type {RunOptions} Active run options for scramble search */
         this.options = { ...defaultRunOptions };
@@ -178,7 +178,7 @@ export class ScrambleOptimizer {
         /** @type {ScrambleCandidate[]} All candidate scrambles tied for lowest cost */
         this.candidates = [];
         /** @type {OrientationResultInfo[] | null} */
-        this.rotationInfo = null;
+        this.orientationInfo = null;
         /** @type {Float64Array} Lowest cost found so far to reach each (logical index, grip, orientation) search state */
         this.memo = new Float64Array(0);
         /** @type {MoveVariant[]} */
@@ -387,7 +387,7 @@ export class ScrambleOptimizer {
             return;
         }
         const bestCost = this.candidates[0]?.cost ?? Infinity;
-        if (options.pruneRotations && cost > bestCost + options.depth) {
+        if (options.pruneStartingOrientations && cost > bestCost + options.depth) {
             return;
         }
         if (cost > ctx.minCost + options.depth) {
@@ -533,7 +533,7 @@ export class ScrambleOptimizer {
             const candidateItem = {
                 scramble: this.buildScramble(ctx, permutationIndex, pathLength),
                 cost,
-                rotation: { up: null, front: null },
+                startingRotation: { up: null, front: null },
                 startingGrip: ctx.startGrip,
                 finalOrientation: { ...ORIENTATIONS[orientationIndex] },
                 partitionBoundaries: [],
@@ -568,7 +568,7 @@ export class ScrambleOptimizer {
         let currCandidates = [{
             scramble: ScrambleOptimizer.copyScramble(scramble),
             cost: initialCost,
-            rotation: { up: null, front: null },
+            startingRotation: { up: null, front: null },
             startingGrip: startGrip,
             finalOrientation: { ...orientation },
             partitionBoundaries: [],
@@ -628,7 +628,7 @@ export class ScrambleOptimizer {
                     const candidateItem = {
                         scramble: res.scramble,
                         cost: res.cost,
-                        rotation: cand.rotation || { up: null, front: null },
+                        startingRotation: cand.startingRotation || { up: null, front: null },
                         startingGrip: startGrip,
                         finalOrientation: res.finalOrientation,
                         partitionBoundaries: newBoundaries,
@@ -670,7 +670,7 @@ export class ScrambleOptimizer {
         this.options = { ...defaultRunOptions, ...options, cubeSize };
         this.candidates = [];
         this.distribution = new Map();
-        this.rotationInfo = [];
+        this.orientationInfo = [];
         this.iterations = 0;
         this.initSearchTables(preprocessedScramble.length);
 
@@ -710,7 +710,7 @@ export class ScrambleOptimizer {
                                 bestGripCost = res.cost;
                                 bestGripStartingGrip = startGrip;
                             }
-                            res.rotation = { up: top_rot, front: front_rot };
+                            res.startingRotation = { up: top_rot, front: front_rot };
                             ScrambleOptimizer.addCandidate(this.candidates, res, this.options.maxCapacity);
                         }
                     }
@@ -718,9 +718,9 @@ export class ScrambleOptimizer {
 
                 const orientationIterations = this.iterations - prevIterations;
 
-                if (this.rotationInfo) {
-                    this.rotationInfo.push({
-                        rotation: { up: top_rot, front: front_rot }, 
+                if (this.orientationInfo) {
+                    this.orientationInfo.push({
+                        startingRotation: { up: top_rot, front: front_rot }, 
                         startingGrip: bestGripStartingGrip,
                         cost: bestGripCost, 
                         iterations: orientationIterations,
@@ -731,7 +731,7 @@ export class ScrambleOptimizer {
                 if(this.callback)
                     await this.callback();
 
-                if(!this.options.searchRotations)
+                if(!this.options.searchStartingOrientations)
                     return;
             }
         }
@@ -785,11 +785,11 @@ export class ScrambleOptimizer {
 
         const formatGrip = (/** @type {GripState} */ g) => `[${g.replace(" ", "/")}]`;
 
-        const { topColor, frontColor } = getOrientationColors(candidate.rotation, options.colorScheme);
+        const { topColor, frontColor } = getOrientationColors(candidate.startingRotation, options.colorScheme);
         const orientationColorStr = topColor && frontColor ? `${topColor} U ${frontColor} F` : "";
         const rotations = options.showOrientationColors 
             ? (orientationColorStr ? [`[${orientationColorStr}]`] : [])
-            : [candidate.rotation?.up, candidate.rotation?.front].filter(Boolean);
+            : [candidate.startingRotation?.up, candidate.startingRotation?.front].filter(Boolean);
 
         const startGrip = options.showGrips && candidate.startingGrip ? [formatGrip(candidate.startingGrip)] : [];
         const breakdown = this.analyzeCandidate(candidate, options);
@@ -809,8 +809,8 @@ export class ScrambleOptimizer {
         }
 
         const solverStartOrientation = { up: /** @type {FaceStr} */ ("U"), front: /** @type {FaceStr} */ ("F") };
-        if (candidate.rotation?.up) Move.transposeOrientation(solverStartOrientation, candidate.rotation.up);
-        if (candidate.rotation?.front) Move.transposeOrientation(solverStartOrientation, candidate.rotation.front);
+        if (candidate.startingRotation?.up) Move.transposeOrientation(solverStartOrientation, candidate.startingRotation.up);
+        if (candidate.startingRotation?.front) Move.transposeOrientation(solverStartOrientation, candidate.startingRotation.front);
 
         const solverFinalOrientation = getFinalOrientation(candidate.scramble, solverStartOrientation);
         const restoringRot = getRestoringRotation(solverFinalOrientation, this.originalFinalOrientation);

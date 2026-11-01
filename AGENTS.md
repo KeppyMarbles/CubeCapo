@@ -55,4 +55,5 @@ scramblemanip-js/
 4. Do not use inline imports for js types; import them at the top of the file.
 5. Save temporary test scripts and verification files directly in the workspace `scratch/` folder so that project-relative imports (e.g. `../shared/...`) and ES module package boundaries resolve cleanly.
 6. Be mindful of scratch script runtime. Time them out after 10 seconds, or keep watch on their progress.
-7. Update this file if it becomes outdated or has errors.
+7. The project is unreleased at this time, so don't write specialized migrations unless asked.
+8. Update this file if it becomes outdated or has errors.
