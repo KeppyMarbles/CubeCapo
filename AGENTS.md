@@ -28,8 +28,9 @@ scramblemanip-js/
 │   ├── storage.js           # Cross-environment storage helper (chrome.storage.local with localStorage fallback) and the SETTINGS_CHANGED tab notification
 │   ├── cube/
 │   │   ├── evaluator.js     # ExecutionEvaluator class: 5-state thumb/wrist model, pre-computed transitionCache, transition cost evaluation, candidate regrip search
-│   │   ├── move.js          # Move class: copy/clone/invert methods, transposition matrix, rotation helpers
-│   │   ├── optimizer.js     # ScrambleOptimizer class: branch-and-bound optimization, partition sequencing, orientation search, candidate management
+│   │   ├── move.js          # Move class: copy/clone/invert methods, transposition matrix, rotation helpers, ALPHAS index lists
+│   │   ├── optimizer.js     # ScrambleOptimizer class: integer-based branch-and-bound search, partition sequencing, orientation search, candidate management
+│   │   ├── rotations.js     # Lookup tables for the search: cube orientations, face permutations from rotations, wide move rotations, all indexed by integer
 │   │   ├── parser.js        # ScrambleParser class: tokenization, recursive descent parsing for commutators/conjugates/groups, notation detection & normalization
 │   │   └── util.js          # Cube utility functions: normalizeScramble, getFinalOrientation, getOrientationColors, getRestoringRotation, detectCubeSize
 │   ├── ui/

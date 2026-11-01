@@ -1,5 +1,5 @@
-import { Move } from "./move.js";
-/** @import { FaceStr, WideFaceStr, AxisStr, MiddleStr, MoveKey, RotationStr, MoveStr } from "./move.js" */
+import { Move, ALPHA_COUNT, ALPHA_INDEXES } from "./move.js";
+/** @import { FaceStr, WideFaceStr, AxisStr, MoveKey, RotationStr, MoveStr } from "./move.js" */
 
 /** @typedef {'F' | 'U' | 'D' | 'Bu' | 'Bd'} ThumbPosition */
 
@@ -350,11 +350,6 @@ export function computeZTransition(grip, rotKey) {
     const type = (rotKey === "z" || rotKey === "z'") ? "rotation" : "rotation_double";
     return { next: grip, type };
 }
-
-/** @type {readonly (FaceStr | MiddleStr | AxisStr)[]} Every value a move's alpha can take */
-const ALPHAS = Object.freeze([...Move.MOVE_LIST, ...Move.MIDDLE_MOVE_LIST, ...Move.ROTATION_LIST]);
-const ALPHA_COUNT = ALPHAS.length;
-const ALPHA_INDEXES = Object.freeze(Object.fromEntries(ALPHAS.map((alpha, i) => [alpha, i])));
 
 /** Exclusive upper bound for cube size and slice count, used to pack step keys */
 const MAX_CUBE_SIZE = 1024;

@@ -1,10 +1,14 @@
 import { defaultFormatOptions, defaultRunOptions } from "../defaults.js";
-import { Move } from "./move.js";
+import { Move, ALPHAS, ALPHA_INDEXES, ALPHA_COUNT, FACE_COUNT } from "./move.js";
+import {
+    ROTATION_KEYS, ROTATION_COUNT, ROTATION_INDEXES, ORIENTATIONS, ORIENTATION_AFTER, PERMUTATIONS, PERMUTATION_AFTER, PERMUTATION_FACE, WIDE_OPPOSITE,
+    getOrientationIndex, getWideRotation
+} from "./rotations.js";
 import { getOrientationColors, getRestoringRotation, detectCubeSize, normalizeScramble, getFinalOrientation } from "./util.js";
 /** @import { ExecutionEvaluator, GripState, Transition, ExecutionStep, CostDetails } from "./evaluator.js" */
 /** @import { Orientation, StartingRotation, ColorSchemeConfig } from "./util.js" */
 /** @import { ParseResult, NotationMode } from "./parser.js" */
-/** @import { FaceStr, MoveStr, RotationStr, AxisStr, FacePermutation } from "./move.js" */
+/** @import { FaceStr, MoveStr, RotationStr } from "./move.js" */
 
 /**
  * @typedef {Object} FormatOptions
@@ -45,20 +49,8 @@ import { getOrientationColors, getRestoringRotation, detectCubeSize, normalizeSc
  * @property {StartingRotation} rotation The rotation applied at the beginning of the scramble
  * @property {GripState} [startingGrip] The starting grip used
  * @property {number} cost The scramble cost
- * @property {number} iterations The number of iterations of bruteforceOptimize
+ * @property {number} iterations The number of iterations of search
  * @property {boolean} maxed If the max iteration count was hit
- */
-
-/**
- * @typedef {Object} TransformDescriptor
- * @property {number} physicalCount Number of moves this transform executes in place of the current move
- * @property {(move: Move, steps: Move[], orientation: Orientation) => RotationStr | null} apply Fills `steps` with the moves to execute in place of `move`, updates the orientation, and returns the rotation that all later moves must be transposed by
- */
-
-/**
- * @typedef {Object} PathNode A move executed during the search, linked back to the moves before it
- * @property {Move} move
- * @property {PathNode | null} prev
  */
 
 /**
@@ -109,80 +101,30 @@ import { getOrientationColors, getRestoringRotation, detectCubeSize, normalizeSc
  * @property {ScrambleCandidate[]} minResults Candidates tied for lowest cost
  */
 
-const FACE_INDEXES = Object.freeze({ U: 0, D: 1, F: 2, B: 3, R: 4, L: 5 });
+/**
+ * @typedef {Object} StepOption One way to execute a move: directly, or after a regrip
+ * @property {Transition} transition
+ * @property {number} nextGrip Index of the grip after the move
+ * @property {number} cost
+ */
 
 /**
- * Turns a move into its wide equivalent and updates the orientation
- * @param {Move} move Move to convert in-place
- * @param {Move[]} steps Receives the converted move
- * @param {Orientation} orientation
- * @returns {RotationStr | null} The rotation later moves must be transposed by
+ * @typedef {Object} MoveVariant Everything about a move except which face it turns, which the search changes by rotating the cube
+ * @property {number} sliceNum
+ * @property {boolean} isPrime
+ * @property {boolean} isDouble
+ * @property {boolean} isInvertedSlice
+ * @property {boolean} isRotation
+ * @property {boolean} isMiddle
+ * @property {(StepOption[] | undefined)[]} options Ways to execute the move, indexed by alpha * grip count + grip
  */
-function wideReplace(move, steps, orientation) {
-    steps[0] = move.toWide();
-    const rotKey = move.getAssociatedRotation();
-    if (rotKey) Move.transposeOrientation(orientation, rotKey);
-    return rotKey;
-}
 
-/** @type {TransformDescriptor} */
-const IDENTITY_DESCRIPTOR = Object.freeze({
-    physicalCount: 1,
-    apply: (move, steps) => {
-        steps[0] = move.clone();
-        return null;
-    }
+/** Rotations that the search can inject mid-scramble, by axis */
+const INJECTABLE_ROTATIONS = Object.freeze({
+    z: Object.freeze(["z", "z'", "z2"]),
+    x: Object.freeze(["x", "x'", "x2"]),
+    y: Object.freeze(["y", "y'", "y2"]),
 });
-
-/** @type {TransformDescriptor} */
-const WIDE_DESCRIPTOR = Object.freeze({
-    physicalCount: 1,
-    apply: (move, steps, orientation) => wideReplace(move.clone(), steps, orientation)
-});
-
-/** @type {TransformDescriptor} */
-const PRIME_DESCRIPTOR = Object.freeze({
-    physicalCount: 1,
-    apply: (move, steps) => {
-        steps[0] = move.clone().invert();
-        return null;
-    }
-});
-
-/** @type {TransformDescriptor} */
-const PRIME_WIDE_DESCRIPTOR = Object.freeze({
-    physicalCount: 1,
-    apply: (move, steps, orientation) => wideReplace(move.clone().invert(), steps, orientation)
-});
-
-/**
- * @param {RotationStr} rotKey
- * @returns {TransformDescriptor}
- */
-function makeRotationInjectDescriptor(rotKey) {
-    return Object.freeze({
-        physicalCount: 2,
-        apply: (move, steps, orientation) => {
-            steps[0] = new Move(/** @type {AxisStr} */ (rotKey[0]), rotKey.includes("'"), rotKey.includes("2"), true);
-            steps[1] = move.clone();
-            steps[1].transpose(rotKey);
-            Move.transposeOrientation(orientation, rotKey);
-            return rotKey;
-        }
-    });
-}
-
-const Z_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("z");
-const Z_PRIME_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("z'");
-const Z2_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("z2");
-
-const X_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("x");
-const X_PRIME_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("x'");
-const X2_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("x2");
-
-const Y_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("y");
-const Y_PRIME_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("y'");
-const Y2_INJECT_DESCRIPTOR = makeRotationInjectDescriptor("y2");
 
 export class ScrambleOptimizer {
     /**
@@ -196,21 +138,6 @@ export class ScrambleOptimizer {
         const rotFront = candidate.rotation?.front || "";
         const movesStr = candidate.scramble ? candidate.scramble.join(" ") : "";
         return `${candidate.startingGrip || ""}|${rotUp}|${rotFront}|${movesStr}`;
-    }
-
-    /**
-     * Packs a search state into a single number for use as a memo key.
-     * @param {number} logicalIndex 
-     * @param {number} gripIndex 
-     * @param {number} gripCount 
-     * @param {Orientation} orientation 
-     * @returns {number}
-     */
-    static getMemoKey(logicalIndex, gripIndex, gripCount, orientation) {
-        const faces = Object.keys(FACE_INDEXES).length;
-        const up = FACE_INDEXES[orientation.up];
-        const front = FACE_INDEXES[orientation.front];
-        return ((logicalIndex * gripCount + gripIndex) * faces + up) * faces + front;
     }
 
     /**
@@ -244,7 +171,7 @@ export class ScrambleOptimizer {
         this.callback = callback || null;
         /** @type {RunOptions} Active run options for scramble search */
         this.options = { ...defaultRunOptions };
-        /** @type {number} The current number of iterations from bruteforceOptimize */
+        /** @type {number} The current number of iterations from search */
         this.iterations = 0;
         /** @type {Map<number, number> | null} Amount of found scrambles with a specific cost */
         this.distribution = null;
@@ -252,28 +179,29 @@ export class ScrambleOptimizer {
         this.candidates = [];
         /** @type {OrientationResultInfo[] | null} */
         this.rotationInfo = null;
-        /** @type {Map<number, number>} Memoization for all orientations */
-        this.memo = new Map();
-    }
-
-    /**
-     * Builds the full scramble for a finished search: the moves before the search, the moves chosen by it, and the untouched remainder transposed by the search's rotations
-     * @param {SearchContext} ctx 
-     * @param {FacePermutation | null} permutation 
-     * @param {PathNode | null} path 
-     * @returns {Move[]}
-     */
-    static buildScramble(ctx, permutation, path) {
-        const chosen = [];
-        for (let node = path; node; node = node.prev) {
-            chosen.push(node.move.clone());
-        }
-        chosen.reverse();
-
-        const tail = ScrambleOptimizer.copyScramble(ctx.moves.slice(ctx.endIndex));
-        tail.forEach(move => move.transposeWith(permutation));
-
-        return [...ScrambleOptimizer.copyScramble(ctx.moves.slice(0, ctx.startIndex)), ...chosen, ...tail];
+        /** @type {Float64Array} Lowest cost found so far to reach each (logical index, grip, orientation) search state */
+        this.memo = new Float64Array(0);
+        /** @type {MoveVariant[]} */
+        this.variants = [];
+        /** @type {Map<number, number>} Index in variants of each distinct combination of move properties */
+        this.variantIndexes = new Map();
+        /** @type {Int32Array} Variant of the rotation move for each rotation (-1 for rotations that can't be injected) */
+        this.rotationVariants = new Int32Array(ROTATION_COUNT);
+        /** @type {number[]} Rotations the search may inject before a move, in the order they are tried */
+        this.injectedRotations = [];
+        /** @type {Uint8Array} Whether each rotation can be performed from each grip, at grip * ROTATION_COUNT + rotation */
+        this.canRotate = new Uint8Array(0);
+        // Scratch space for the partition search currently running
+        /** @type {Int8Array} Alpha of each move before any rotation of the search is applied */
+        this.baseAlphas = new Int8Array(0);
+        /** @type {Int32Array} Variants of each move as it is, as a wide move, as a prime move, and as both; at move * 4 + kind, -1 when not allowed */
+        this.baseVariants = new Int32Array(0);
+        /** @type {Int32Array} Variant of each move executed so far by the search */
+        this.pathVariants = new Int32Array(0);
+        /** @type {Int8Array} Alpha of each move executed so far by the search */
+        this.pathAlphas = new Int8Array(0);
+        /** @type {Transition[]} Transition of each move executed so far by the search */
+        this.pathTransitions = [];
     }
 
     /**
@@ -303,139 +231,319 @@ export class ScrambleOptimizer {
     }
 
     /**
-     * @param {SearchContext} ctx 
+     * Resets everything the search caches between runs, since it depends on the run options.
+     * @param {number} scrambleLength Number of moves in the scramble being optimized
+     */
+    initSearchTables(scrambleLength) {
+        const gripCount = this.evaluator.allGripKeys.length;
+
+        this.memo = new Float64Array(this.options.memoize ? (scrambleLength + 1) * gripCount * ORIENTATIONS.length : 0).fill(Infinity);
+
+        this.variants = [];
+        this.variantIndexes = new Map();
+        this.rotationVariants.fill(-1);
+        for (const rotKey of Object.values(INJECTABLE_ROTATIONS).flat()) {
+            this.rotationVariants[ROTATION_INDEXES[rotKey]] = this.getVariantIndex(0, rotKey.includes("'"), rotKey.includes("2"), false, true, false);
+        }
+
+        this.injectedRotations = [];
+        if (this.options.injectZRotations) this.injectedRotations.push(...INJECTABLE_ROTATIONS.z.map(rotKey => ROTATION_INDEXES[rotKey]));
+        if (this.options.injectXRotations) this.injectedRotations.push(...INJECTABLE_ROTATIONS.x.map(rotKey => ROTATION_INDEXES[rotKey]));
+        if (this.options.injectYRotations) this.injectedRotations.push(...INJECTABLE_ROTATIONS.y.map(rotKey => ROTATION_INDEXES[rotKey]));
+
+        this.canRotate = new Uint8Array(gripCount * ROTATION_COUNT);
+        for (let grip = 0; grip < gripCount; grip++) {
+            for (let rot = 0; rot < ROTATION_COUNT; rot++) {
+                this.canRotate[grip * ROTATION_COUNT + rot] = Number(this.evaluator.getTransition(this.evaluator.allGripKeys[grip], ROTATION_KEYS[rot]) !== null);
+            }
+        }
+    }
+
+    /**
+     * @param {number} sliceNum
+     * @param {boolean} isPrime
+     * @param {boolean} isDouble
+     * @param {boolean} isInvertedSlice
+     * @param {boolean} isRotation
+     * @param {boolean} isMiddle
+     * @returns {number} Index in this.variants of the variant with these properties
+     */
+    getVariantIndex(sliceNum, isPrime, isDouble, isInvertedSlice, isRotation, isMiddle) {
+        const key = ((((sliceNum * 2 + Number(isPrime)) * 2 + Number(isDouble)) * 2 + Number(isInvertedSlice)) * 2 + Number(isRotation)) * 2 + Number(isMiddle);
+        let index = this.variantIndexes.get(key);
+        if (index === undefined) {
+            index = this.variants.length;
+            this.variants.push({
+                sliceNum, isPrime, isDouble, isInvertedSlice, isRotation, isMiddle,
+                options: new Array(ALPHA_COUNT * this.evaluator.allGripKeys.length).fill(undefined)
+            });
+            this.variantIndexes.set(key, index);
+        }
+        return index;
+    }
+
+    /**
+     * Gets the ways to execute a move from a grip: directly, and/or after a regrip.
+     * @param {number} variantIndex
+     * @param {number} alphaIndex
+     * @param {number} gripIndex
+     * @returns {StepOption[]}
+     */
+    getStepOptions(variantIndex, alphaIndex, gripIndex) {
+        const variant = this.variants[variantIndex];
+        const slot = alphaIndex * this.evaluator.allGripKeys.length + gripIndex;
+        const cached = variant.options[slot];
+        if (cached) return cached;
+
+        const moved = new Move(ALPHAS[alphaIndex], variant.isPrime, variant.isDouble, variant.isRotation, variant.isInvertedSlice, variant.isMiddle, variant.sliceNum);
+        const grip = this.evaluator.allGripKeys[gripIndex];
+        /** @type {ExecutionStep[]} */
+        const steps = [];
+
+        const direct = this.evaluator.getDirectStep(grip, moved, this.options.cubeSize);
+        if (direct) {
+            steps.push(direct);
+        }
+        if (!direct || this.options.searchRegrips) {
+            steps.push(...this.evaluator.getRegripOptions(grip, moved, this.options.cubeSize, this.options.maxRegripBranches ?? 2));
+        }
+
+        const options = steps.map(step => ({ transition: step.transition, nextGrip: this.evaluator.getGripIndex(step.nextGrip), cost: step.cost }));
+        variant.options[slot] = options;
+        return options;
+    }
+
+    /**
+     * Describes the moves a partition search will consider replacing, so the search itself only handles integers.
+     * @param {Move[]} moves The scramble being searched
+     * @param {number} startIndex
+     * @param {number} endIndex
+     */
+    prepareSearch(moves, startIndex, endIndex) {
+        if (this.baseAlphas.length < moves.length) {
+            this.baseAlphas = new Int8Array(moves.length);
+            this.baseVariants = new Int32Array(moves.length * 4);
+        }
+        const maxPathLength = (endIndex - startIndex) * 2;
+        if (this.pathVariants.length < maxPathLength) {
+            this.pathVariants = new Int32Array(maxPathLength);
+            this.pathAlphas = new Int8Array(maxPathLength);
+        }
+
+        for (let i = startIndex; i < endIndex; i++) {
+            const move = moves[i];
+            const alpha = ALPHA_INDEXES[move.alpha];
+            if (alpha === undefined || alpha >= FACE_COUNT) {
+                throw new Error(`Search expects scramble of face moves, got ${move}`);
+            }
+            this.baseAlphas[i] = alpha;
+
+            const { sliceNum, isPrime, isDouble, isInvertedSlice, isRotation, isMiddle } = move;
+            const canWide = this.canWideReplace(move);
+            this.baseVariants[i * 4] = this.getVariantIndex(sliceNum, isPrime, isDouble, isInvertedSlice, isRotation, isMiddle);
+            this.baseVariants[i * 4 + 1] = canWide ? this.getVariantIndex(sliceNum, isPrime, isDouble, true, isRotation, isMiddle) : -1;
+            this.baseVariants[i * 4 + 2] = isDouble ? this.getVariantIndex(sliceNum, !isPrime, isDouble, isInvertedSlice, isRotation, isMiddle) : -1;
+            this.baseVariants[i * 4 + 3] = isDouble && canWide ? this.getVariantIndex(sliceNum, !isPrime, isDouble, true, isRotation, isMiddle) : -1;
+        }
+    }
+
+    /**
+     * Builds the full scramble for a finished search: the moves before the search, the moves chosen by it, and the untouched remainder transposed by the search's rotations
+     * @param {SearchContext} ctx
+     * @param {number} permutationIndex
+     * @param {number} pathLength
+     * @returns {Move[]}
+     */
+    buildScramble(ctx, permutationIndex, pathLength) {
+        const chosen = [];
+        for (let i = 0; i < pathLength; i++) {
+            const { sliceNum, isPrime, isDouble, isInvertedSlice, isRotation, isMiddle } = this.variants[this.pathVariants[i]];
+            const move = new Move(ALPHAS[this.pathAlphas[i]], isPrime, isDouble, isRotation, isInvertedSlice, isMiddle, sliceNum);
+            move.transition = this.pathTransitions[i];
+            chosen.push(move);
+        }
+
+        const tail = ScrambleOptimizer.copyScramble(ctx.moves.slice(ctx.endIndex));
+        tail.forEach(move => move.transposeWith(PERMUTATIONS[permutationIndex]));
+
+        return [...ScrambleOptimizer.copyScramble(ctx.moves.slice(0, ctx.startIndex)), ...chosen, ...tail];
+    }
+
+    /**
+     * Depth first search over the ways to execute the moves of a partition, pruning branches that can't beat the best found.
+     * Cube rotations are tracked as indexes into the tables in rotations.js; the moves chosen so far are in the path arrays.
+     * @param {SearchContext} ctx
      * @param {number} index Index in ctx.moves of the next move to execute
      * @param {number} logicalIndex Logical index in original scramble
-     * @param {GripState} currentGrip 
-     * @param {number} currentCost 
-     * @param {Orientation} orientation 
-     * @param {FacePermutation | null} permutation Net rotation applied so far to the moves from `index` onward
-     * @param {PathNode | null} path Moves executed so far since the search began
+     * @param {number} gripIndex Current grip
+     * @param {number} cost Cost so far
+     * @param {number} orientationIndex Current orientation of the cube
+     * @param {number} permutationIndex Net rotation applied so far to the moves from `index` onward
+     * @param {number} pathLength Number of moves executed so far since the search began
      */
-    bruteforceOptimize(ctx, index, logicalIndex, currentGrip, currentCost, orientation, permutation = null, path = null) {
-        if (this.iterations >= this.options.maxIterations) {
+    search(ctx, index, logicalIndex, gripIndex, cost, orientationIndex, permutationIndex, pathLength) {
+        const options = this.options;
+        if (this.iterations >= options.maxIterations) {
             return;
         }
         const bestCost = this.candidates[0]?.cost ?? Infinity;
-        if (this.options.pruneRotations && currentCost > bestCost + this.options.depth) {
+        if (options.pruneRotations && cost > bestCost + options.depth) {
             return;
         }
-        if (currentCost > ctx.minCost + this.options.depth) {
+        if (cost > ctx.minCost + options.depth) {
             return;
         }
         if (index >= ctx.endIndex) {
-            if (ctx.minResults.length === 0 || currentCost <= ctx.minResults[0].cost) {
-                /** @type {ScrambleCandidate} */
-                const candidateItem = {
-                    scramble: ScrambleOptimizer.buildScramble(ctx, permutation, path),
-                    cost: currentCost,
-                    rotation: { up: null, front: null },
-                    startingGrip: ctx.startGrip,
-                    finalOrientation: { ...orientation },
-                    partitionBoundaries: [],
-                    finalGrip: currentGrip,
-                    logicalIndex: logicalIndex
-                };
-                ScrambleOptimizer.addCandidate(ctx.minResults, candidateItem, this.options.maxCapacity);
-                ctx.minCost = ctx.minResults[0].cost;
-            }
-            this.recordCost(currentCost);
+            this.finishSearch(ctx, logicalIndex, gripIndex, cost, orientationIndex, permutationIndex, pathLength);
             return;
         }
-        if (this.options.memoize) {
-            const key = ScrambleOptimizer.getMemoKey(logicalIndex, this.evaluator.getGripIndex(currentGrip), this.evaluator.allGripKeys.length, orientation);
-            if ((this.memo.get(key) ?? Infinity) + this.options.depth <= currentCost)
+        if (options.memoize) {
+            const key = (logicalIndex * this.evaluator.allGripKeys.length + gripIndex) * ORIENTATIONS.length + orientationIndex;
+            if (this.memo[key] + options.depth <= cost) {
                 return;
-            this.memo.set(key, currentCost);
+            }
+            this.memo[key] = cost;
         }
 
         this.iterations++;
-        const move = ctx.moves[index].clone();
-        move.transposeWith(permutation);
-
-        /**
-         * Create a new branch by replacing the current move using a TransformDescriptor
-         * @param {TransformDescriptor} descriptor
-         */
-        const branchWith = (descriptor) => {
-            /** @type {Move[]} */
-            const steps = new Array(descriptor.physicalCount);
-            const newOrientation = { ...orientation };
-            const rotKey = descriptor.apply(move, steps, newOrientation);
-            const newPermutation = rotKey ? Move.composeTransposition(permutation, rotKey) : permutation;
-
-            /**
-             * Recursively evaluates the direct move execution and candidate regrips for each step of this branch.
-             * @param {number} stepIdx Current index in steps
-             * @param {GripState} cGrip Current grip state
-             * @param {number} cCost Cumulative cost
-             * @param {PathNode | null} cPath Moves executed so far
-             */
-            const evaluateSequenceBranch = (stepIdx, cGrip, cCost, cPath) => {
-                if (stepIdx >= steps.length) {
-                    this.bruteforceOptimize(ctx, index + 1, logicalIndex + 1, cGrip, cCost, newOrientation, newPermutation, cPath);
-                    return;
-                }
-                const step = steps[stepIdx];
-
-                const direct = this.evaluator.getDirectStep(cGrip, step, this.options.cubeSize);
-                if (direct) {
-                    step.transition = direct.transition;
-                    evaluateSequenceBranch(stepIdx + 1, direct.nextGrip, cCost + direct.cost, { move: step, prev: cPath });
-                }
-
-                if (!direct || this.options.searchRegrips) {
-                    const regripOptions = this.evaluator.getRegripOptions(cGrip, step, this.options.cubeSize, this.options.maxRegripBranches ?? 2);
-                    for (let i = 0; i < regripOptions.length; i++) {
-                        const opt = regripOptions[i];
-                        step.transition = opt.transition;
-                        evaluateSequenceBranch(stepIdx + 1, opt.nextGrip, cCost + opt.cost, { move: step, prev: cPath });
-                    }
-                }
-            };
-
-            evaluateSequenceBranch(0, currentGrip, currentCost, path);
-        };
+        const alpha = PERMUTATION_FACE[permutationIndex * FACE_COUNT + this.baseAlphas[index]];
+        const variants = this.baseVariants;
 
         // Normal branch
-        branchWith(IDENTITY_DESCRIPTOR);
+        this.branch(ctx, index, logicalIndex, gripIndex, cost, orientationIndex, permutationIndex, pathLength, variants[index * 4], alpha, -1);
 
-        // Injected Z rotations (when injectZRotations option is enabled)
-        if (this.options.injectZRotations) {
-            if (this.evaluator.getTransition(currentGrip, "z")) branchWith(Z_INJECT_DESCRIPTOR);
-            if (this.evaluator.getTransition(currentGrip, "z'")) branchWith(Z_PRIME_INJECT_DESCRIPTOR);
-            if (this.evaluator.getTransition(currentGrip, "z2")) branchWith(Z2_INJECT_DESCRIPTOR);
-        }
-
-        // Injected X rotations (when injectXRotations option is enabled)
-        if (this.options.injectXRotations) {
-            if (this.evaluator.getTransition(currentGrip, "x")) branchWith(X_INJECT_DESCRIPTOR);
-            if (this.evaluator.getTransition(currentGrip, "x'")) branchWith(X_PRIME_INJECT_DESCRIPTOR);
-            if (this.evaluator.getTransition(currentGrip, "x2")) branchWith(X2_INJECT_DESCRIPTOR);
-        }
-
-        // Injected Y rotations (when injectYRotations option is enabled)
-        if (this.options.injectYRotations) {
-            if (this.evaluator.getTransition(currentGrip, "y")) branchWith(Y_INJECT_DESCRIPTOR);
-            if (this.evaluator.getTransition(currentGrip, "y'")) branchWith(Y_PRIME_INJECT_DESCRIPTOR);
-            if (this.evaluator.getTransition(currentGrip, "y2")) branchWith(Y2_INJECT_DESCRIPTOR);
-        }
-
-        const canWideReplace = this.canWideReplace(move);
-
-        // wide variation (single-layer wide)
-        if (canWideReplace)
-            branchWith(WIDE_DESCRIPTOR);
-
-        // prime variation for double (toggle R2 <-> R2')
-        if(move.isDouble) { 
-            branchWith(PRIME_DESCRIPTOR);
-
-            // Combinations (prime + wide, prime + wideReplaceDouble, etc.)
-            if (canWideReplace) {
-                branchWith(PRIME_WIDE_DESCRIPTOR);
+        // Injected rotations (when the option for their axis is enabled)
+        for (let i = 0; i < this.injectedRotations.length; i++) {
+            const rotation = this.injectedRotations[i];
+            if (this.canRotate[gripIndex * ROTATION_COUNT + rotation]) {
+                this.branchWithInjectedRotation(ctx, index, logicalIndex, gripIndex, cost, orientationIndex, permutationIndex, pathLength, rotation);
             }
         }
+
+        // wide variation (single-layer wide)
+        const wideVariant = variants[index * 4 + 1];
+        if (wideVariant >= 0) {
+            this.branchWide(ctx, index, logicalIndex, gripIndex, cost, orientationIndex, permutationIndex, pathLength, wideVariant, alpha);
+        }
+
+        // prime variation for double (toggle R2 <-> R2')
+        const primeVariant = variants[index * 4 + 2];
+        if (primeVariant >= 0) {
+            this.branch(ctx, index, logicalIndex, gripIndex, cost, orientationIndex, permutationIndex, pathLength, primeVariant, alpha, -1);
+
+            // Combinations (prime + wide, prime + wideReplaceDouble, etc.)
+            const primeWideVariant = variants[index * 4 + 3];
+            if (primeWideVariant >= 0) {
+                this.branchWide(ctx, index, logicalIndex, gripIndex, cost, orientationIndex, permutationIndex, pathLength, primeWideVariant, alpha);
+            }
+        }
+    }
+
+    /**
+     * Continues the search from a wide version of the current move, which also rotates the cube.
+     * @param {SearchContext} ctx
+     * @param {number} index
+     * @param {number} logicalIndex
+     * @param {number} gripIndex
+     * @param {number} cost
+     * @param {number} orientationIndex
+     * @param {number} permutationIndex
+     * @param {number} pathLength
+     * @param {number} variantIndex The wide variant of the current move
+     * @param {number} alpha Alpha of the current move before it is made wide
+     */
+    branchWide(ctx, index, logicalIndex, gripIndex, cost, orientationIndex, permutationIndex, pathLength, variantIndex, alpha) {
+        const wideAlpha = WIDE_OPPOSITE[alpha];
+        const { isPrime, isDouble } = this.variants[variantIndex];
+        const rotation = getWideRotation(wideAlpha, isPrime, isDouble);
+        this.branch(ctx, index, logicalIndex, gripIndex, cost, orientationIndex, permutationIndex, pathLength, variantIndex, wideAlpha, rotation);
+    }
+
+    /**
+     * Continues the search from executing the current move as a given variant, then rotating the cube.
+     * @param {SearchContext} ctx
+     * @param {number} index
+     * @param {number} logicalIndex
+     * @param {number} gripIndex
+     * @param {number} cost
+     * @param {number} orientationIndex
+     * @param {number} permutationIndex
+     * @param {number} pathLength
+     * @param {number} variantIndex The variant of the move to execute
+     * @param {number} alpha Alpha of the move to execute
+     * @param {number} rotation Rotation the move applies to the cube afterward, or -1 for none
+     */
+    branch(ctx, index, logicalIndex, gripIndex, cost, orientationIndex, permutationIndex, pathLength, variantIndex, alpha, rotation) {
+        const newOrientation = rotation < 0 ? orientationIndex : ORIENTATION_AFTER[orientationIndex * ROTATION_COUNT + rotation];
+        const newPermutation = rotation < 0 ? permutationIndex : PERMUTATION_AFTER[permutationIndex * ROTATION_COUNT + rotation];
+
+        const stepOptions = this.getStepOptions(variantIndex, alpha, gripIndex);
+        for (let i = 0; i < stepOptions.length; i++) {
+            const option = stepOptions[i];
+            this.pathVariants[pathLength] = variantIndex;
+            this.pathAlphas[pathLength] = alpha;
+            this.pathTransitions[pathLength] = option.transition;
+            this.search(ctx, index + 1, logicalIndex + 1, option.nextGrip, cost + option.cost, newOrientation, newPermutation, pathLength + 1);
+        }
+    }
+
+    /**
+     * Continues the search from performing a rotation before the current move, which is then executed in the new orientation.
+     * @param {SearchContext} ctx
+     * @param {number} index
+     * @param {number} logicalIndex
+     * @param {number} gripIndex
+     * @param {number} cost
+     * @param {number} orientationIndex
+     * @param {number} permutationIndex
+     * @param {number} pathLength
+     * @param {number} rotation The rotation to inject
+     */
+    branchWithInjectedRotation(ctx, index, logicalIndex, gripIndex, cost, orientationIndex, permutationIndex, pathLength, rotation) {
+        const newOrientation = ORIENTATION_AFTER[orientationIndex * ROTATION_COUNT + rotation];
+        const newPermutation = PERMUTATION_AFTER[permutationIndex * ROTATION_COUNT + rotation];
+        const rotationVariant = this.rotationVariants[rotation];
+        const rotationAlpha = ALPHA_INDEXES[ROTATION_KEYS[rotation][0]];
+        const moveVariant = this.baseVariants[index * 4];
+        const rotatedAlpha = PERMUTATION_FACE[newPermutation * FACE_COUNT + this.baseAlphas[index]];
+
+        const rotationOptions = this.getStepOptions(rotationVariant, rotationAlpha, gripIndex);
+        for (let i = 0; i < rotationOptions.length; i++) {
+            const rotationOption = rotationOptions[i];
+            this.pathVariants[pathLength] = rotationVariant;
+            this.pathAlphas[pathLength] = rotationAlpha;
+            this.pathTransitions[pathLength] = rotationOption.transition;
+            this.branch(ctx, index, logicalIndex, rotationOption.nextGrip, cost + rotationOption.cost, newOrientation, newPermutation, pathLength + 1, moveVariant, rotatedAlpha, -1);
+        }
+    }
+
+    /**
+     * Records a completed partition search if it ties or beats the best found.
+     * @param {SearchContext} ctx
+     * @param {number} logicalIndex
+     * @param {number} gripIndex
+     * @param {number} cost
+     * @param {number} orientationIndex
+     * @param {number} permutationIndex
+     * @param {number} pathLength
+     */
+    finishSearch(ctx, logicalIndex, gripIndex, cost, orientationIndex, permutationIndex, pathLength) {
+        if (ctx.minResults.length === 0 || cost <= ctx.minResults[0].cost) {
+            /** @type {ScrambleCandidate} */
+            const candidateItem = {
+                scramble: this.buildScramble(ctx, permutationIndex, pathLength),
+                cost,
+                rotation: { up: null, front: null },
+                startingGrip: ctx.startGrip,
+                finalOrientation: { ...ORIENTATIONS[orientationIndex] },
+                partitionBoundaries: [],
+                finalGrip: this.evaluator.allGripKeys[gripIndex],
+                logicalIndex
+            };
+            ScrambleOptimizer.addCandidate(ctx.minResults, candidateItem, this.options.maxCapacity);
+            ctx.minCost = ctx.minResults[0].cost;
+        }
+        this.recordCost(cost);
     }
 
     /**
@@ -499,7 +607,8 @@ export class ScrambleOptimizer {
                     minResults: []
                 };
 
-                this.bruteforceOptimize(ctx, physicalStartIndex, candLogicalStart, currentGrip, cand.cost, cand.finalOrientation);
+                this.prepareSearch(cand.scramble, physicalStartIndex, physicalEndIndex);
+                this.search(ctx, physicalStartIndex, candLogicalStart, this.evaluator.getGripIndex(currentGrip), cand.cost, getOrientationIndex(cand.finalOrientation), 0, 0);
 
                 if (!ctx.minResults || ctx.minResults.length === 0) {
                     continue;
@@ -543,7 +652,7 @@ export class ScrambleOptimizer {
     }
 
     /**
-     * Calls bruteforceOptimize for all orientations of the cube to find the best one
+     * Runs the partition search for all orientations of the cube to find the best one
      * @param {ParseResult} parseResult The input parse result
      * @param {Partial<RunOptions>} [options] Options for execution
      */
@@ -562,8 +671,8 @@ export class ScrambleOptimizer {
         this.candidates = [];
         this.distribution = new Map();
         this.rotationInfo = [];
-        this.memo = new Map();
         this.iterations = 0;
+        this.initSearchTables(preprocessedScramble.length);
 
         const candidateGrips = this.evaluator.allGripKeys;
         const partitionLength = Math.max(0, this.options.partitionLength || 0);
