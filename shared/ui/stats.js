@@ -161,6 +161,9 @@ function drawDistributionChart(distribution) {
     chartContainer.appendChild(wrapper);
 }
 
+/** Text color for cells drawn over a cost color, which stays light regardless of theme */
+const costCellTextColor = "#0f172a";
+
 /**
  * Get a color between red and green based on value
  * @param {number} cost 
@@ -207,6 +210,7 @@ export function renderBreakdownTable(tbody, breakdownEntries, costToStyleFn) {
             const styleRes = costToStyleFn(entry.addedCost);
             if (styleRes.startsWith("hsl") || styleRes.startsWith("#") || styleRes.startsWith("rgb")) {
                 tdCost.style.background = styleRes;
+                tdCost.style.color = costCellTextColor;
                 tdCost.style.textAlign = "right";
             } else if (styleRes) {
                 tdCost.style.cssText = styleRes;
@@ -280,11 +284,13 @@ function drawOrientationInfoTable(info) {
         const tdIterations = document.createElement("td");
         if (row.maxed) {
             tdIterations.style.background = "#ff0000";
+            tdIterations.style.color = costCellTextColor;
         }
         tdIterations.textContent = String(row.iterations);
 
         const tdCost = document.createElement("td");
         tdCost.style.background = costToColor(row.cost, 80, -20);
+        tdCost.style.color = costCellTextColor;
         tdCost.style.textAlign = "right";
         tdCost.textContent = String(row.cost);
 
