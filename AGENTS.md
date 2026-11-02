@@ -24,7 +24,7 @@ scramblemanip-js/
 ├── scratch/                 # Test script folder for agents. Excluded from git.
 ├── shared/
 │   ├── defaults.js          # Default configurations: `defaultColorScheme`, `defaultFormatOptions`, `defaultSearchOptions`, `defaultScrambleOptions`, `defaultRunOptions`, `defaultCostConfiguration`, `defaultFingertricks`, `strategyPresets`
-│   ├── profiles.js          # Profile type, built-in Default profile, storage helpers for saved profiles / active profile name, and imported profile parsing
+│   ├── profiles.js          # Profile type, built-in Default profile, saved profiles stored as a base name plus overrides (changes from the base), resolving/diffing them, storage helpers for saved profiles / active profile name, and imported profile parsing
 │   ├── storage.js           # Cross-environment storage helper (chrome.storage.local with localStorage fallback) and the SETTINGS_CHANGED tab notification
 │   ├── cube/
 │   │   ├── evaluator.js     # ExecutionEvaluator class: 5-state thumb/wrist model, pre-computed transitionCache, transition cost evaluation, candidate regrip search
@@ -35,7 +35,7 @@ scramblemanip-js/
 │   │   └── util.js          # Cube utility functions: normalizeScramble, getFinalOrientation, getOrientationColors, getRestoringRotation, detectCubeSize
 │   ├── ui/
 │   │   ├── dom.js           # Type-safe DOM element getters & query helpers (getElement, getOptionalElement, queryElement, queryElementOptional, queryElements)
-│   │   ├── form.js          # Form handler: input parsing, cost config tab setup, profile list (cards from a <template>, delegated actions: activate/reset/rename/clone/export/delete/import), autosave to the active profile
+│   │   ├── form.js          # Form handler: input parsing, cost config tab setup, profile list, highlights settings the active profile overrides, autosave to the active profile
 │   │   └── stats.js         # Optimization stats: CSS bar chart, breakdown table renderer, orientation matrix, cost color mapping
 └── extension/
     ├── background.js        # Service worker: handles async OPTIMIZE_SCRAMBLE & OPEN_OPTIONS_PAGE messages

@@ -7,6 +7,7 @@
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
   --input-bg: #ffffff;
+  --override: rgba(245, 158, 11, 0.55);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -763,10 +764,31 @@ summary {
   cursor: not-allowed;
 }
 
+.profile-card-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .profile-name {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
+}
+
+.profile-base {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.profile-base:empty {
+  display: none;
+}
+
+/* A setting the active profile changes from its base */
+:is(input, select, button).overridden {
+  outline: 2px solid var(--override);
+  outline-offset: 1px;
 }
 
 .hidden {
@@ -927,6 +949,11 @@ summary {
 .icon-rename {
   -webkit-mask-image: url("./assets/rename.svg");
   mask-image: url("./assets/rename.svg");
+}
+
+.icon-branch {
+  -webkit-mask-image: url("./assets/branch.svg");
+  mask-image: url("./assets/branch.svg");
 }
 
 .icon-copy {

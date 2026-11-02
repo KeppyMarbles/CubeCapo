@@ -111,7 +111,7 @@
                 <div class="strategy-container">
                   <div class="strategy-group">
                     <h3>Profiles</h3>
-                    <p class="profile-desc">Select a profile to use its compute settings, costs, colors and move executions. Default can't be edited, so clone it to make your own.</p>
+                    <p class="profile-desc">Select a profile to use its compute settings, costs, colors and move executions. </p>
                     <div id="profileList" class="profile-list"></div>
                     <div class="profile-actions">
                       <button type="button" id="importButton" class="btn-profile">Import</button>
@@ -137,16 +137,16 @@
                     <h3>Move Transformations</h3>
                     <div class="strategy-fields">
                       <label title="If single moves can be replaced with wide moves (e.g. R -> r)">Wide Replace
-                        <input type="checkbox" id="wideReplace" checked/>
+                        <input type="checkbox" id="wideReplace" data-path="searchOptions.wideReplace" checked/>
                       </label>
                       <label title="Try injecting X rotations mid-scramble">Inject X Rotations
-                        <input type="checkbox" id="injectXRotations"/>
+                        <input type="checkbox" id="injectXRotations" data-path="searchOptions.injectXRotations"/>
                       </label>
                       <label title="Try injecting Y rotations mid-scramble">Inject Y Rotations
-                        <input type="checkbox" id="injectYRotations"/>
+                        <input type="checkbox" id="injectYRotations" data-path="searchOptions.injectYRotations"/>
                       </label>
                       <label title="Try injecting Z rotations mid-scramble">Inject Z Rotations
-                        <input type="checkbox" id="injectZRotations"/>
+                        <input type="checkbox" id="injectZRotations" data-path="searchOptions.injectZRotations"/>
                       </label>
                     </div>
                   </div>
@@ -155,16 +155,16 @@
                     <h3>Search Exploration</h3>
                     <div class="strategy-fields">
                       <label title="If the search should explore all starting cube orientations">Search Starting Orientations
-                        <input type="checkbox" id="searchStartingOrientations"/>
+                        <input type="checkbox" id="searchStartingOrientations" data-path="searchOptions.searchStartingOrientations"/>
                       </label>
                       <label title="If an orientation search should stop early if worse than the best orientation">Prune Starting Orientations
-                        <input type="checkbox" id="pruneStartingOrientations"/>
+                        <input type="checkbox" id="pruneStartingOrientations" data-path="searchOptions.pruneStartingOrientations"/>
                       </label>
                       <label title="Always explore regrip candidates even when a direct transition exists">Search Regrips
-                        <input type="checkbox" id="searchRegrips"/>
+                        <input type="checkbox" id="searchRegrips" data-path="searchOptions.searchRegrips"/>
                       </label>
                       <label title="Maximum number of candidate regrips to explore when a regrip is required">Max Regrip Branches
-                        <input type="number" id="maxRegripBranches" min="1" max="25" value="2"/>
+                        <input type="number" id="maxRegripBranches" data-path="searchOptions.maxRegripBranches" min="1" max="25" value="2"/>
                       </label>
                     </div>
                   </div>
@@ -173,16 +173,16 @@
                     <h3>Engine & Limits</h3>
                     <div class="strategy-fields">
                       <label title="Number of iterations to try on each orientation before bailing out">Max Iterations
-                        <input type="number" id="iterations"/>
+                        <input type="number" id="iterations" data-path="searchOptions.maxIterations"/>
                       </label>
                       <label title="The most the current cost can be above the best cost before pruning the branch. Increase this if you have negative cost values">Pruning Threshold
-                        <input type="number" id="depth"/>
+                        <input type="number" id="depth" data-path="searchOptions.depth"/>
                       </label>
                       <label title="Maximum move count per sub-scramble partition to optimize long scrambles (0 to disable)">Partition Length
-                        <input type="number" id="partitionLength" min="0" value="0"/>
+                        <input type="number" id="partitionLength" data-path="searchOptions.partitionLength" min="0" value="0"/>
                       </label>
                       <label title="If reaching an already visited state [current grip & scramble index & cube orientation] should prune the current branch">Memoize
-                        <input type="checkbox" id="memoize"/>
+                        <input type="checkbox" id="memoize" data-path="searchOptions.memoize"/>
                       </label>
                     </div>
                   </div>
@@ -210,16 +210,16 @@
                     <h3>Scramble</h3>
                     <div class="strategy-fields">
                       <label title="Show starting thumb placement and mid-scramble regrip transitions in the output scramble string">Show Grips
-                        <input type="checkbox" id="showGrips"/>
+                        <input type="checkbox" id="showGrips" data-path="formatOptions.showGrips"/>
                       </label>
                       <label title="Display starting cube orientation as colors (e.g. White top, Green front)">Show Orientation Colors
-                        <input type="checkbox" id="showOrientationColors"/>
+                        <input type="checkbox" id="showOrientationColors" data-path="formatOptions.showOrientationColors"/>
                       </label>
                       <label title="Convert wide moves to wedge count notation (e.g. Rw instead of r)">Wedge Notation
-                        <input type="checkbox" id="wedgeNotation"/>
+                        <input type="checkbox" id="wedgeNotation" data-path="formatOptions.wedgeNotation"/>
                       </label>
                       <label title="Append rotations at the end of the scramble to restore original cube orientation">Reorient
-                        <input type="checkbox" id="reorient"/>
+                        <input type="checkbox" id="reorient" data-path="formatOptions.reorient"/>
                       </label>
                     </div>
                   </div>
@@ -228,22 +228,22 @@
                     <h3>Orientation Colors</h3>
                     <div class="strategy-fields">
                       <label>Up
-                        <input type="text" id="colorSchemeU" data-face="U" value="White" placeholder="e.g. White"/>
+                        <input type="text" id="colorSchemeU" data-path="formatOptions.colorScheme.U" data-face="U" value="White" placeholder="e.g. White"/>
                       </label>
                       <label>Down
-                        <input type="text" id="colorSchemeD" data-face="D" value="Yellow" placeholder="e.g. Yellow"/>
+                        <input type="text" id="colorSchemeD" data-path="formatOptions.colorScheme.D" data-face="D" value="Yellow" placeholder="e.g. Yellow"/>
                       </label>
                       <label>Front
-                        <input type="text" id="colorSchemeF" data-face="F" value="Green" placeholder="e.g. Green"/>
+                        <input type="text" id="colorSchemeF" data-path="formatOptions.colorScheme.F" data-face="F" value="Green" placeholder="e.g. Green"/>
                       </label>
                       <label>Back
-                        <input type="text" id="colorSchemeB" data-face="B" value="Blue" placeholder="e.g. Blue"/>
+                        <input type="text" id="colorSchemeB" data-path="formatOptions.colorScheme.B" data-face="B" value="Blue" placeholder="e.g. Blue"/>
                       </label>
                       <label>Right
-                        <input type="text" id="colorSchemeR" data-face="R" value="Red" placeholder="e.g. Red"/>
+                        <input type="text" id="colorSchemeR" data-path="formatOptions.colorScheme.R" data-face="R" value="Red" placeholder="e.g. Red"/>
                       </label>
                       <label>Left
-                        <input type="text" id="colorSchemeL" data-face="L" value="Orange" placeholder="e.g. Orange"/>
+                        <input type="text" id="colorSchemeL" data-path="formatOptions.colorScheme.L" data-face="L" value="Orange" placeholder="e.g. Orange"/>
                       </label>
                     </div>
                   </div>
@@ -267,11 +267,15 @@
 
   <template id="profileCardTemplate">
     <div class="profile-card">
-      <span class="profile-name"></span>
+      <div class="profile-card-text">
+        <span class="profile-name"></span>
+        <span class="profile-base"></span>
+      </div>
       <div class="profile-icon-buttons">
         <button type="button" class="btn-profile-icon" data-action="reset" title="Undo changes made since the page was opened" aria-label="Undo changes made since the page was opened"><span class="icon-svg icon-reset"></span></button>
         <button type="button" class="btn-profile-icon" data-action="rename" title="Rename" aria-label="Rename"><span class="icon-svg icon-rename"></span></button>
-        <button type="button" class="btn-profile-icon" data-action="clone" title="Clone" aria-label="Clone"><span class="icon-svg icon-copy"></span></button>
+        <button type="button" class="btn-profile-icon" data-action="branch" title="Branch: make a new profile that keeps following this one, with only your changes on top" aria-label="Branch"><span class="icon-svg icon-branch"></span></button>
+        <button type="button" class="btn-profile-icon" data-action="duplicate" title="Duplicate: copy this profile and its changes, with the same base" aria-label="Duplicate"><span class="icon-svg icon-copy"></span></button>
         <button type="button" class="btn-profile-icon" data-action="export" title="Export" aria-label="Export"><span class="icon-svg icon-export"></span></button>
         <button type="button" class="btn-profile-icon btn-danger" data-action="delete" title="Delete" aria-label="Delete"><span class="icon-svg icon-delete"></span></button>
       </div>

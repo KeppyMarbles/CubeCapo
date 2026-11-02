@@ -5,7 +5,7 @@ import { Move } from "../cube/move.js";
 import { THUMB_POSITIONS, RIGHT_FINGERTRICKS, LEFT_FINGERTRICKS, mirrorRightFingertrick, mirrorLeftFingertrick } from "../cube/evaluator.js";
 import { getElement, queryElement, queryElementOptional, queryElements } from "./dom.js";
 import { getStorageItem, setStorageItem, removeStorageItem, notifySettingsChanged } from "../storage.js";
-import { DEFAULT_PROFILE_NAME, createDefaultProfile, migrateConfig, persistActiveProfile, loadProfiles, saveProfiles, loadActiveProfileName, saveActiveProfileName, uniqueProfileName, parseImportedProfile } from "../profiles.js";
+import { DEFAULT_PROFILE_NAME, CUSTOM_PROFILE_NAME, migrateConfig, persistActiveProfile, loadProfiles, saveProfiles, loadActiveProfileName, saveActiveProfileName, uniqueProfileName, parseImportedProfile, resolveProfile, createBranch, createStoredProfile, removeProfile, isOverridden } from "../profiles.js";
 /** @import { Profile, ProfileMap } from "../profiles.js" */
 /** @import { CostConfig, TransitionConfig, ThumbPosition, RightFingertrick, LeftFingertrick } from "../cube/evaluator.js" */
 /** @import { RunOptions, SearchOptions, ScrambleOptions, FormatOptions } from "../cube/optimizer.js" */
@@ -170,6 +170,7 @@ export async function setupForm(onSubmit, onFormatChange) {
                 if (formTypes[key] === "select") {
                     const select = document.createElement("select");
                     select.name = `${groupName}.${key}`;
+                    select.dataset.path = `costConfig.${groupName}.${key}`;
                     const optRight = document.createElement("option");
                     optRight.value = "right";
                     optRight.textContent = "Right";
@@ -184,6 +185,7 @@ export async function setupForm(onSubmit, onFormatChange) {
                     const input = document.createElement("input");
                     input.type = formTypes[key] || "number";
                     input.name = `${groupName}.${key}`;
+                    input.dataset.path = `costConfig.${groupName}.${key}`;
                     if (input.type === "checkbox") {
                         input.checked = Boolean(val);
                     } else {
@@ -209,7 +211,8 @@ export async function setupForm(onSubmit, onFormatChange) {
     applyScrambleOptionsValues(await loadOptions("scrambleOptions", defaultScrambleOptions));
 
     const transitionsTabEl = getElement("transitions", HTMLElement);
-    renderTransitionsTab(transitionsTabEl, currentTransitions, () => handleSettingsChange(), false);
+    // Replaced whenever the transitions tab is rendered
+    let refreshTransitionHighlights = () => {};
 
     // Attach change detection to computation settings
     const computeInputIds = [
@@ -316,7 +319,7 @@ export async function setupForm(onSubmit, onFormatChange) {
             el.toggleAttribute("disabled", readOnly);
         getElement("readOnlyNotice", HTMLElement).classList.toggle("hidden", !readOnly);
         form.classList.toggle("read-only", readOnly);
-        renderTransitionsTab(transitionsTabEl, currentTransitions, () => handleSettingsChange(), readOnly);
+        refreshTransitionHighlights = renderTransitionsTab(transitionsTabEl, currentTransitions, () => handleSettingsChange(), readOnly, isPathOverridden);
     };
 
     /**
@@ -350,7 +353,17 @@ export async function setupForm(onSubmit, onFormatChange) {
     const activeProfileCard = getElement("activeProfileCard", HTMLElement);
 
     /** @param {string} name */
-    const getProfile = (name) => name === DEFAULT_PROFILE_NAME ? createDefaultProfile() : profiles[name];
+    const getProfile = (name) => resolveProfile(name, profiles);
+
+    // Whether the active profile changes a setting from its base's
+    /** @param {string} path */
+    const isPathOverridden = (path) => activeProfileName !== DEFAULT_PROFILE_NAME && profiles[activeProfileName].base !== null && isOverridden(profiles[activeProfileName].overrides, path);
+
+    const highlightOverrides = () => {
+        for (const el of queryElements(form, "[data-path]", HTMLElement))
+            el.classList.toggle("overridden", el.dataset.path !== undefined && isPathOverridden(el.dataset.path));
+        refreshTransitionHighlights();
+    };
 
     /** @param {Profile} profile */
     const persistActiveSettings = async (profile) => {
@@ -367,6 +380,13 @@ export async function setupForm(onSubmit, onFormatChange) {
         onFormatChange?.();
     };
 
+    // Show the active profile again after something it inherits from changed
+    const syncActiveProfile = async () => {
+        const profile = getProfile(activeProfileName);
+        applyProfile(profile);
+        await persistActiveSettings(profile);
+    };
+
     /** @type {ReturnType<typeof setTimeout> | undefined} */
     let saveTimer;
 
@@ -376,7 +396,7 @@ export async function setupForm(onSubmit, onFormatChange) {
         saveTimer = undefined;
         await saveProfiles(profiles);
         if (activeProfileName !== DEFAULT_PROFILE_NAME)
-            await persistActiveSettings(profiles[activeProfileName]);
+            await persistActiveSettings(getProfile(activeProfileName));
     };
     window.addEventListener("pagehide", flushPendingSave);
 
@@ -388,7 +408,7 @@ export async function setupForm(onSubmit, onFormatChange) {
         // Wait for the user to finish typing rather than saving a half-entered number
         if (hasNaN(profile.costConfig) || hasNaN(profile.searchOptions)) return;
 
-        profiles[activeProfileName] = profile;
+        profiles[activeProfileName] = createStoredProfile(profiles[activeProfileName].base, profile, profiles);
         render();
         clearTimeout(saveTimer);
         saveTimer = setTimeout(flushPendingSave, PROFILE_AUTOSAVE_DELAY_MS);
@@ -411,11 +431,9 @@ export async function setupForm(onSubmit, onFormatChange) {
         reset: async (name) => {
             if (!confirm(`Reset "${name}" to how it was when the page was opened?`)) return;
             profiles[name] = structuredClone(baselines[name]);
-            if (name === activeProfileName) {
-                applyProfile(profiles[name]);
-                await persistActiveSettings(profiles[name]);
-            }
             await saveProfiles(profiles);
+            // The active profile may be this one or inherit from it
+            await syncActiveProfile();
             render();
         },
 
@@ -432,6 +450,10 @@ export async function setupForm(onSubmit, onFormatChange) {
                 const newKey = key === name ? newName : key;
                 renamed[newKey] = profiles[key];
                 renamedBaselines[newKey] = baselines[key];
+                // Profiles based on this one follow the new name
+                for (const stored of [renamed[newKey], renamedBaselines[newKey]]) {
+                    if (stored.base === name) stored.base = newName;
+                }
             }
             profiles = renamed;
             Object.keys(baselines).forEach(key => delete baselines[key]);
@@ -445,21 +467,32 @@ export async function setupForm(onSubmit, onFormatChange) {
             render();
         },
 
-        clone: async (name) => {
-            // "Default copy" reads oddly, since this is how you make your own profile
-            const baseName = name === DEFAULT_PROFILE_NAME ? "Custom" : `${name} copy`;
-            const cloneName = uniqueProfileName(baseName, profiles);
-            profiles[cloneName] = structuredClone(getProfile(name));
-            baselines[cloneName] = structuredClone(profiles[cloneName]);
+        // A new profile that follows this one, changing only what the user edits
+        branch: async (name) => {
+            const branchName = uniqueProfileName(name === DEFAULT_PROFILE_NAME ? CUSTOM_PROFILE_NAME : `${name} branch`, profiles);
+            profiles[branchName] = createBranch(name);
+            baselines[branchName] = structuredClone(profiles[branchName]);
             await saveProfiles(profiles);
-            await activate(cloneName);
+            await activate(branchName);
         },
 
-        export: (name) => exportProfile(name, getProfile(name)),
+        // A new profile with the same base and changes, which doesn't follow this one
+        duplicate: async (name) => {
+            const copyName = uniqueProfileName(`${name} copy`, profiles);
+            profiles[copyName] = name === DEFAULT_PROFILE_NAME ? createStoredProfile(null, getProfile(name), profiles) : structuredClone(profiles[name]);
+            baselines[copyName] = structuredClone(profiles[copyName]);
+            await saveProfiles(profiles);
+            await activate(copyName);
+        },
+
+        export: (name) => exportProfile(name, profiles[name]?.base ?? undefined, getProfile(name)),
 
         delete: async (name) => {
-            if (!confirm(`Delete profile "${name}"? This can't be undone.`)) return;
-            delete profiles[name];
+            const dependants = Object.keys(profiles).filter(key => profiles[key].base === name);
+            const note = dependants.length ? ` Profiles based on it will keep their settings and ${profiles[name].base === null ? "become standalone" : `be based on "${profiles[name].base}" instead`}.` : "";
+            if (!confirm(`Delete profile "${name}"?${note} This can't be undone.`)) return;
+            for (const key of removeProfile(name, profiles))
+                baselines[key] = structuredClone(profiles[key]);
             delete baselines[name];
             await saveProfiles(profiles);
             if (activeProfileName === name) {
@@ -499,6 +532,7 @@ export async function setupForm(onSubmit, onFormatChange) {
             card.dataset.name = name;
             card.classList.toggle("active", name === activeProfileName);
             queryElement(card, ".profile-name", HTMLElement).textContent = name;
+            queryElement(card, ".profile-base", HTMLElement).textContent = isDefault || profiles[name].base === null ? "" : `based on ${profiles[name].base}`;
 
             // The built-in default profile can't be changed
             queryElement(card, '[data-action="reset"]', HTMLButtonElement).disabled = !isModified;
@@ -507,6 +541,7 @@ export async function setupForm(onSubmit, onFormatChange) {
 
             listEl.appendChild(card);
         }
+        highlightOverrides();
     };
 
     const importFile = getElement("importFile", HTMLInputElement);
@@ -518,8 +553,8 @@ export async function setupForm(onSubmit, onFormatChange) {
         try {
             const { name, profile } = parseImportedProfile(JSON.parse(await file.text()), file.name.replace(/\.json$/i, ""));
             const importedName = uniqueProfileName(name, profiles);
-            profiles[importedName] = profile;
-            baselines[importedName] = structuredClone(profile);
+            profiles[importedName] = createStoredProfile(DEFAULT_PROFILE_NAME, profile, profiles);
+            baselines[importedName] = structuredClone(profiles[importedName]);
             await saveProfiles(profiles);
             render();
         }
@@ -703,12 +738,14 @@ function promptProfileName(message, initial, profiles, current) {
 }
 
 /**
- * Save a profile as a JSON file, asking where to put it where the browser supports that
+ * Save a profile as a JSON file, asking where to put it where the browser supports that.
+ * The file has the full settings so it doesn't depend on the base existing wherever it's imported.
  * @param {string} name
+ * @param {string | undefined} base Name of the profile it follows, for information only
  * @param {Profile} profile
  */
-async function exportProfile(name, profile) {
-    const json = JSON.stringify({ name, ...profile }, null, 2);
+async function exportProfile(name, base, profile) {
+    const json = JSON.stringify({ name, base, ...profile }, null, 2);
     const fileName = `CubeCapo-${name}.json`;
 
     if ("showSaveFilePicker" in window) {
@@ -1083,11 +1120,22 @@ const CANONICAL_MOVE_PAIRS = Object.freeze(
  * @param {TransitionConfig} currentTransitions
  * @param {() => void} onTransitionChange
  * @param {boolean} readOnly If the selects and link toggles should be disabled
+ * @param {(path: string) => boolean} isPathOverridden Whether the profile changes a setting from its base's
+ * @returns {() => void} Updates which controls are highlighted as overridden
  */
-function renderTransitionsTab(container, currentTransitions, onTransitionChange, readOnly) {
+function renderTransitionsTab(container, currentTransitions, onTransitionChange, readOnly, isPathOverridden) {
     container.replaceChildren();
 
     let activePosition = /** @type {ThumbPosition} */ ("F");
+
+    /** @type {{ elements: HTMLElement[], path: string }[]} */
+    let highlights = [];
+    const refreshHighlights = () => {
+        for (const { elements, path } of highlights) {
+            const overridden = isPathOverridden(path);
+            for (const el of elements) el.classList.toggle("overridden", overridden);
+        }
+    };
 
     const subtabBar = document.createElement("div");
     subtabBar.className = "subtab-buttons";
@@ -1097,6 +1145,7 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange,
 
     const renderCurrentGrid = () => {
         contentContainer.replaceChildren();
+        highlights = [];
 
         const headerRow = document.createElement("div");
         headerRow.className = "transition-header-row";
@@ -1264,10 +1313,14 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange,
             row.appendChild(rSelect);
             row.appendChild(rLabel);
 
+            highlights.push({ elements: [rSelect], path: `transitionConfig.right.${activePosition}.${rMove}` });
+            highlights.push({ elements: [lSelect, linkBtn], path: `transitionConfig.left.${activePosition}.${lMove}` });
+
             grid.appendChild(row);
         }
 
         contentContainer.appendChild(grid);
+        refreshHighlights();
     };
 
     THUMB_POSITIONS.forEach(pos => {
@@ -1287,6 +1340,7 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange,
     container.appendChild(subtabBar);
     container.appendChild(contentContainer);
     renderCurrentGrid();
+    return refreshHighlights;
 }
 
 /**

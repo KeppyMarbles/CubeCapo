@@ -1,5 +1,5 @@
 import { getElement } from "../shared/ui/dom.js";
-import { DEFAULT_PROFILE_NAME, createDefaultProfile, loadProfiles, loadActiveProfileName, saveActiveProfileName, persistActiveProfile } from "../shared/profiles.js";
+import { DEFAULT_PROFILE_NAME, resolveProfile, loadProfiles, loadActiveProfileName, saveActiveProfileName, persistActiveProfile } from "../shared/profiles.js";
 
 const extAPI = /** @type {any} */ (globalThis).browser || globalThis.chrome;
 
@@ -101,7 +101,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     profileSelect.addEventListener("change", async () => {
         const name = profileSelect.value;
-        await persistActiveProfile(name === DEFAULT_PROFILE_NAME ? createDefaultProfile() : profiles[name]);
+        await persistActiveProfile(resolveProfile(name, profiles));
         await saveActiveProfileName(name);
 
         // Notify the options page / content scripts of the settings change
