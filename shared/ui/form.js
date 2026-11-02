@@ -48,11 +48,21 @@ export async function setupForm(onSubmit, onFormatChange) {
         input.value = text || "";
 
         if (text) {
-            removeStorageItem("pendingScramble");
             setTimeout(() => {
                 getElement("submitButton", HTMLButtonElement).click();
             }, 50);
         }
+    };
+
+    let pendingClaim = Promise.resolve();
+    const consumePendingScramble = () => {
+        pendingClaim = pendingClaim.then(async () => {
+            const pending = String(await getStorageItem("pendingScramble", "") || "");
+            if (!pending) return;
+            await removeStorageItem("pendingScramble");
+            applyScrambleAndSubmit(pending);
+        });
+        return pendingClaim;
     };
 
     // Initial scramble population on setup
@@ -60,21 +70,20 @@ export async function setupForm(onSubmit, onFormatChange) {
     if (urlScramble) {
         applyScrambleAndSubmit(urlScramble);
     } else {
-        const pending = await getStorageItem("pendingScramble", "");
-        applyScrambleAndSubmit(String(pending || ""));
+        await consumePendingScramble();
     }
 
     // Real-time updates for already-open settings tabs
     if (typeof chrome !== "undefined") {
         chrome.storage?.onChanged?.addListener((changes, area) => {
             if (area === "local" && changes.pendingScramble?.newValue) {
-                applyScrambleAndSubmit(String(changes.pendingScramble.newValue || ""));
+                consumePendingScramble();
             }
         });
 
         chrome.runtime?.onMessage?.addListener((msg) => {
-            if (msg.action === "LOAD_PENDING_SCRAMBLE" && msg.scrambleText) {
-                applyScrambleAndSubmit(String(msg.scrambleText || ""));
+            if (msg.action === "LOAD_PENDING_SCRAMBLE") {
+                consumePendingScramble();
             }
         });
     }
