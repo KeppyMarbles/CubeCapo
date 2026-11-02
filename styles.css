@@ -267,6 +267,14 @@ button:hover:not(:disabled) {
   border-bottom: 1px solid var(--border);
 }
 
+.breakdown-table td.orientation-cost {
+  text-align: right;
+}
+
+.adjustment-spacer {
+  height: 8px;
+}
+
 .cubecapo-partition-boundary td {
   border-top: 2px dashed var(--border);
 }

@@ -1,4 +1,4 @@
-import { getElement, queryElementOptional } from "./dom.js";
+import { cloneTemplate, getElement, queryElement, queryElementOptional } from "./dom.js";
 /** @import { ScrambleBreakdownEntry, OrientationResultInfo, FormatOptions, ScrambleOptimizer } from "../cube/optimizer.js" */
 /** @import { ParseResult } from "../cube/parser.js" */
 
@@ -64,10 +64,7 @@ function drawDistributionChart(distribution) {
 
     const isMap = distribution instanceof Map;
     if (!isMap || distribution.size === 0) {
-        const emptyDiv = document.createElement("div");
-        emptyDiv.className = "chart-empty";
-        emptyDiv.textContent = "No stats available";
-        chartContainer.appendChild(emptyDiv);
+        chartContainer.appendChild(cloneTemplate("chartEmptyTemplate", HTMLElement));
         getElement("samples", HTMLElement).textContent = "-";
         getElement("averageCost", HTMLElement).textContent = "-";
         getElement("standardDeviation", HTMLElement).textContent = "-";
@@ -121,26 +118,20 @@ function drawDistributionChart(distribution) {
     const maxCount = Math.max(...counts);
 
     // Create the visual CSS bar chart
-    const wrapper = document.createElement("div");
-    wrapper.className = "chart-wrapper";
-
-    const barsContainer = document.createElement("div");
-    barsContainer.className = "chart-bars-container";
+    const wrapper = cloneTemplate("chartTemplate", HTMLElement);
+    const barsContainer = queryElement(wrapper, ".chart-bars-container", HTMLElement);
 
     costs.forEach((cost, idx) => {
         const count = counts[idx];
         const percent = (count / maxCount) * 100;
-        
-        const col = document.createElement("div");
-        col.className = "chart-col";
 
-        const bar = document.createElement("div");
-        bar.className = "chart-bar";
+        const col = cloneTemplate("chartColumnTemplate", HTMLElement);
+
+        const bar = queryElement(col, ".chart-bar", HTMLElement);
         bar.style.height = `${percent}%`;
         bar.title = `Cost ~${cost}: Count ${count}`;
 
-        const label = document.createElement("div");
-        label.className = "chart-label";
+        const label = queryElement(col, ".chart-label", HTMLElement);
         const step = Math.max(1, Math.floor(costs.length / 5));
         if (idx === 0) {
             label.classList.add("chart-label-first");
@@ -152,12 +143,9 @@ function drawDistributionChart(distribution) {
             label.textContent = cost;
         }
 
-        col.appendChild(bar);
-        col.appendChild(label);
         barsContainer.appendChild(col);
     });
 
-    wrapper.appendChild(barsContainer);
     chartContainer.appendChild(wrapper);
 }
 
@@ -275,44 +263,27 @@ function drawOrientationInfoTable(info) {
     let total = 0;
     for (const row of info) { //TODO sort by best cost
         total += row.iterations;
-        const tr = document.createElement("tr");
+        const tr = cloneTemplate("orientationRowTemplate", HTMLTableRowElement);
 
-        const tdRotation = document.createElement("td");
         const startRotations = [row.startingRotation?.up, row.startingRotation?.front].filter(Boolean).join(" ");
-        tdRotation.textContent = startRotations || "(none)";
+        queryElement(tr, ".orientation-rotation", HTMLElement).textContent = startRotations || "(none)";
 
-        const tdIterations = document.createElement("td");
+        const tdIterations = queryElement(tr, ".orientation-iterations", HTMLElement);
         if (row.maxed) {
             tdIterations.style.background = "#ff0000";
             tdIterations.style.color = costCellTextColor;
         }
         tdIterations.textContent = String(row.iterations);
 
-        const tdCost = document.createElement("td");
+        const tdCost = queryElement(tr, ".orientation-cost", HTMLElement);
         tdCost.style.background = costToColor(row.cost, 80, -20);
         tdCost.style.color = costCellTextColor;
-        tdCost.style.textAlign = "right";
         tdCost.textContent = String(row.cost);
 
-        tr.appendChild(tdRotation);
-        tr.appendChild(tdIterations);
-        tr.appendChild(tdCost);
         tbody.appendChild(tr);
     }
 
-    const totalRow = document.createElement("tr");
-    const tdTotalLabel = document.createElement("td");
-    tdTotalLabel.colSpan = 1;
-    const bLabel = document.createElement("b");
-    bLabel.textContent = "Total Iterations";
-    tdTotalLabel.appendChild(bLabel);
-
-    const tdTotalVal = document.createElement("td");
-    const bVal = document.createElement("b");
-    bVal.textContent = String(total);
-    tdTotalVal.appendChild(bVal);
-
-    totalRow.appendChild(tdTotalLabel);
-    totalRow.appendChild(tdTotalVal);
+    const totalRow = cloneTemplate("orientationTotalTemplate", HTMLTableRowElement);
+    queryElement(totalRow, ".orientation-total", HTMLElement).textContent = String(total);
     tbody.appendChild(totalRow);
 }

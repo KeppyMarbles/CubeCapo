@@ -34,7 +34,7 @@ scramblemanip-js/
 │   │   ├── parser.js        # ScrambleParser class: tokenization, recursive descent parsing for commutators/conjugates/groups, notation detection & normalization
 │   │   └── util.js          # Cube utility functions: normalizeScramble, getFinalOrientation, getOrientationColors, getRestoringRotation, detectCubeSize
 │   ├── ui/
-│   │   ├── dom.js           # Type-safe DOM element getters & query helpers (getElement, getOptionalElement, queryElement, queryElementOptional, queryElements)
+│   │   ├── dom.js           # Type-safe DOM element getters & query helpers (getElement, getOptionalElement, queryElement, queryElementOptional, queryElements, cloneTemplate)
 │   │   ├── form.js          # Form handler: input parsing, cost config tab setup, profile list, highlights settings the active profile overrides, autosave to the active profile
 │   │   └── stats.js         # Optimization stats: CSS bar chart, breakdown table renderer, orientation matrix, cost color mapping
 └── extension/
@@ -56,4 +56,5 @@ scramblemanip-js/
 5. Save temporary test scripts and verification files directly in the workspace `scratch/` folder so that project-relative imports (e.g. `../shared/...`) and ES module package boundaries resolve cleanly.
 6. Be mindful of scratch script runtime. Time them out after 10 seconds, or keep watch on their progress.
 7. The project is unreleased at this time, so don't write specialized migrations unless asked.
-8. Update this file if it becomes outdated or has errors.
+8. Prefer usage of HTML files for creating DOM elements. Do not inline HTML code in JS.
+9. Update this file if it becomes outdated or has errors.

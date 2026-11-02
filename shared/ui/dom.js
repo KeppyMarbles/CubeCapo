@@ -39,6 +39,25 @@ export function getOptionalElement(id, constructor) {
 }
 
 /**
+ * Clones the single root element of a <template> by ID and asserts its type constructor.
+ * @template {HTMLElement} T
+ * @param {string} id
+ * @param {new (...args: any[]) => T} constructor
+ * @returns {T}
+ */
+export function cloneTemplate(id, constructor) {
+    const template = getElement(id, HTMLTemplateElement);
+    const el = document.importNode(template.content, true).firstElementChild;
+    if (!el) {
+        throw new Error(`Template #${id} has no root element`);
+    }
+    if (!(el instanceof constructor)) {
+        throw new Error(`Template #${id} root is an instance of ${el.constructor.name}, expected ${constructor.name}`);
+    }
+    return el;
+}
+
+/**
  * Queries a required DOM element within a parent container and asserts its type constructor.
  * @template {HTMLElement} T
  * @param {ParentNode} parent 

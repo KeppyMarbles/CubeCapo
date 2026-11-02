@@ -3,7 +3,7 @@ import { costToColor } from "./stats.js";
 import { defaultCostConfiguration, defaultFormatOptions, defaultSearchOptions, defaultScrambleOptions, defaultFingertricks, defaultColorScheme, strategyPresets } from "../defaults.js";
 import { Move } from "../cube/move.js";
 import { THUMB_POSITIONS, RIGHT_FINGERTRICKS, LEFT_FINGERTRICKS, mirrorRightFingertrick, mirrorLeftFingertrick } from "../cube/evaluator.js";
-import { getElement, queryElement, queryElementOptional, queryElements } from "./dom.js";
+import { cloneTemplate, getElement, queryElement, queryElementOptional, queryElements } from "./dom.js";
 import { getStorageItem, setStorageItem, removeStorageItem, notifySettingsChanged } from "../storage.js";
 import { DEFAULT_PROFILE_NAME, CUSTOM_PROFILE_NAME, migrateConfig, persistActiveProfile, loadProfiles, saveProfiles, loadActiveProfileName, saveActiveProfileName, uniqueProfileName, parseImportedProfile, resolveProfile, createBranch, createStoredProfile, removeProfile, isOverridden } from "../profiles.js";
 /** @import { Profile, ProfileMap } from "../profiles.js" */
@@ -146,8 +146,7 @@ export async function setupForm(onSubmit, onFormatChange) {
             const groupDiv = queryElementOptional(form, `[data-group="${groupName}"]`, HTMLElement);
             if (!groupDiv || typeof groupValue !== "object" || !groupValue) continue;
 
-            const gridDiv = document.createElement("div");
-            gridDiv.className = "cost-category-grid";
+            const gridDiv = cloneTemplate("costGridTemplate", HTMLDivElement);
 
             const getColumnIndex = columnClassifiers[groupName] || (() => 0);
             /** @type {Map<number, HTMLDivElement>} */
@@ -156,33 +155,24 @@ export async function setupForm(onSubmit, onFormatChange) {
             for (const [key, val] of Object.entries(groupValue)) {
                 const colIdx = getColumnIndex(key);
                 if (!colMap.has(colIdx)) {
-                    const col = document.createElement("div");
-                    col.className = "cost-col";
-                    colMap.set(colIdx, col);
+                    colMap.set(colIdx, cloneTemplate("costColumnTemplate", HTMLDivElement));
                 }
                 const colDiv = colMap.get(colIdx);
                 if (!colDiv) continue;
 
-                const label = document.createElement("label");
-                label.textContent = formAlias[key] || key;
+                const isSelect = formTypes[key] === "select";
+                const label = cloneTemplate(isSelect ? "costSelectTemplate" : "costInputTemplate", HTMLLabelElement);
+                // Text goes before the control, which is already inside the label
+                label.prepend(formAlias[key] || key);
                 label.title = formTitles[key] || "";
 
-                if (formTypes[key] === "select") {
-                    const select = document.createElement("select");
+                if (isSelect) {
+                    const select = queryElement(label, "select", HTMLSelectElement);
                     select.name = `${groupName}.${key}`;
                     select.dataset.path = `costConfig.${groupName}.${key}`;
-                    const optRight = document.createElement("option");
-                    optRight.value = "right";
-                    optRight.textContent = "Right";
-                    const optLeft = document.createElement("option");
-                    optLeft.value = "left";
-                    optLeft.textContent = "Left";
-                    select.appendChild(optRight);
-                    select.appendChild(optLeft);
                     select.value = String(val || "right");
-                    label.appendChild(select);
                 } else {
-                    const input = document.createElement("input");
+                    const input = queryElement(label, "input", HTMLInputElement);
                     input.type = formTypes[key] || "number";
                     input.name = `${groupName}.${key}`;
                     input.dataset.path = `costConfig.${groupName}.${key}`;
@@ -193,7 +183,6 @@ export async function setupForm(onSubmit, onFormatChange) {
                         input.value = String(val);
                         input.dataset.valueType = "additive";
                     }
-                    label.appendChild(input);
                 }
                 colDiv.appendChild(label);
             }
@@ -349,7 +338,6 @@ export async function setupForm(onSubmit, onFormatChange) {
     const baselines = structuredClone(profiles);
 
     const listEl = getElement("profileList", HTMLElement);
-    const template = getElement("profileCardTemplate", HTMLTemplateElement);
     const activeProfileCard = getElement("activeProfileCard", HTMLElement);
 
     /** @param {string} name */
@@ -527,8 +515,7 @@ export async function setupForm(onSubmit, onFormatChange) {
             const isDefault = name === DEFAULT_PROFILE_NAME;
             const isModified = !isDefault && JSON.stringify(profiles[name]) !== JSON.stringify(baselines[name]);
 
-            const fragment = /** @type {DocumentFragment} */ (template.content.cloneNode(true));
-            const card = queryElement(fragment, ".profile-card", HTMLElement);
+            const card = cloneTemplate("profileCardTemplate", HTMLElement);
             card.dataset.name = name;
             card.classList.toggle("active", name === activeProfileName);
             queryElement(card, ".profile-name", HTMLElement).textContent = name;
@@ -785,59 +772,24 @@ function addGroupControls(form, groupName, controls) {
     if (!groupDiv) return;
 
     // Wrapped so the whole section can be hidden for the read-only profile
-    const adjustments = document.createElement("div");
-    adjustments.className = "adjustments";
+    const adjustments = cloneTemplate("adjustmentsTemplate", HTMLDivElement);
     groupDiv.appendChild(adjustments);
 
-    // Add a visual separator
-    const separator = document.createElement("hr");
-    separator.className = "group-separator";
-    adjustments.appendChild(separator);
+    // Controls go before the zero button, which ends the section
+    const zeroButton = queryElement(adjustments, ".btn-zero", HTMLButtonElement);
 
-    // Create a section header
-    const header = document.createElement("h4");
-    header.textContent = "Adjustments";
-    adjustments.appendChild(header);
-
-    // Create controls
     for (const ctrl of controls) {
         if (ctrl.label === "") {
-            const spacer = document.createElement("div");
-            spacer.style.height = "8px";
-            adjustments.appendChild(spacer);
+            zeroButton.before(cloneTemplate("adjustmentSpacerTemplate", HTMLDivElement));
             continue;
         }
 
-        const wrapper = document.createElement("div");
-        wrapper.className = "adjustment-row";
+        const wrapper = cloneTemplate("adjustmentRowTemplate", HTMLDivElement);
+        queryElement(wrapper, ".adjustment-label", HTMLElement).textContent = ctrl.label;
+        zeroButton.before(wrapper);
 
-        const labelSpan = document.createElement("span");
-        labelSpan.textContent = ctrl.label;
-        wrapper.appendChild(labelSpan);
-
-        const btnGroup = document.createElement("div");
-        btnGroup.className = "btn-adjust-group";
-
-        const minus = document.createElement("button");
-        minus.type = "button";
-        minus.className = "btn-adjust";
-        minus.textContent = "−";
-        minus.dataset.group = groupName;
-        minus.dataset.delta = "-0.5";
-
-        const plus = document.createElement("button");
-        plus.type = "button";
-        plus.className = "btn-adjust";
-        plus.textContent = "+";
-        plus.dataset.group = groupName;
-        plus.dataset.delta = "0.5";
-
-        btnGroup.appendChild(minus);
-        btnGroup.appendChild(plus);
-        wrapper.appendChild(btnGroup);
-        adjustments.appendChild(wrapper);
-
-        for (const btn of [minus, plus]) {
+        for (const btn of queryElements(wrapper, ".btn-adjust", HTMLButtonElement)) {
+            btn.dataset.group = groupName;
             btn.addEventListener('click', () => {
                 const delta = parseFloat(btn.dataset.delta || "0");
                 queryElements(form, `[name^="${groupName}."]`, HTMLInputElement).forEach(input => {
@@ -851,12 +803,6 @@ function addGroupControls(form, groupName, controls) {
             });
         }
     }
-
-    const zeroButton = document.createElement("button");
-    zeroButton.textContent = "Zero All";
-    zeroButton.type = "button";
-    zeroButton.className = "btn-zero";
-    adjustments.appendChild(zeroButton);
 
     zeroButton.addEventListener('click', () => {
         queryElements(form, `[name^="${groupName}."]`, HTMLInputElement).forEach(input => {
@@ -1137,27 +1083,29 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange,
         }
     };
 
-    const subtabBar = document.createElement("div");
-    subtabBar.className = "subtab-buttons";
+    const root = cloneTemplate("transitionsTemplate", HTMLDivElement);
+    const subtabBar = queryElement(root, ".subtab-buttons", HTMLDivElement);
+    const grid = queryElement(root, ".transition-grid", HTMLDivElement);
 
-    const contentContainer = document.createElement("div");
-    contentContainer.className = "transition-container";
+    /**
+     * Shows a link toggle as linked or unlinked
+     * @param {HTMLButtonElement} linkBtn
+     * @param {HTMLSelectElement} lSelect
+     * @param {boolean} isLinked
+     */
+    const setLinkAppearance = (linkBtn, lSelect, isLinked) => {
+        linkBtn.classList.toggle("linked", isLinked);
+        linkBtn.classList.toggle("unlinked", !isLinked);
+        linkBtn.title = isLinked ? "Linked to Right Hand (Mirrored). Click to unlink." : "Custom Left Hand Override. Click to relink.";
+        const icon = queryElement(linkBtn, ".icon-svg", HTMLElement);
+        icon.classList.toggle("icon-link", isLinked);
+        icon.classList.toggle("icon-unlink", !isLinked);
+        lSelect.classList.toggle("select-mirrored", isLinked);
+    };
 
     const renderCurrentGrid = () => {
-        contentContainer.replaceChildren();
+        grid.replaceChildren();
         highlights = [];
-
-        const headerRow = document.createElement("div");
-        headerRow.className = "transition-header-row";
-        for (const title of ["Move", "🤚 Left Hand", "Link", "✋ Right Hand", "Move"]) {
-            const span = document.createElement("span");
-            span.textContent = title;
-            headerRow.appendChild(span);
-        }
-        contentContainer.appendChild(headerRow);
-
-        const grid = document.createElement("div");
-        grid.className = "transition-grid";
 
         for (const { r: rMove, l: lMove } of CANONICAL_MOVE_PAIRS) {
             const rFt = currentTransitions.right[activePosition] ? currentTransitions.right[activePosition][rMove] : null;
@@ -1168,62 +1116,23 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange,
                 ? (rFt ? mirrorRightFingertrick(rFt) : null)
                 : (leftSub ? leftSub[lMove] : null);
 
-            const row = document.createElement("div");
-            row.className = "transition-row";
+            const row = cloneTemplate("transitionRowTemplate", HTMLDivElement);
+            queryElement(row, ".left-move", HTMLElement).textContent = lMove;
+            queryElement(row, ".right-move", HTMLElement).textContent = rMove;
 
-            // Left Move Label
-            const lLabel = document.createElement("span");
-            lLabel.className = "transition-move-label";
-            lLabel.textContent = lMove;
-
-            // Left Hand Select
-            const lSelect = document.createElement("select");
-            if (isLinked) lSelect.classList.add("select-mirrored");
-            const lNoneOpt = document.createElement("option");
-            lNoneOpt.value = "";
-            lNoneOpt.textContent = "None";
-            lSelect.appendChild(lNoneOpt);
-
-            for (const ft of LEFT_FINGERTRICKS) {
-                const opt = document.createElement("option");
-                opt.value = ft;
-                opt.textContent = ft;
-                lSelect.appendChild(opt);
-            }
+            const lSelect = queryElement(row, ".left-select", HTMLSelectElement);
+            lSelect.append(...LEFT_FINGERTRICKS.map(ft => new Option(ft, ft)));
             lSelect.value = resolvedLFt || "";
             lSelect.disabled = readOnly;
 
-            // Link Toggle Button
-            const linkBtn = document.createElement("button");
-            linkBtn.type = "button";
-            linkBtn.className = `btn-link-toggle ${isLinked ? "linked" : "unlinked"}`;
-            linkBtn.title = isLinked ? "Linked to Right Hand (Mirrored). Click to unlink." : "Custom Left Hand Override. Click to relink.";
-
-            const iconSpan = document.createElement("span");
-            iconSpan.className = `icon-svg ${isLinked ? "icon-link" : "icon-unlink"}`;
-            linkBtn.appendChild(iconSpan);
-            linkBtn.disabled = readOnly;
-
-            // Right Hand Select
-            const rSelect = document.createElement("select");
-            const rNoneOpt = document.createElement("option");
-            rNoneOpt.value = "";
-            rNoneOpt.textContent = "None";
-            rSelect.appendChild(rNoneOpt);
-
-            for (const ft of RIGHT_FINGERTRICKS) {
-                const opt = document.createElement("option");
-                opt.value = ft;
-                opt.textContent = ft;
-                rSelect.appendChild(opt);
-            }
+            const rSelect = queryElement(row, ".right-select", HTMLSelectElement);
+            rSelect.append(...RIGHT_FINGERTRICKS.map(ft => new Option(ft, ft)));
             rSelect.value = rFt || "";
             rSelect.disabled = readOnly;
 
-            // Right Move Label
-            const rLabel = document.createElement("span");
-            rLabel.className = "transition-move-label";
-            rLabel.textContent = rMove;
+            const linkBtn = queryElement(row, ".btn-link-toggle", HTMLButtonElement);
+            linkBtn.disabled = readOnly;
+            setLinkAppearance(linkBtn, lSelect, isLinked);
 
             // Event Listeners
             rSelect.addEventListener("change", () => {
@@ -1284,10 +1193,7 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange,
                     }
                     targetSub[lMove] = /** @type {LeftFingertrick | null} */ (lSelect.value || null);
 
-                    iconSpan.className = "icon-svg icon-unlink";
-                    linkBtn.className = "btn-link-toggle unlinked";
-                    linkBtn.title = "Custom Left Hand Override. Click to relink.";
-                    lSelect.classList.remove("select-mirrored");
+                    setLinkAppearance(linkBtn, lSelect, false);
                 } else {
                     // Relink: delete override
                     const leftSub = currentTransitions.left ? currentTransitions.left[activePosition] : undefined;
@@ -1299,19 +1205,10 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange,
                     const mirrored = currentRightVal ? mirrorRightFingertrick(currentRightVal) : null;
                     lSelect.value = mirrored || "";
 
-                    iconSpan.className = "icon-svg icon-link";
-                    linkBtn.className = "btn-link-toggle linked";
-                    linkBtn.title = "Linked to Right Hand (Mirrored). Click to unlink.";
-                    lSelect.classList.add("select-mirrored");
+                    setLinkAppearance(linkBtn, lSelect, true);
                 }
                 onTransitionChange();
             });
-
-            row.appendChild(lLabel);
-            row.appendChild(lSelect);
-            row.appendChild(linkBtn);
-            row.appendChild(rSelect);
-            row.appendChild(rLabel);
 
             highlights.push({ elements: [rSelect], path: `transitionConfig.right.${activePosition}.${rMove}` });
             highlights.push({ elements: [lSelect, linkBtn], path: `transitionConfig.left.${activePosition}.${lMove}` });
@@ -1319,14 +1216,12 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange,
             grid.appendChild(row);
         }
 
-        contentContainer.appendChild(grid);
         refreshHighlights();
     };
 
     THUMB_POSITIONS.forEach(pos => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = `subtab-btn ${pos === activePosition ? "active" : ""}`;
+        const btn = cloneTemplate("subtabButtonTemplate", HTMLButtonElement);
+        btn.classList.toggle("active", pos === activePosition);
         btn.textContent = pos;
         btn.addEventListener("click", () => {
             activePosition = pos;
@@ -1337,8 +1232,7 @@ function renderTransitionsTab(container, currentTransitions, onTransitionChange,
         subtabBar.appendChild(btn);
     });
 
-    container.appendChild(subtabBar);
-    container.appendChild(contentContainer);
+    container.append(...root.children);
     renderCurrentGrid();
     return refreshHighlights;
 }

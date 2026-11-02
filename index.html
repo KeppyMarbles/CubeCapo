@@ -282,6 +282,111 @@
     </div>
   </template>
 
+  <template id="chartTemplate">
+    <div class="chart-wrapper">
+      <div class="chart-bars-container"></div>
+    </div>
+  </template>
+
+  <template id="chartEmptyTemplate">
+    <div class="chart-empty">No stats available</div>
+  </template>
+
+  <template id="chartColumnTemplate">
+    <div class="chart-col">
+      <div class="chart-bar"></div>
+      <div class="chart-label"></div>
+    </div>
+  </template>
+
+  <template id="orientationRowTemplate">
+    <tr>
+      <td class="orientation-rotation"></td>
+      <td class="orientation-iterations"></td>
+      <td class="orientation-cost"></td>
+    </tr>
+  </template>
+
+  <template id="orientationTotalTemplate">
+    <tr>
+      <td><b>Total Iterations</b></td>
+      <td><b class="orientation-total"></b></td>
+    </tr>
+  </template>
+
+  <template id="costGridTemplate">
+    <div class="cost-category-grid"></div>
+  </template>
+
+  <template id="costColumnTemplate">
+    <div class="cost-col"></div>
+  </template>
+
+  <template id="costInputTemplate">
+    <label><input></label>
+  </template>
+
+  <template id="costSelectTemplate">
+    <label>
+      <select>
+        <option value="right">Right</option>
+        <option value="left">Left</option>
+      </select>
+    </label>
+  </template>
+
+  <template id="adjustmentsTemplate">
+    <div class="adjustments">
+      <hr class="group-separator">
+      <h4>Adjustments</h4>
+      <button type="button" class="btn-zero">Zero All</button>
+    </div>
+  </template>
+
+  <template id="adjustmentRowTemplate">
+    <div class="adjustment-row">
+      <span class="adjustment-label"></span>
+      <div class="btn-adjust-group">
+        <button type="button" class="btn-adjust" data-delta="-0.5">−</button>
+        <button type="button" class="btn-adjust" data-delta="0.5">+</button>
+      </div>
+    </div>
+  </template>
+
+  <template id="adjustmentSpacerTemplate">
+    <div class="adjustment-spacer"></div>
+  </template>
+
+  <template id="transitionsTemplate">
+    <div class="transitions-root">
+      <div class="subtab-buttons"></div>
+      <div class="transition-container">
+        <div class="transition-header-row">
+          <span>Move</span>
+          <span>🤚 Left Hand</span>
+          <span>Link</span>
+          <span>✋ Right Hand</span>
+          <span>Move</span>
+        </div>
+        <div class="transition-grid"></div>
+      </div>
+    </div>
+  </template>
+
+  <template id="subtabButtonTemplate">
+    <button type="button" class="subtab-btn"></button>
+  </template>
+
+  <template id="transitionRowTemplate">
+    <div class="transition-row">
+      <span class="transition-move-label left-move"></span>
+      <select class="left-select"><option value="">None</option></select>
+      <button type="button" class="btn-link-toggle"><span class="icon-svg"></span></button>
+      <select class="right-select"><option value="">None</option></select>
+      <span class="transition-move-label right-move"></span>
+    </div>
+  </template>
+
   <script type="module" src="main.js"></script>
 </body>
 </html>
