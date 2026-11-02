@@ -47,6 +47,30 @@
     border-radius: 4px;
 }
 
+.cubecapo-badge.cubecapo-badge-error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.cubecapo-badge.cubecapo-badge-muted {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+body[style*="background-color: rgb(0, 0, 0)"] .cubecapo-badge.cubecapo-badge-muted,
+body[style*="background-color: black"] .cubecapo-badge.cubecapo-badge-muted,
+body.dark .cubecapo-badge.cubecapo-badge-muted {
+    background: #1e293b;
+    color: #cbd5e1;
+}
+
+body[style*="background-color: rgb(0, 0, 0)"] .cubecapo-badge.cubecapo-badge-error,
+body[style*="background-color: black"] .cubecapo-badge.cubecapo-badge-error,
+body.dark .cubecapo-badge.cubecapo-badge-error {
+    background: #7f1d1d;
+    color: #fecaca;
+}
+
 .cubecapo-optimized-scramble {
     font-weight: 600;
     font-size: 14px;

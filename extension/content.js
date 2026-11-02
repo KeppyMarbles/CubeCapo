@@ -82,8 +82,6 @@ async function findScrambleElement() {
     return null;
 }
 
-let lastOptimizedText = "";
-
 /**
  * Triggers background optimization for a scramble element and manages UI state.
  * @param {Element} element - Target scramble DOM element.
@@ -110,36 +108,82 @@ async function processScramble(element) {
     if (text === lastOriginalText) return;
 
     lastOriginalText = text;
-    lastOptimizedText = "";
     isShowingOptimized = true;
 
     showOptimizingState(element);
 
-    // Send to background optimizer worker
-    extAPI.runtime.sendMessage(
-        {
-            action: "OPTIMIZE_SCRAMBLE",
-            scrambleText: text
-        },
-        /**
-         * @param {OptimizationResult} response
-         */
-        async (response) => {
-            if (extAPI.runtime.lastError) {
-                console.warn("[Cube Capo] Chrome extension message error:", extAPI.runtime.lastError);
-                hideIndicator();
-                return;
+    try {
+        // Send to background optimizer worker
+        extAPI.runtime.sendMessage(
+            {
+                action: "OPTIMIZE_SCRAMBLE",
+                scrambleText: text
+            },
+            /**
+             * @param {OptimizationResult} response
+             */
+            async (response) => {
+                try {
+                    if (extAPI.runtime.lastError) {
+                        throw new Error(extAPI.runtime.lastError.message);
+                    }
+                    if (response && response.success) {
+                        console.log("[Cube Capo] Optimization success:", response.bestScrambleStr);
+                        showOptimizedState(element, response);
+                    } else {
+                        const reason = response ? response.error : "No response";
+                        console.log("[Cube Capo] Scramble ignored or not supported:", reason);
+                        showBanner(element, `Cube Capo: unknown scramble type`, false);
+                    }
+                } catch (err) {
+                    showErrorState(element, err);
+                }
             }
-            if (response && response.success) {
-                console.log("[Cube Capo] Optimization success:", response.bestScrambleStr);
-                lastOptimizedText = response.bestScrambleStr || "";
-                showOptimizedState(element, response);
-            } else {
-                console.log("[Cube Capo] Scramble ignored or not supported:", response ? response.error : "No response");
-                hideIndicator();
-            }
-        }
+        );
+    } catch (err) {
+        // sendMessage throws synchronously when the extension context was invalidated (e.g. extension reloaded)
+        showErrorState(element, err);
+    }
+}
+
+/**
+ * Restores the original scramble text and shows an error banner above it.
+ * @param {Element} scrambleElement - Target scramble DOM element.
+ * @param {unknown} err - The error that occurred.
+ */
+function showErrorState(scrambleElement, err) {
+    console.error("[Cube Capo] Error:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    const isInvalidated = message.includes("Extension context invalidated");
+    showBanner(
+        scrambleElement,
+        isInvalidated ? "Cube Capo was updated or reloaded. Refresh this page." : `Cube Capo error: ${message}`,
+        true
     );
+}
+
+/**
+ * Restores the original scramble text and shows a banner above it.
+ * @param {Element} scrambleElement - Target scramble DOM element.
+ * @param {string} text - Banner message.
+ * @param {boolean} isError - Whether to use the error style instead of the neutral one.
+ */
+function showBanner(scrambleElement, text, isError) {
+    hideIndicator();
+
+    const bar = document.createElement("div");
+    bar.id = "cubecapo-indicator";
+    bar.className = "cubecapo-indicator-bar";
+    bar.addEventListener("click", (/** @type {Event} */ e) => e.stopPropagation());
+
+    const badge = document.createElement("span");
+    badge.className = isError ? "cubecapo-badge cubecapo-badge-error" : "cubecapo-badge cubecapo-badge-muted";
+    badge.textContent = text;
+    bar.appendChild(badge);
+
+    if (scrambleElement.parentNode) {
+        scrambleElement.parentNode.insertBefore(bar, scrambleElement);
+    }
 }
 
 /**
@@ -450,7 +494,6 @@ function stopMonitoring() {
         scrambleObserver = null;
     }
     lastOriginalText = "";
-    lastOptimizedText = "";
     targetElement = null;
 }
 
