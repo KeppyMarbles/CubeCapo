@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Cube Capo** (also referenced as `scramblemanip-js`) is a JavaScript application and WebExtension tool designed to analyze Rubik's Cube scrambles and generate ergonomics-optimized, transposed scrambles with fingertrick and regrip details.
+**Cube Capo** (also referenced as `scramblemanip-js`) is a JavaScript application and WebExtension tool designed to analyze Rubik's Cube scrambles and generate ergonomics-optimized, transposed scrambles with fingertrick and regrip details. It is formatted as a static page with no build step, for GitHub Pages compatibility.
 
 The tool parses scrambles, searches starting cube orientations and starting thumb placements (grips), evaluates transition costs using customizable fingertrick and grip penalty parameters, and replaces movements (e.g. replacing normal turns with wide moves or prime variations) to discover the path with the lowest overall cost while maintaining functional equivalence.
 

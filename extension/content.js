@@ -78,31 +78,8 @@ async function findScrambleElement() {
         } catch (err) {
             console.error(`[Cube Capo] Invalid saved selector '${savedSelector}':`, err);
         }
-    } else {
-        console.log(`[Cube Capo] No saved selector for host '${location.hostname}'.`);
     }
     return null;
-}
-
-/**
- * Safe utility to modify scramble element text content in place.
- * Disconnects the observer during mutation to prevent mutation loops.
- * @param {Element} element - Target scramble DOM element.
- * @param {string} text - New text content.
- * @returns {Promise<void>}
- */
-async function updateScrambleText(element, text) {
-    if (scrambleObserver) {
-        scrambleObserver.disconnect();
-    }
-    element.textContent = text;
-    if (scrambleObserver) {
-        scrambleObserver.observe(element, {
-            characterData: true,
-            childList: true,
-            subtree: true
-        });
-    }
 }
 
 let lastOptimizedText = "";
@@ -461,8 +438,6 @@ async function startMonitoring() {
 
         // Run immediately
         processScramble(targetElement);
-    } else {
-        console.log("[Cube Capo] Target scramble element not found in DOM.");
     }
 }
 
