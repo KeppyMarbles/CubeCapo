@@ -386,11 +386,7 @@ export class ScrambleOptimizer {
         if (this.iterations >= options.maxIterations) {
             return;
         }
-        const bestCost = this.candidates[0]?.cost ?? Infinity;
-        if (options.pruneStartingOrientations && cost > bestCost + options.depth) {
-            return;
-        }
-        if (cost > ctx.minCost + options.depth) {
+        if (this.isOverBound(ctx, cost)) {
             return;
         }
         if (index >= ctx.endIndex) {
@@ -440,6 +436,21 @@ export class ScrambleOptimizer {
     }
 
     /**
+     * Checks if a branch costs too much to tie or beat the best found, within the search depth.
+     * @param {SearchContext} ctx
+     * @param {number} cost
+     * @returns {boolean}
+     */
+    isOverBound(ctx, cost) {
+        const options = this.options;
+        if (cost > ctx.minCost + options.depth) {
+            return true;
+        }
+        const bestCost = this.candidates[0]?.cost ?? Infinity;
+        return options.pruneStartingOrientations && cost > bestCost + options.depth;
+    }
+
+    /**
      * Continues the search from a wide version of the current move, which also rotates the cube.
      * @param {SearchContext} ctx
      * @param {number} index
@@ -480,6 +491,10 @@ export class ScrambleOptimizer {
         const stepOptions = this.getStepOptions(variantIndex, alpha, gripIndex);
         for (let i = 0; i < stepOptions.length; i++) {
             const option = stepOptions[i];
+            // Same check search makes on entry; skipping the call here avoids its overhead for the many children that fail it
+            if (this.isOverBound(ctx, cost + option.cost)) {
+                continue;
+            }
             this.pathVariants[pathLength] = variantIndex;
             this.pathAlphas[pathLength] = alpha;
             this.pathTransitions[pathLength] = option.transition;
