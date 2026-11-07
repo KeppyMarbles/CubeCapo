@@ -818,6 +818,11 @@ summary {
   cursor: not-allowed;
 }
 
+/* Fingertrick costs the execution config doesn't use */
+.cost-form label.unused {
+  color: color-mix(in srgb, currentColor 40%, transparent);
+}
+
 /* Transitions Tab Styles */
 .subtab-buttons {
   display: flex;

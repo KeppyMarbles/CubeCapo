@@ -12,6 +12,8 @@ import { Move, ALPHA_COUNT, ALPHA_INDEXES } from "./move.js";
  *   | "ring"
  *   | "ring_middle"
  *   | "ring_push"
+ *   | "pinky"
+ *   | "pinky_ring"
  *   | "middle"
  *   | "middle_push"
  *   | "thumb"
@@ -112,6 +114,8 @@ const RIGHT_TO_LEFT_FINGERTRICK = Object.freeze({
     "right_ring":         "left_ring",
     "right_ring_middle":  "left_ring_middle",
     "right_ring_push":    "left_ring_push",
+    "right_pinky":        "left_pinky",
+    "right_pinky_ring":   "left_pinky_ring",
     "right_middle":       "left_middle",
     "right_middle_push":  "left_middle_push",
     "right_thumb":        "left_thumb",
@@ -126,10 +130,10 @@ const LEFT_TO_RIGHT_FINGERTRICK = Object.freeze(/** @type {Record<LeftFingertric
     Object.fromEntries(Object.entries(RIGHT_TO_LEFT_FINGERTRICK).map(([r, l]) => [l, r]))
 ));
 
-/** @type {readonly RightFingertrick[]} List of all 14 right-hand fingertricks */
+/** @type {readonly RightFingertrick[]} List of all 16 right-hand fingertricks */
 export const RIGHT_FINGERTRICKS = Object.freeze(/** @type {readonly RightFingertrick[]} */ (Object.keys(RIGHT_TO_LEFT_FINGERTRICK)));
 
-/** @type {readonly LeftFingertrick[]} List of all 14 left-hand fingertricks */
+/** @type {readonly LeftFingertrick[]} List of all 16 left-hand fingertricks */
 export const LEFT_FINGERTRICKS = Object.freeze(/** @type {readonly LeftFingertrick[]} */ (Object.values(RIGHT_TO_LEFT_FINGERTRICK)));
 
 /**

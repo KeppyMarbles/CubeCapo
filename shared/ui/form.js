@@ -302,13 +302,29 @@ export async function setupForm(onSubmit, onFormatChange) {
     // Controls that edit the active profile; these are disabled for the read-only Default profile
     const PROFILE_CONTROLS = "#mainTabStrategy :is(input, select, button), #mainTabPenalties :is(input, select, .btn-adjust, .btn-zero), #mainTabFormat :is(input, select)";
 
+    let isReadOnly = false;
+
+    // Fingertrick costs only matter for the fingertricks the execution config uses
+    const updateUnusedFingertricks = () => {
+        const used = getUsedFingertricks(currentTransitions);
+        for (const input of queryElements(form, '[name^="fingertrick."]', HTMLInputElement)) {
+            const key = input.name.split(".")[1];
+            const unused = HAND_FINGERTRICKS.has(key) && !used.has(key);
+            input.disabled = isReadOnly || unused;
+            input.title = unused ? "Not used by the Execution configuration" : "";
+            input.closest("label")?.classList.toggle("unused", unused);
+        }
+    };
+
     /** @param {boolean} readOnly */
     const updateReadOnly = (readOnly) => {
+        isReadOnly = readOnly;
         for (const el of queryElements(form, PROFILE_CONTROLS, HTMLElement))
             el.toggleAttribute("disabled", readOnly);
         getElement("readOnlyNotice", HTMLElement).classList.toggle("hidden", !readOnly);
         form.classList.toggle("read-only", readOnly);
         refreshTransitionHighlights = renderTransitionsTab(transitionsTabEl, currentTransitions, () => handleSettingsChange(), readOnly, isPathOverridden);
+        updateUnusedFingertricks();
     };
 
     /**
@@ -390,6 +406,7 @@ export async function setupForm(onSubmit, onFormatChange) {
 
     // Called whenever a profile setting is edited
     const handleSettingsChange = () => {
+        updateUnusedFingertricks();
         if (activeProfileName === DEFAULT_PROFILE_NAME) return;
 
         const profile = collectProfile();
@@ -642,12 +659,13 @@ export async function setupForm(onSubmit, onFormatChange) {
         { label: "Index Finger", targets: ["right_index", "right_index_push", "right_index_front", "right_index_middle", "left_index", "left_index_push", "left_index_front", "left_index_middle"]},
         { label: "Middle Finger", targets: ["right_middle", "right_middle_push", "left_middle", "left_middle_push"]},
         { label: "Ring Finger", targets: ["right_ring", "right_ring_middle", "right_ring_push", "left_ring", "left_ring_middle", "left_ring_push"]},
+        { label: "Pinky Finger", targets: ["right_pinky", "right_pinky_ring", "left_pinky", "left_pinky_ring"]},
         { label: "Thumbs", targets: ["right_thumb", "left_thumb"]},
         { label: "Twist Up", targets: ["right_up", "right_up_double", "left_up", "left_up_double"]},
         { label: "Twist Down", targets: ["right_down", "right_down_double", "left_down", "left_down_double"]},
         { label: "", targets: []},
-        { label: "Right Hand", targets: ["right_index", "right_index_push", "right_index_front", "right_index_middle", "right_middle", "right_middle_push", "right_ring", "right_ring_middle", "right_ring_push", "right_thumb", "right_up", "right_up_double", "right_down", "right_down_double"]},
-        { label: "Left Hand", targets: ["left_index", "left_index_push", "left_index_front", "left_index_middle", "left_middle", "left_middle_push", "left_ring", "left_ring_middle", "left_ring_push", "left_thumb", "left_up", "left_up_double", "left_down", "left_down_double"]},
+        { label: "Right Hand", targets: ["right_index", "right_index_push", "right_index_front", "right_index_middle", "right_middle", "right_middle_push", "right_ring", "right_ring_middle", "right_ring_push", "right_pinky", "right_pinky_ring", "right_thumb", "right_up", "right_up_double", "right_down", "right_down_double"]},
+        { label: "Left Hand", targets: ["left_index", "left_index_push", "left_index_front", "left_index_middle", "left_middle", "left_middle_push", "left_ring", "left_ring_middle", "left_ring_push", "left_pinky", "left_pinky_ring", "left_thumb", "left_up", "left_up_double", "left_down", "left_down_double"]},
         { label: "", targets: []},
         { label: "Rotations", targets: ["rotation", "rotation_double"]},
     ]);
@@ -1060,6 +1078,33 @@ const CANONICAL_MOVE_PAIRS = Object.freeze(
         })
     )
 );
+
+/** Hand fingertricks the execution config can use; other fingertrick costs (rotations) always apply */
+const HAND_FINGERTRICKS = new Set([...RIGHT_FINGERTRICKS, ...LEFT_FINGERTRICKS].map(String));
+
+/**
+ * Which fingertricks the execution configuration can produce, for either hand
+ * @param {TransitionConfig} transitions
+ * @returns {Set<string>}
+ */
+function getUsedFingertricks(transitions) {
+    /** @type {Set<string>} */
+    const used = new Set();
+    for (const position of THUMB_POSITIONS) {
+        const rightSub = transitions.right[position];
+        const leftSub = transitions.left?.[position];
+        for (const { r, l } of CANONICAL_MOVE_PAIRS) {
+            const rFt = rightSub?.[r];
+            if (rFt) used.add(rFt);
+            // A left entry that isn't set mirrors the right hand
+            const lFt = leftSub?.[l];
+            if (lFt) used.add(lFt);
+            else if (lFt === undefined && rFt) used.add(mirrorRightFingertrick(rFt));
+        }
+    }
+    return used;
+}
+
 /**
  * Renders the Transitions tab in the configuration form
  * @param {HTMLElement} container
