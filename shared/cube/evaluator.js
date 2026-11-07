@@ -17,10 +17,10 @@ import { Move, ALPHA_COUNT, ALPHA_INDEXES } from "./move.js";
  *   | "middle"
  *   | "middle_push"
  *   | "thumb"
- *   | "up"
- *   | "up_double"
- *   | "down"
- *   | "down_double"
+ *   | "twist_up"
+ *   | "twist_up_double"
+ *   | "twist_down"
+ *   | "twist_down_double"
  * )} FingerAction
  */
 
@@ -119,10 +119,10 @@ const RIGHT_TO_LEFT_FINGERTRICK = Object.freeze({
     "right_middle":       "left_middle",
     "right_middle_push":  "left_middle_push",
     "right_thumb":        "left_thumb",
-    "right_up":           "left_up",
-    "right_up_double":    "left_up_double",
-    "right_down":         "left_down",
-    "right_down_double":  "left_down_double",
+    "right_twist_up":           "left_twist_up",
+    "right_twist_up_double":    "left_twist_up_double",
+    "right_twist_down":         "left_twist_down",
+    "right_twist_down_double":  "left_twist_down_double",
 });
 
 /** @type {Record<LeftFingertrick, RightFingertrick>} */
@@ -156,18 +156,18 @@ export function mirrorLeftFingertrick(ft) {
 
 /** @type {Partial<Record<FingerAction, Record<ThumbPosition, ThumbPosition | null>>>} */
 const WRIST_TRANSITIONS = Object.freeze({
-    "up":          { "Bd": "D",  "D": "F",  "F": "U",  "U": "Bu", "Bu": null },
-    "down":        { "Bu": "U",  "U": "F",  "F": "D",  "D": "Bd", "Bd": null },
-    "up_double":   { "Bd": "F",  "D": "U",  "F": "Bu", "U": null, "Bu": null },
-    "down_double": { "Bu": "F",  "U": "D",  "F": "Bd", "D": null, "Bd": null },
+    "twist_up":          { "Bd": "D",  "D": "F",  "F": "U",  "U": "Bu", "Bu": null },
+    "twist_down":        { "Bu": "U",  "U": "F",  "F": "D",  "D": "Bd", "Bd": null },
+    "twist_up_double":   { "Bd": "F",  "D": "U",  "F": "Bu", "U": null, "Bu": null },
+    "twist_down_double": { "Bu": "F",  "U": "D",  "F": "Bd", "D": null, "Bd": null },
 });
 
 /** @type {Partial<Record<RotationStr, FingerAction>>} */
 const X_ROTATION_ACTIONS = Object.freeze({
-    "x": "up",
-    "x'": "down",
-    "x2": "up_double",
-    "x2'": "down_double"
+    "x": "twist_up",
+    "x'": "twist_down",
+    "x2": "twist_up_double",
+    "x2'": "twist_down_double"
 });
 
 /** @type {Record<ThumbPosition, { next: ThumbPosition, regrip: boolean }>} */
